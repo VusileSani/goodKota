@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#14100c" />
+  <title>GoodKota · Independent Marketplace Prototype</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <button class="brand" data-route="customer" aria-label="Go to customer view">
+      <span class="brand-mark">GK</span>
+      <span>
+        <strong>GoodKota</strong>
+        <small>Local flavour. One marketplace.</small>
+      </span>
+    </button>
+
+    <nav class="role-nav" aria-label="Prototype views">
+      <button class="nav-button active" data-route="customer">Customer</button>
+      <button class="nav-button" data-route="merchant">Merchant</button>
+      <button class="nav-button" data-route="admin">GoodKota Admin</button>
+    </nav>
+  </header>
+
+  <main class="shell">
+    <section id="customerView" class="view active">
+      <section class="hero">
+        <div class="hero-copy">
+          <span class="eyebrow">Good food, close to home</span>
+          <h1>Find your next kota.</h1>
+          <p>Discover independent kota stores, order ahead, choose collection or delivery, and follow your order from acceptance to completion.</p>
+          <div class="hero-search">
+            <label class="field compact">
+              <span>Your area</span>
+              <input id="customerLocation" value="Midrand" placeholder="Midrand, Tembisa, Centurion..." />
+            </label>
+            <button id="findStoresButton" class="button primary">Find stores</button>
+          </div>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <div class="hero-kota">🥪</div>
+          <div class="hero-note">Made local.<br />Ordered simply.</div>
+        </div>
+      </section>
+
+      <section class="section-block">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Nearby merchants</span>
+            <h2>Choose a store</h2>
+          </div>
+          <span id="merchantCount" class="muted"></span>
+        </div>
+        <div id="merchantCards" class="merchant-grid"></div>
+      </section>
+
+      <section id="storefrontSection" class="storefront-section">
+        <div id="storefrontHeader" class="storefront-header card"></div>
+
+        <div class="storefront-grid">
+          <section>
+            <div class="menu-toolbar">
+              <div id="categoryChips" class="chip-row"></div>
+              <label class="search-box">
+                <span class="sr-only">Search menu</span>
+                <input id="menuSearch" placeholder="Search this menu..." />
+              </label>
+            </div>
+            <div id="menuGrid" class="menu-grid"></div>
+          </section>
+
+          <aside class="cart-panel card">
+            <div class="cart-title">
+              <div>
+                <span class="eyebrow">Your order</span>
+                <h3>Cart</h3>
+              </div>
+              <span id="cartCount" class="pill">0 items</span>
+            </div>
+
+            <div class="segmented" id="fulfilmentSelector">
+              <button data-fulfilment="COLLECTION" class="active">Collection</button>
+              <button data-fulfilment="DELIVERY">Delivery</button>
+            </div>
+
+            <div id="cartLines" class="cart-lines"></div>
+            <div id="cartTotals" class="totals"></div>
+            <button id="checkoutButton" class="button primary full">Checkout</button>
+          </aside>
+        </div>
+      </section>
+
+      <section class="section-block">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Order tracking</span>
+            <h2>Recent demo orders</h2>
+          </div>
+        </div>
+        <div id="customerOrders" class="order-stack"></div>
+      </section>
+    </section>
+
+    <section id="merchantView" class="view">
+      <div class="view-heading">
+        <div>
+          <span class="eyebrow">Merchant workspace</span>
+          <h1>Run today's service.</h1>
+          <p class="muted">Orders, catalogue and store availability in one place.</p>
+        </div>
+        <label class="field merchant-picker">
+          <span>Demo merchant</span>
+          <select id="merchantWorkspaceSelect"></select>
+        </label>
+      </div>
+
+      <div id="merchantIdentityCard" class="card"></div>
+      <div id="merchantStats" class="stats-grid"></div>
+
+      <section class="section-block">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Live service</span>
+            <h2>Order queue</h2>
+          </div>
+        </div>
+        <div id="merchantOrders" class="order-stack"></div>
+      </section>
+
+      <section class="section-block">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Catalogue</span>
+            <h2>Menu items</h2>
+          </div>
+          <button id="addMenuItemButton" class="button dark">+ Add item</button>
+        </div>
+        <div id="merchantCatalogue" class="table-card"></div>
+      </section>
+    </section>
+
+    <section id="adminView" class="view">
+      <div class="view-heading">
+        <div>
+          <span class="eyebrow">Marketplace control</span>
+          <h1>GoodKota Admin.</h1>
+          <p class="muted">Merchant health, subscriptions, promotions and marketplace orders.</p>
+        </div>
+        <button id="resetDemoButton" class="button ghost">Reset demo data</button>
+      </div>
+
+      <div id="adminStats" class="stats-grid"></div>
+
+      <section class="section-block">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Merchant network</span>
+            <h2>Merchants</h2>
+          </div>
+          <button id="addMerchantButton" class="button dark">+ Add merchant</button>
+        </div>
+        <div id="adminMerchants" class="table-card"></div>
+      </section>
+
+      <section class="admin-two-column section-block">
+        <div>
+          <div class="section-heading compact-heading">
+            <div>
+              <span class="eyebrow">Growth tools</span>
+              <h2>Promotions</h2>
+            </div>
+            <button id="addPromoButton" class="button dark small">+ Add</button>
+          </div>
+          <div id="adminPromos" class="table-card"></div>
+        </div>
+
+        <div>
+          <div class="section-heading compact-heading">
+            <div>
+              <span class="eyebrow">Business model</span>
+              <h2>Subscription plans</h2>
+            </div>
+          </div>
+          <div id="subscriptionPlans" class="plan-grid"></div>
+        </div>
+      </section>
+
+      <section class="section-block">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Platform activity</span>
+            <h2>All orders</h2>
+          </div>
+        </div>
+        <div id="adminOrders" class="table-card"></div>
+      </section>
+    </section>
+  </main>
+
+  <footer>
+    <strong>GoodKota V1.0</strong>
+    <span>Independent prototype · Browser-local demo data · Payments simulated</span>
+  </footer>
+
+  <div id="checkoutModal" class="modal" aria-hidden="true">
+    <div class="modal-card large">
+      <div class="modal-heading">
+        <div>
+          <span class="eyebrow">Complete order</span>
+          <h2>Checkout</h2>
+        </div>
+        <button class="icon-button" data-close-modal="checkoutModal">✕</button>
+      </div>
+
+      <div class="form-grid">
+        <label class="field"><span>Name</span><input id="checkoutName" value="Demo Customer" /></label>
+        <label class="field"><span>Mobile number</span><input id="checkoutPhone" value="071 000 0000" /></label>
+        <label class="field"><span>Order timing</span>
+          <select id="orderTiming">
+            <option value="ASAP">As soon as possible</option>
+            <option value="SCHEDULED">Schedule for later</option>
+          </select>
+        </label>
+        <label id="scheduleField" class="field hidden"><span>Scheduled time</span><input id="scheduledAt" type="datetime-local" /></label>
+        <label id="deliveryAddressField" class="field full-span hidden"><span>Delivery address</span><input id="deliveryAddress" placeholder="Street / complex / suburb" /></label>
+        <label class="field"><span>Promo code</span><input id="promoCode" placeholder="Try KOTA10" /></label>
+        <label class="field"><span>Tip</span>
+          <select id="tipPercent">
+            <option value="0">No tip</option>
+            <option value="5">5%</option>
+            <option value="10">10%</option>
+            <option value="15">15%</option>
+          </select>
+        </label>
+        <label class="field full-span"><span>Order notes</span><textarea id="orderNotes" rows="3" placeholder="No onions, extra sauce..."></textarea></label>
+      </div>
+
+      <div id="checkoutSummary" class="checkout-summary"></div>
+      <button id="placeOrderButton" class="button primary full">Place demo order</button>
+      <p class="fine-print">Prototype only. No real payment information is collected or processed.</p>
+    </div>
+  </div>
+
+  <div id="menuItemModal" class="modal" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-heading">
+        <div><span class="eyebrow">Merchant catalogue</span><h2>Add menu item</h2></div>
+        <button class="icon-button" data-close-modal="menuItemModal">✕</button>
+      </div>
+      <div class="form-grid">
+        <label class="field"><span>Name</span><input id="menuItemName" /></label>
+        <label class="field"><span>Price (R)</span><input id="menuItemPrice" type="number" min="0" step="0.01" /></label>
+        <label class="field"><span>Category</span><input id="menuItemCategory" value="Kotas" /></label>
+        <label class="field"><span>Icon</span><input id="menuItemEmoji" value="🥪" maxlength="4" /></label>
+        <label class="field full-span"><span>Description</span><textarea id="menuItemDescription" rows="3"></textarea></label>
+      </div>
+      <button id="saveMenuItemButton" class="button primary full">Save item</button>
+    </div>
+  </div>
+
+  <div id="merchantModal" class="modal" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-heading">
+        <div><span class="eyebrow">Marketplace onboarding</span><h2>Add merchant</h2></div>
+        <button class="icon-button" data-close-modal="merchantModal">✕</button>
+      </div>
+      <div class="form-grid">
+        <label class="field"><span>Store name</span><input id="merchantName" /></label>
+        <label class="field"><span>Area</span><input id="merchantLocation" /></label>
+        <label class="field"><span>Preparation time (min)</span><input id="merchantPrep" type="number" value="20" min="1" /></label>
+        <label class="field"><span>Delivery fee (R)</span><input id="merchantDeliveryFee" type="number" value="25" min="0" step="0.01" /></label>
+        <label class="field"><span>Minimum order (R)</span><input id="merchantMinimum" type="number" value="30" min="0" step="0.01" /></label>
+        <label class="field"><span>Subscription plan</span><select id="merchantPlan"></select></label>
+      </div>
+      <button id="saveMerchantButton" class="button primary full">Create merchant</button>
+    </div>
+  </div>
+
+  <div id="promoModal" class="modal" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-heading">
+        <div><span class="eyebrow">Marketplace promotion</span><h2>Add promo</h2></div>
+        <button class="icon-button" data-close-modal="promoModal">✕</button>
+      </div>
+      <div class="form-grid">
+        <label class="field"><span>Code</span><input id="promoNewCode" placeholder="KOTA10" /></label>
+        <label class="field"><span>Discount %</span><input id="promoDiscount" type="number" min="1" max="100" value="10" /></label>
+        <label class="field"><span>Minimum spend (R)</span><input id="promoMinimum" type="number" min="0" value="50" /></label>
+        <label class="field"><span>Status</span><select id="promoStatus"><option value="ACTIVE">Active</option><option value="DISABLED">Disabled</option></select></label>
+      </div>
+      <button id="savePromoButton" class="button primary full">Save promo</button>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

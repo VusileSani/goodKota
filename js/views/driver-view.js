@@ -2,9 +2,9 @@ import { escapeHtml, formatDateTime } from "../core/utils.js";
 import { currentDriverLocation, deliveryProgress, deliveryStatusLabel, nextDriverStatus, trackingEvents } from "../services/delivery-service.js";
 
 const ACTION_LABELS = {
-  assigned: "Start towards outlet",
-  driver_to_outlet: "Arrived at outlet",
-  at_outlet: "Confirm pickup",
+  assigned: "Start towards merchant",
+  driver_to_pickup: "Arrived at merchant",
+  at_pickup: "Confirm pickup",
   picked_up: "Start delivery",
   en_route: "I'm near the customer"
 };
@@ -16,7 +16,7 @@ export function renderDriverView(app) {
   const vehicle = app.store.vehicle(driver.vehicleId);
   const task = driver.activeTaskId ? app.store.deliveryTask(driver.activeTaskId) : null;
   const order = task ? app.store.state.orders.find(item => item.id === task.orderId) : null;
-  const outlet = task ? app.store.outlet(task.outletId) : null;
+  const merchant = task ? app.store.merchant(task.merchantId) : null;
   const location = currentDriverLocation(app.store.state, driver.id);
   const events = task ? trackingEvents(app.store.state, task.id).slice(-5).reverse() : [];
 
@@ -47,7 +47,7 @@ export function renderDriverView(app) {
       </div>
     </section>
 
-    ${task ? activeTaskMarkup(task, order, outlet, driver, events) : `
+    ${task ? activeTaskMarkup(task, order, merchant, driver, events) : `
       <section class="section">
         <div class="empty"><strong>No active delivery.</strong><br>Dispatch can assign an eligible job when this driver is online and available.</div>
       </section>`}
@@ -80,7 +80,7 @@ export function renderDriverView(app) {
   });
 }
 
-function activeTaskMarkup(task, order, outlet, driver, events) {
+function activeTaskMarkup(task, order, merchant, driver, events) {
   const progress = deliveryProgress(task.status);
   const next = nextDriverStatus(task.status);
   return `
@@ -90,7 +90,7 @@ function activeTaskMarkup(task, order, outlet, driver, events) {
       <div class="grid grid-2" style="margin-top:16px">
         <div class="card">
           <h3>Route</h3>
-          <div class="route-stop"><span class="route-marker">A</span><div><strong>${escapeHtml(outlet?.name || task.pickup.address)}</strong><div class="muted small">${escapeHtml(task.pickup.address)}</div></div></div>
+          <div class="route-stop"><span class="route-marker">A</span><div><strong>${escapeHtml(merchant?.name || task.pickup.address)}</strong><div class="muted small">${escapeHtml(task.pickup.address)}</div></div></div>
           <div class="route-line"></div>
           <div class="route-stop"><span class="route-marker">B</span><div><strong>${escapeHtml(order?.customer || "Customer")}</strong><div class="muted small">${escapeHtml(task.dropoff.address)}</div></div></div>
           <div class="row-actions" style="margin-top:16px">
@@ -112,7 +112,7 @@ function nudgeDriverLocation(app, driverId) {
   const task = driver?.activeTaskId ? app.store.deliveryTask(driver.activeTaskId) : null;
   if (!task) return;
   const current = currentDriverLocation(app.store.state, driverId);
-  const target = ["assigned", "driver_to_outlet", "at_outlet"].includes(task.status) ? task.pickup : task.dropoff;
+  const target = ["assigned", "driver_to_pickup", "at_pickup"].includes(task.status) ? task.pickup : task.dropoff;
   const startLat = current?.latitude ?? task.pickup.latitude;
   const startLng = current?.longitude ?? task.pickup.longitude;
   const ratio = task.status === "arriving" ? 0.85 : 0.35;

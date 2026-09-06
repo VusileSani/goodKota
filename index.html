@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#F15A29" />
   <meta name="description" content="GoodKota — location-first kota discovery, verified quality, ordering and delivery-ready fulfilment." />
-  <title>GoodKota — Foundation v4</title>
+  <title>GoodKota — Foundation v4.3</title>
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" href="./assets/goodkota-logo.png" type="image/png" />
   <link rel="stylesheet" href="./css/styles.css" />
@@ -28,6 +28,14 @@
       <button data-route="delivery">Delivery Ops</button>
       <button data-route="admin">GoodKota Office</button>
     </nav>
+
+    <select id="mobileRoleSelect" class="mobile-role-select" aria-label="Prototype view">
+      <option value="customer">Customer</option>
+      <option value="merchant">Merchant</option>
+      <option value="driver">Driver</option>
+      <option value="delivery">Delivery Ops</option>
+      <option value="admin">GoodKota Office</option>
+    </select>
   </header>
 
   <main id="app" class="app-shell" aria-live="polite"></main>

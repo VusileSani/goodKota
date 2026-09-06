@@ -1,17 +1,15 @@
-# GoodKota delivery architecture
+# GoodKota delivery architecture — v4.2
 
 ## Core principle
 
-Delivery is an add-on operational domain connected to an order through a `deliveryTask`. The order does not become a giant courier object.
-
-This preserves GoodKota's ability to add or change fulfilment providers without changing customer checkout, merchant catalogue, ratings or payment concepts.
+Delivery is a separate operational domain connected to an order through a `deliveryTask`. A merchant remains the store fulfilling the food order; driver-specific state does not belong in the order or merchant document.
 
 ## Boundaries
 
 ### Order domain owns
 
 - customer
-- merchant/outlet
+- merchant
 - items
 - payment state
 - requested fulfilment type
@@ -23,7 +21,7 @@ This preserves GoodKota's ability to add or change fulfilment providers without 
 - dispatch state
 - driver assignment
 - current driver location
-- pickup/dropoff state
+- pickup/drop-off state
 - ETA
 - delivery events
 - proof of delivery
@@ -46,18 +44,18 @@ getJob(externalJobId)
 translateWebhook(providerEvent) -> GoodKota delivery event/status
 ```
 
-GoodKota should continue to expose its own stable delivery statuses to customers and merchants even if different providers use different terminology.
+GoodKota should expose stable internal delivery statuses even if providers use different terminology.
 
 ## Dispatch evolution
 
-This foundation ranks available eligible drivers by straight-line distance to the outlet after the outlet marks the food ready.
+The foundation ranks eligible available drivers by straight-line distance to the merchant after the merchant marks food ready.
 
-Future dispatch scoring can become:
+Future scoring can include:
 
 ```text
 score =
   pickupETA
-  + predictedOutletWait
+  + predictedMerchantWait
   + deliveryETA
   + workloadPenalty
   + SLA risk
@@ -65,56 +63,43 @@ score =
   + providerCost
 ```
 
-The lowest/most suitable score wins, subject to business rules.
-
 ## Tracking
 
-Driver location should be treated as ephemeral operational data. Durable business evidence comes from delivery events and proof-of-delivery records.
-
-Recommended future pattern:
+Driver location is ephemeral operational data. Durable evidence comes from delivery events and proof-of-delivery records.
 
 ```text
-Native/hybrid driver app
+native/hybrid driver app
   → authenticated location update
-  → Firestore current driver location / realtime transport
-  → customer receives only assigned delivery tracking
-  → operations dashboard receives authorized fleet view
+  → current driver location snapshot
+  → assigned customer receives relevant tracking
+  → operations receives authorized fleet view
   → raw location expires after short retention
 ```
 
 ## Geofencing
 
-The driver app can later define geofences around:
+A future driver app can define geofences around:
 
-- pickup outlet
+- merchant pickup point
 - customer delivery point
 
-These can automate suggested events such as `at_outlet` and `arriving`, while still requiring explicit pickup/proof-of-delivery confirmation for consequential transitions.
+They may suggest `at_pickup` and `arriving` states while explicit pickup/proof-of-delivery confirmation remains required for consequential transitions.
 
 ## Proof of delivery
 
 Default recommendation: customer PIN.
 
-Possible later alternatives:
-
-- customer QR confirmation
-- signature
-- photo evidence where appropriate
-- trusted geofence + customer acknowledgement
-
-Use the least intrusive method that resolves disputes reliably.
+Possible later alternatives include customer QR confirmation, signature, photo evidence where appropriate, or trusted geofence plus customer acknowledgement. Use the least intrusive method that resolves disputes reliably.
 
 ## Analytics enabled by delivery events
 
 - order-ready → driver-assigned time
-- driver-assigned → outlet-arrival time
-- outlet-arrival → pickup time
+- driver-assigned → merchant-arrival time
+- merchant-arrival → pickup time
 - pickup → delivered time
 - total delivery SLA
-- outlet waiting delay
+- merchant waiting delay
 - driver cancellation/reassignment rate
 - delivery failure cause
 - driver quality
 - provider cost/performance
-
-These metrics can later inform driver deployment zones and how many drivers GoodKota needs by area/time of day.

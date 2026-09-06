@@ -4,8 +4,8 @@ export const DELIVERY_STATUS_ORDER = [
   "awaiting_prep",
   "ready_for_dispatch",
   "assigned",
-  "driver_to_outlet",
-  "at_outlet",
+  "driver_to_pickup",
+  "at_pickup",
   "picked_up",
   "en_route",
   "arriving",
@@ -16,8 +16,8 @@ const LABELS = {
   awaiting_prep: "Preparing",
   ready_for_dispatch: "Ready for driver",
   assigned: "Driver assigned",
-  driver_to_outlet: "Driver heading to outlet",
-  at_outlet: "Driver at outlet",
+  driver_to_pickup: "Driver heading to merchant",
+  at_pickup: "Driver at merchant",
   picked_up: "Picked up",
   en_route: "On the way",
   arriving: "Arriving",
@@ -87,9 +87,9 @@ export function estimateMinutes(distance, assumedKmh = 28) {
 
 export function nextDriverStatus(status) {
   const next = {
-    assigned: "driver_to_outlet",
-    driver_to_outlet: "at_outlet",
-    at_outlet: "picked_up",
+    assigned: "driver_to_pickup",
+    driver_to_pickup: "at_pickup",
+    at_pickup: "picked_up",
     picked_up: "en_route",
     en_route: "arriving"
   };
@@ -98,9 +98,9 @@ export function nextDriverStatus(status) {
 
 export function statusEvent(status, driverName = "Driver") {
   const events = {
-    driver_to_outlet: { type: "driver_to_outlet", message: `${driverName} is heading to the outlet` },
-    at_outlet: { type: "driver_at_outlet", message: `${driverName} arrived at the outlet` },
-    picked_up: { type: "pickup_confirmed", message: "Order collected from outlet" },
+    driver_to_pickup: { type: "driver_to_pickup", message: `${driverName} is heading to the merchant` },
+    at_pickup: { type: "driver_at_pickup", message: `${driverName} arrived at the merchant` },
+    picked_up: { type: "pickup_confirmed", message: "Order collected from merchant" },
     en_route: { type: "en_route", message: "Driver is on the way" },
     arriving: { type: "arriving", message: "Driver is approaching the delivery point" },
     delivered: { type: "delivered", message: "Delivery completed" }

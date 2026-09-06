@@ -1,115 +1,144 @@
-# GoodKota Foundation v4 — Branded Operations
+# GoodKota Foundation v4.3 — Customer Navigation Pass
 
-Foundation v4 keeps the approved GoodKota architecture and applies the official brand assets plus the latest operational UI decisions.
+Foundation v4.3 retains the simplified merchant model from v4.2 and rebuilds the customer-facing ordering journey around fast, phone-first navigation.
 
-## What changed in v4
+## Customer-facing navigation
 
-- Official GoodKota logo is now used in the application shell and PWA icon.
-- Official orange patterned artwork is used for the launch splash screen.
-- Brand primary colour is derived from the supplied logo: `#F15A29`.
-- Operational screens were reduced to information and actions that serve the current task.
-- GoodKota Office now has a clear **Add merchant** flow. The common one-outlet case creates the merchant and primary outlet together in one form while preserving separate backend entities.
-- Multi-outlet merchants use **Add another outlet** from merchant detail.
-- Merchant orders now have an explicit **Open** action and order ID link. Full order details use progressive disclosure for secondary information.
-- Existing location-first discovery, verified quality, payment invariants, delivery-task separation, dispatch, tracking and proof-of-delivery foundations are retained.
-
-## Product foundations
-
-1. **Location-first discovery** — physical outlets carry coordinates and eligible outlets are ranked by distance.
-2. **Merchant/outlet separation** — merchant = business; outlet = physical operating location.
-3. **GoodKota Standard** — verified order ratings feed quality monitoring and Office intervention.
-4. **Direct merchant settlement** — production payment state must be confirmed server-side; merchant settlement identity remains provider-managed/tokenised where possible.
-5. **Separate delivery domain** — orders own the purchase and requested fulfilment; delivery tasks own dispatch, driver assignment, tracking events and proof of delivery.
-6. **Minimal operational UI** — secondary implementation/architecture detail stays out of normal user screens.
-
-## Core delivery flow
+The customer view now follows a compact mobile hierarchy:
 
 ```text
-paid order
-  → outlet accepts
-  → outlet prepares
-  → outlet marks ready
-  → delivery task becomes dispatchable
+location
+  → nearby merchants
+  → selected merchant menu
+  → persistent order/cart
+  → checkout / orders
+```
+
+- location stays visible with a simple Change action
+- merchant cards are fully tappable
+- menu search is prominent
+- categories wrap inside the phone width rather than creating a horizontal page
+- product cards are fully tappable, with a direct add control
+- a persistent customer nav provides Home, Browse, Orders, Cart and Account
+- a persistent order bar keeps the current cart visible while browsing
+- checkout remains progressively disclosed rather than crowding the menu
+
+The customer navigation was informed by the useful interaction patterns in the supplied Mugg & Bean, Nando's and KFC screenshots while keeping GoodKota's own restrained visual system.
+
+## Overlay behaviour
+
+Opening any GoodKota dialog now locks the underlying document at its exact scroll position. The dialog itself remains vertically scrollable, while touch/wheel interaction cannot move the page behind it. Closing the dialog restores the previous page position.
+
+## Core simplification
+
+A **Merchant is the actual operating store/location**. One merchant record now owns:
+
+- trading and legal name
+- contact details
+- physical address, area and coordinates
+- operating status
+- compliance status and Office note
+- preparation time
+- minimum order
+- delivery fee, radius and provider preference
+- settlement/gateway identity
+- GoodKota quality workflow and rating summary
+- catalogue and orders through `merchantId`
+
+There is no separate `outlets` collection and orders no longer carry `outletId`.
+
+If GoodKota later needs to represent several stores under one brand or legal group, add an optional higher-level Brand/Group entity above merchants. Do not reintroduce a mandatory Merchant → Outlet hierarchy.
+
+## GoodKota Office
+
+- Merchant rows are fully interactive.
+- **Add merchant** creates the operating store in one form.
+- Existing merchants can be edited from one detail view.
+- Office can change compliance status independently of settlement verification and quality workflow.
+- Office can enable/disable merchants and manage quality intervention states.
+- Location, operations and delivery configuration are all edited on the merchant itself.
+
+## Mobile-width invariant
+
+Foundation v4.3 continues to enforce phone-width usability:
+
+- no intentional horizontal page scrolling
+- operational tables collapse into labelled vertical records on narrow screens
+- forms collapse to one column
+- dialogs remain inside the viewport
+- long references, addresses and status text wrap rather than expand the page
+- header navigation wraps into a compact grid
+- controls and buttons stay within their container width
+
+This is a product constraint: future screens should preserve the same invariant.
+
+## Foundations retained
+
+1. **Location-first discovery** — merchants carry coordinates and eligible merchants are ranked by distance.
+2. **GoodKota Standard** — verified GoodKota orders feed merchant food/service quality monitoring.
+3. **Direct merchant settlement** — the payment provider can settle the verified merchant account directly.
+4. **Delivery as a separate operational domain** — delivery tasks, assignments, drivers, location snapshots, events and proof of delivery remain separate from food orders.
+5. **Hybrid delivery support** — GoodKota fleet, merchant fleet and future third-party adapters use one delivery-task contract.
+6. **Customer PIN proof of delivery** — the prototype demonstrates final handover confirmation without exposing a production credential model.
+
+## Order and delivery flow
+
+```text
+customer pays
+  → order is submitted to merchant
+  → merchant accepts
+  → merchant prepares
+  → merchant marks ready
+  → delivery task becomes dispatchable (for delivery orders)
   → eligible driver assigned
-  → pickup
-  → tracked delivery
-  → customer PIN handover
-  → order completes
+  → driver travels to merchant
+  → pickup confirmed
+  → customer sees tracked delivery state
+  → customer PIN confirms handover
+  → delivery and order complete
 ```
 
 ## Architecture
 
 ```text
 index.html
-css/styles.css
-js/app.js
-js/core/store.js
-js/core/utils.js
-js/data/seed.js
-js/services/location-service.js
-js/services/notification-service.js
-js/services/payment-service.js
-js/services/quality-service.js
-js/services/delivery-service.js
-js/views/customer-view.js
-js/views/merchant-view.js
-js/views/driver-view.js
-js/views/delivery-ops-view.js
-js/views/admin-view.js
-assets/goodkota-logo.png
-assets/goodkota-splash.jpg
-assets/goodkota-logo-print.pdf
-manifest.webmanifest
+css/
+  styles.css
+js/
+  app.js
+  core/
+    store.js
+    utils.js
+  data/
+    seed.js
+  services/
+    location-service.js
+    notification-service.js
+    payment-service.js
+    quality-service.js
+    delivery-service.js
+  views/
+    customer-view.js
+    merchant-view.js
+    driver-view.js
+    delivery-ops-view.js
+    admin-view.js
 service-worker.js
+manifest.webmanifest
+assets/
+  goodkota-logo.png
+  goodkota-splash.jpg
+  goodkota-logo-print.pdf
 FIREBASE-SCHEMA.md
 DELIVERY-ARCHITECTURE.md
 ```
 
-`AppStore` is still the browser-local prototype repository. The product boundaries remain structured so Firestore repositories can replace it without rewriting the views.
+## Compatibility with v4/v4.1 browser data
+
+The local `AppStore` includes a one-time compatibility migration. Older browser state that still contains merchants plus outlets is flattened into the v4.2+ merchant model. A previous extra outlet becomes its own merchant location and shared catalogue items are copied to that merchant as needed.
 
 ## Recommended production stack
 
-Firebase Authentication + Cloud Firestore + Cloud Functions + Firebase Cloud Messaging. True background driver GPS remains a native/hybrid driver-app concern.
+Firebase Authentication + Cloud Firestore + Cloud Functions + Firebase Cloud Messaging.
 
-## Production invariants
-
-- Browser payment success never marks an order paid; a trusted server-side gateway webhook must verify it.
-- A delivery cannot be assigned before the outlet marks the order ready.
-- Only the assigned driver may progress consequential delivery steps.
-- Delivery completion requires server-verified proof of delivery.
-- Driver location is short-lived operational data; durable history comes from delivery events and proof-of-delivery records.
-- Delivery quality should remain separate from food/outlet quality.
-
-## Run locally
-
-Because the build uses ES modules, serve it over HTTP:
-
-```bash
-cd goodkota-foundation-v4
-python -m http.server 8080
-```
-
-Then open `http://localhost:8080`.
-
-## Suggested walkthrough
-
-1. Open **GoodKota Office** → **Add merchant** and create a merchant plus its primary outlet.
-2. Open that merchant to confirm the outlet is separate and use **Add another outlet** if required.
-3. Open **Merchant** and click **Open** on an order to review the complete order detail.
-4. Accept/prepare the order and mark a delivery order ready.
-5. Open **Delivery Ops** to assign the recommended eligible driver.
-6. Progress the job in **Driver**, then confirm the customer PIN.
-7. Return to **Customer** to see tracking/completion and submit a verified rating.
-
-## Next production pass
-
-1. Create/configure the GoodKota Firebase project.
-2. Replace `AppStore` with Firestore repositories.
-3. Add Authentication and role-based access.
-4. Add Security Rules and Cloud Functions enforcing order/payment/delivery transitions.
-5. Select the South African marketplace payment gateway and implement the provider adapter + verified webhook.
-6. Add real geocoding/geohash queries and service-radius validation.
-7. Add FCM transactional notifications.
-8. Build the authenticated native/hybrid driver shell for background GPS.
-9. Add route/traffic ETA scoring.
-10. Add delivery/driver quality metrics separately from kota/outlet quality.
+Production rules should enforce role-based access, server-side payment verification, permitted order/delivery state transitions, restricted driver-location reads and short retention of raw operational location data.

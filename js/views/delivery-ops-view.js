@@ -47,15 +47,15 @@ export function renderDeliveryOpsView(app) {
 
 function taskTable(app, tasks) {
   if (!tasks.length) return '<div class="empty">No delivery tasks yet. Place a Home Delivery order from Customer view.</div>';
-  return `<table><thead><tr><th>Delivery</th><th>Outlet → Customer</th><th>Provider</th><th>Status</th><th>Driver</th><th>Fee</th><th>Dispatch</th></tr></thead><tbody>${tasks.map(task => {
+  return `<table><thead><tr><th>Delivery</th><th>Merchant → Customer</th><th>Provider</th><th>Status</th><th>Driver</th><th>Fee</th><th>Dispatch</th></tr></thead><tbody>${tasks.map(task => {
     const order = app.store.state.orders.find(item => item.id === task.orderId);
-    const outlet = app.store.outlet(task.outletId);
+    const merchant = app.store.merchant(task.merchantId);
     const driver = task.assignedDriverId ? app.store.driver(task.assignedDriverId) : null;
     const recommendations = !driver && ["awaiting_prep", "ready_for_dispatch"].includes(task.status) ? recommendDrivers(app.store.state, task) : [];
     const best = recommendations[0];
     return `<tr>
       <td><strong>${escapeHtml(task.orderId)}</strong><div class="muted small">${formatDateTime(task.createdAt)}</div></td>
-      <td><strong>${escapeHtml(outlet?.name || task.pickup.address)}</strong><div class="muted small">→ ${escapeHtml(order?.customer || "Customer")} · ${escapeHtml(task.dropoff.address)}</div></td>
+      <td><strong>${escapeHtml(merchant?.name || task.pickup.address)}</strong><div class="muted small">→ ${escapeHtml(order?.customer || "Customer")} · ${escapeHtml(task.dropoff.address)}</div></td>
       <td><span class="badge">${escapeHtml(task.providerType)}</span></td>
       <td><span class="badge ${task.status === "delivered" ? "ok" : "info"}">${escapeHtml(deliveryStatusLabel(task.status))}</span></td>
       <td>${driver ? `<strong>${escapeHtml(driver.name)}</strong><div class="muted small">${escapeHtml(driver.operatorType)}</div>` : '<span class="muted">Unassigned</span>'}</td>
@@ -63,7 +63,7 @@ function taskTable(app, tasks) {
       <td>${driver
         ? '<span class="muted small">Assigned</span>'
         : task.status === "awaiting_prep"
-          ? (best ? `<span class="muted small">Likely next: ${escapeHtml(best.driver.name)} · ~${estimateMinutes(best.distanceToPickupKm)} min from outlet</span>` : '<span class="muted small">Waiting for outlet</span>')
+          ? (best ? `<span class="muted small">Likely next: ${escapeHtml(best.driver.name)} · ~${estimateMinutes(best.distanceToPickupKm)} min from merchant</span>` : '<span class="muted small">Waiting for merchant</span>')
           : task.status === "ready_for_dispatch" && best
             ? `<button class="btn primary small" data-assign-best="${task.id}">Assign ${escapeHtml(best.driver.name)} · ~${estimateMinutes(best.distanceToPickupKm)} min away</button>`
             : task.status === "ready_for_dispatch"

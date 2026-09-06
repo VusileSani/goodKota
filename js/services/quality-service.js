@@ -30,20 +30,14 @@ export function assessQuality(summary) {
     summary.overall < QUALITY_THRESHOLDS.alertAverage
     || summary.lowRatingRate >= QUALITY_THRESHOLDS.alertLowRatingRate
   ) {
-    return {
-      signal: "alert",
-      reason: "Frequent low ratings or a materially weak recent average"
-    };
+    return { signal: "alert", reason: "Frequent low ratings or a materially weak recent average" };
   }
 
   if (
     summary.overall < QUALITY_THRESHOLDS.watchAverage
     || summary.lowRatingRate >= QUALITY_THRESHOLDS.watchLowRatingRate
   ) {
-    return {
-      signal: "watch",
-      reason: "Quality trend requires monitoring"
-    };
+    return { signal: "watch", reason: "Quality trend requires monitoring" };
   }
 
   return { signal: "healthy", reason: "Meets the GoodKota Standard" };
@@ -59,8 +53,8 @@ export function qualityBadge(workflowStatus, signal) {
   return { label: "GoodKota Standard", tone: "ok" };
 }
 
-export function isEligibleForProximityRecommendation(outlet) {
-  return outlet.enabled
-    && outlet.qualityWorkflow.status === "healthy"
-    && outlet.qualitySummary.signal === "healthy";
+export function isEligibleForProximityRecommendation(merchant) {
+  return merchant.enabled
+    && merchant.qualityWorkflow.status === "healthy"
+    && merchant.qualitySummary.signal === "healthy";
 }

@@ -26,12 +26,13 @@ export function distanceKm(a, b) {
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
-export function rankOutletsByDistance(outlets, origin) {
-  return outlets
-    .filter(outlet => outlet.enabled && outlet.qualityWorkflow.status !== "suspended")
-    .map(outlet => ({
-      ...outlet,
-      distanceKm: distanceKm(origin, { lat: outlet.latitude, lng: outlet.longitude })
+export function rankMerchantsByDistance(merchants, origin) {
+  return merchants
+    .filter(merchant => merchant.enabled && merchant.qualityWorkflow.status !== "suspended")
+    .filter(merchant => Number.isFinite(Number(merchant.latitude)) && Number.isFinite(Number(merchant.longitude)))
+    .map(merchant => ({
+      ...merchant,
+      distanceKm: distanceKm(origin, { lat: Number(merchant.latitude), lng: Number(merchant.longitude) })
     }))
     .sort((a, b) => a.distanceKm - b.distanceKm);
 }

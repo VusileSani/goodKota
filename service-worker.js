@@ -1,4 +1,4 @@
-const CACHE = "goodkota-v4-shell";
+const CACHE = "goodkota-v4-3-shell";
 const SHELL = [
   "./",
   "./index.html",

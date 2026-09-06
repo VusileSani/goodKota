@@ -9,11 +9,136 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function normaliseDeliveryStatus(status) {
+  if (status === "driver_to_outlet") return "driver_to_pickup";
+  if (status === "at_outlet") return "at_pickup";
+  return status;
+}
+
+function mergeLegacyMerchantOutlet(merchant, outlet) {
+  return {
+    ...merchant,
+    name: outlet?.name || merchant.name,
+    address: outlet?.address || merchant.address || "",
+    area: outlet?.area || merchant.area || outlet?.address?.split(",")[0] || "",
+    latitude: outlet?.latitude ?? merchant.latitude ?? null,
+    longitude: outlet?.longitude ?? merchant.longitude ?? null,
+    enabled: outlet?.enabled ?? merchant.enabled ?? true,
+    prepMinutes: outlet?.prepMinutes ?? merchant.prepMinutes ?? 20,
+    deliveryFee: outlet?.deliveryFee ?? merchant.deliveryFee ?? 20,
+    minOrder: outlet?.minOrder ?? merchant.minOrder ?? 30,
+    delivery: { ...(merchant.delivery || {}), ...(outlet?.delivery || {}) },
+    qualityWorkflow: { ...(merchant.qualityWorkflow || {}), ...(outlet?.qualityWorkflow || {}) },
+    contact: merchant.contact || {},
+    compliance: merchant.compliance || { status: "pending_review", note: "" }
+  };
+}
+
+function migrateLegacyMerchantOutletModel(state) {
+  if (!Array.isArray(state.outlets) || !state.outlets.length) {
+    state.deliveryTasks?.forEach(task => { task.status = normaliseDeliveryStatus(task.status); delete task.outletId; });
+    state.deliveryEvents?.forEach(event => {
+      if (event.type === "outlet_ready") event.type = "merchant_ready";
+      event.message = String(event.message || "").replace(/outlet/gi, "merchant");
+    });
+    return state;
+  }
+
+  const outletToMerchant = new Map();
+  const migratedMerchants = [];
+
+  state.merchants.forEach(merchant => {
+    const related = state.outlets.filter(outlet => outlet.merchantId === merchant.id);
+    const primary = related.find(outlet => outlet.id === merchant.primaryOutletId) || related[0] || null;
+
+    const primaryMerchant = mergeLegacyMerchantOutlet(merchant, primary);
+    delete primaryMerchant.primaryOutletId;
+    migratedMerchants.push(primaryMerchant);
+    if (primary) outletToMerchant.set(primary.id, primaryMerchant.id);
+
+    related.filter(outlet => outlet.id !== primary?.id).forEach(outlet => {
+      const id = `${merchant.id}_${outlet.id}`;
+      outletToMerchant.set(outlet.id, id);
+      migratedMerchants.push(mergeLegacyMerchantOutlet({
+        ...merchant,
+        id,
+        name: outlet.name,
+        contact: { ...(merchant.contact || {}) }
+      }, outlet));
+    });
+  });
+
+  state.outlets.forEach(outlet => {
+    if (outletToMerchant.has(outlet.id)) return;
+    const id = outlet.merchantId || `merchant_${outlet.id}`;
+    outletToMerchant.set(outlet.id, id);
+    migratedMerchants.push(mergeLegacyMerchantOutlet({
+      id,
+      name: outlet.name,
+      legalName: outlet.name,
+      contact: {},
+      compliance: { status: "pending_review", note: "Migrated from earlier GoodKota prototype" }
+    }, outlet));
+  });
+
+  const productCopies = [];
+  (state.products || []).forEach(product => {
+    const legacyOutletIds = Array.isArray(product.outletIds) ? product.outletIds : [];
+    if (!legacyOutletIds.length) {
+      const copy = { ...product };
+      delete copy.outletIds;
+      productCopies.push(copy);
+      return;
+    }
+
+    const merchantIds = [...new Set(legacyOutletIds.map(id => outletToMerchant.get(id)).filter(Boolean))];
+    merchantIds.forEach((merchantId, index) => {
+      const copy = { ...product, merchantId, id: index === 0 ? product.id : `${product.id}_${merchantId}` };
+      delete copy.outletIds;
+      productCopies.push(copy);
+    });
+  });
+
+  (state.orders || []).forEach(order => {
+    if (order.outletId && outletToMerchant.get(order.outletId)) order.merchantId = outletToMerchant.get(order.outletId);
+    delete order.outletId;
+  });
+
+  (state.ratings || []).forEach(rating => {
+    if (rating.outletId && outletToMerchant.get(rating.outletId)) rating.merchantId = outletToMerchant.get(rating.outletId);
+    delete rating.outletId;
+  });
+
+  (state.qualityCases || []).forEach(item => {
+    if (item.outletId && outletToMerchant.get(item.outletId)) item.merchantId = outletToMerchant.get(item.outletId);
+    delete item.outletId;
+  });
+
+  (state.deliveryTasks || []).forEach(task => {
+    if (task.outletId && outletToMerchant.get(task.outletId)) task.merchantId = outletToMerchant.get(task.outletId);
+    task.status = normaliseDeliveryStatus(task.status);
+    delete task.outletId;
+  });
+
+  (state.deliveryEvents || []).forEach(event => {
+    if (event.type === "outlet_ready") event.type = "merchant_ready";
+    event.message = String(event.message || "").replace(/outlet/gi, "merchant");
+  });
+
+  state.merchants = migratedMerchants;
+  state.products = productCopies;
+  delete state.outlets;
+  return state;
+}
+
 export class AppStore {
   constructor() {
     this.state = this.load();
-    this.ensureDeliveryCollections();
+    migrateLegacyMerchantOutletModel(this.state);
+    this.ensureCollections();
+    this.ensureMerchantAdministration();
     this.refreshQualitySummaries(false);
+    this.save();
   }
 
   load() {
@@ -25,10 +150,36 @@ export class AppStore {
     }
   }
 
-  ensureDeliveryCollections() {
-    for (const key of ["drivers", "driverVehicles", "driverLocations", "deliveryTasks", "deliveryAssignments", "deliveryEvents", "proofsOfDelivery"]) {
+  ensureCollections() {
+    for (const key of ["merchants", "products", "orders", "ratings", "payments", "drivers", "driverVehicles", "driverLocations", "deliveryTasks", "deliveryAssignments", "deliveryEvents", "proofsOfDelivery"]) {
       if (!Array.isArray(this.state[key])) this.state[key] = [];
     }
+  }
+
+  ensureMerchantAdministration() {
+    this.state.users?.forEach(user => {
+      if (user.role === "customer" && user.notificationPreferences) {
+        if (user.notificationPreferences.nearbyQualityMerchants === undefined) {
+          user.notificationPreferences.nearbyQualityMerchants = Boolean(user.notificationPreferences.nearbyQualityOutlets);
+        }
+        delete user.notificationPreferences.nearbyQualityOutlets;
+      }
+    });
+
+    this.state.merchants.forEach(merchant => {
+      if (!merchant.contact) merchant.contact = {};
+      if (!merchant.compliance) {
+        merchant.compliance = {
+          status: merchant.settlement?.status === "verified" ? "compliant" : "pending_review",
+          note: ""
+        };
+      }
+      if (!merchant.delivery) merchant.delivery = { enabled: true, radiusKm: 7, providerPreference: "goodkota_fleet" };
+      if (!merchant.qualityWorkflow) merchant.qualityWorkflow = { status: "healthy", note: "" };
+      if (merchant.prepMinutes === undefined) merchant.prepMinutes = 20;
+      if (merchant.deliveryFee === undefined) merchant.deliveryFee = 20;
+      if (merchant.minOrder === undefined) merchant.minOrder = 30;
+    });
   }
 
   save() {
@@ -37,7 +188,8 @@ export class AppStore {
 
   reset() {
     this.state = clone(seed);
-    this.ensureDeliveryCollections();
+    this.ensureCollections();
+    this.ensureMerchantAdministration();
     this.refreshQualitySummaries();
   }
 
@@ -46,7 +198,6 @@ export class AppStore {
   }
 
   merchant(id) { return this.state.merchants.find(item => item.id === id); }
-  outlet(id) { return this.state.outlets.find(item => item.id === id); }
   product(id) { return this.state.products.find(item => item.id === id); }
   driver(id) { return this.state.drivers.find(item => item.id === id); }
   vehicle(id) { return this.state.driverVehicles.find(item => item.id === id); }
@@ -54,22 +205,22 @@ export class AppStore {
   order(id) { return this.state.orders.find(item => item.id === id); }
   deliveryTaskForOrder(orderId) { return taskForOrder(this.state, orderId); }
 
-  productsForOutlet(outletId) {
-    return this.state.products.filter(product => product.enabled && product.outletIds.includes(outletId));
+  productsForMerchant(merchantId) {
+    return this.state.products.filter(product => product.enabled && product.merchantId === merchantId);
   }
 
-  ratingsForOutlet(outletId) {
-    return this.state.ratings.filter(rating => rating.outletId === outletId);
+  ratingsForMerchant(merchantId) {
+    return this.state.ratings.filter(rating => rating.merchantId === merchantId);
   }
 
   refreshQualitySummaries(persist = true) {
-    this.state.outlets.forEach(outlet => {
-      const summary = summariseRatings(this.ratingsForOutlet(outlet.id));
-      outlet.qualitySummary = { ...summary, ...assessQuality(summary) };
+    this.state.merchants.forEach(merchant => {
+      const summary = summariseRatings(this.ratingsForMerchant(merchant.id));
+      merchant.qualitySummary = { ...summary, ...assessQuality(summary) };
 
-      if (outlet.qualitySummary.signal === "alert" && outlet.qualityWorkflow.status === "healthy") {
-        outlet.qualityWorkflow.status = "watch";
-        outlet.qualityWorkflow.note = "Automatically flagged by verified customer ratings";
+      if (merchant.qualitySummary.signal === "alert" && merchant.qualityWorkflow.status === "healthy") {
+        merchant.qualityWorkflow.status = "watch";
+        merchant.qualityWorkflow.note = "Automatically flagged by verified customer ratings";
       }
     });
     if (persist) this.save();
@@ -83,22 +234,21 @@ export class AppStore {
 
   createDeliveryTaskForOrder(order) {
     if (this.deliveryTaskForOrder(order.id)) return;
-    const outlet = this.outlet(order.outletId);
+    const merchant = this.merchant(order.merchantId);
     const destination = order.fulfilment?.destination;
-    if (!outlet || !destination) return;
+    if (!merchant || !destination) return;
 
-    const providerType = order.fulfilment.provider || outlet.delivery?.providerPreference || "goodkota_fleet";
+    const providerType = order.fulfilment.provider || merchant.delivery?.providerPreference || "goodkota_fleet";
     const task = {
       id: uid("delivery"),
       orderId: order.id,
       merchantId: order.merchantId,
-      outletId: order.outletId,
       providerType,
       status: "awaiting_prep",
       assignedDriverId: null,
       assignmentId: null,
       deliveryFee: order.deliveryFee || 0,
-      pickup: { address: outlet.name, latitude: outlet.latitude, longitude: outlet.longitude },
+      pickup: { address: `${merchant.name}, ${merchant.address}`, latitude: merchant.latitude, longitude: merchant.longitude },
       dropoff: { address: destination.address, latitude: destination.latitude, longitude: destination.longitude },
       verification: { method: "pin", demoPin: String(Math.floor(1000 + Math.random() * 9000)) },
       createdAt: Date.now(),
@@ -118,7 +268,7 @@ export class AppStore {
   }
 
   updateOrderStatus(orderId, status) {
-    const order = this.state.orders.find(item => item.id === orderId);
+    const order = this.order(orderId);
     if (!order) return;
     order.status = status;
 
@@ -126,7 +276,7 @@ export class AppStore {
     if (task && status === "ready") {
       task.status = "ready_for_dispatch";
       task.readyAt = Date.now();
-      this.recordDeliveryEvent(task.id, "outlet_ready", "Outlet marked order ready", "merchant", order.merchantId);
+      this.recordDeliveryEvent(task.id, "merchant_ready", "Merchant marked order ready", "merchant", order.merchantId);
     }
     this.save();
   }
@@ -142,7 +292,7 @@ export class AppStore {
     const driver = this.driver(driverId);
     if (!task || !driver) throw new Error("Delivery task or driver not found.");
     if (driver.availability !== "available") throw new Error("Driver is not currently available.");
-    if (task.status !== "ready_for_dispatch") throw new Error("This delivery must be marked ready by the outlet before driver assignment.");
+    if (task.status !== "ready_for_dispatch") throw new Error("This delivery must be marked ready by the merchant before driver assignment.");
 
     const assignment = {
       id: uid("assignment"), taskId, driverId, status: "active", assignedBy, assignedAt: Date.now()
@@ -168,7 +318,7 @@ export class AppStore {
     task.status = next;
     if (next === "picked_up") {
       task.pickedUpAt = Date.now();
-      const order = this.state.orders.find(item => item.id === task.orderId);
+      const order = this.order(task.orderId);
       if (order) order.status = "out_for_delivery";
     }
     if (next === "en_route") task.estimatedArrivalAt = Date.now() + 12 * 60_000;
@@ -188,7 +338,7 @@ export class AppStore {
 
     task.status = "delivered";
     task.deliveredAt = Date.now();
-    const order = this.state.orders.find(item => item.id === task.orderId);
+    const order = this.order(task.orderId);
     if (order) order.status = "completed";
 
     const assignment = this.state.deliveryAssignments.find(item => item.id === task.assignmentId);
@@ -222,13 +372,13 @@ export class AppStore {
   }
 
   addRating({ orderId, overall, food, service, comment }) {
-    const order = this.state.orders.find(item => item.id === orderId);
+    const order = this.order(orderId);
     if (!order || order.status !== "completed" || order.rated) {
       throw new Error("Only completed, unrated GoodKota orders can be rated.");
     }
 
     this.state.ratings.unshift({
-      id: uid("rating"), outletId: order.outletId, orderId, customerId: order.customerId,
+      id: uid("rating"), merchantId: order.merchantId, orderId, customerId: order.customerId,
       verified: true, overall: Number(overall), food: Number(food), service: Number(service),
       comment: String(comment || "").trim(), createdAt: Date.now()
     });
@@ -236,15 +386,44 @@ export class AppStore {
     this.refreshQualitySummaries();
   }
 
-  setQualityWorkflow(outletId, status, note = "") {
-    const outlet = this.outlet(outletId);
-    if (!outlet) return;
-    outlet.qualityWorkflow = { status, note };
+  setQualityWorkflow(merchantId, status, note = "") {
+    const merchant = this.merchant(merchantId);
+    if (!merchant) return;
+    merchant.qualityWorkflow = { status, note };
     this.save();
   }
 
   setNearbyNotifications(enabled) {
-    this.customer.notificationPreferences.nearbyQualityOutlets = Boolean(enabled);
+    this.customer.notificationPreferences.nearbyQualityMerchants = Boolean(enabled);
+    this.save();
+  }
+
+  updateMerchant(merchantId, changes = {}) {
+    const merchant = this.merchant(merchantId);
+    if (!merchant) throw new Error("Merchant not found.");
+
+    for (const key of ["name", "legalName", "address", "area", "latitude", "longitude", "prepMinutes", "deliveryFee", "minOrder"]) {
+      if (changes[key] !== undefined) merchant[key] = changes[key];
+    }
+    if (changes.contact) merchant.contact = { ...merchant.contact, ...changes.contact };
+    if (changes.delivery) merchant.delivery = { ...merchant.delivery, ...changes.delivery };
+    if (changes.deliveryCapability) merchant.deliveryCapability = { ...merchant.deliveryCapability, ...changes.deliveryCapability };
+    this.save();
+  }
+
+  setMerchantCompliance(merchantId, status, note = "") {
+    const merchant = this.merchant(merchantId);
+    if (!merchant) throw new Error("Merchant not found.");
+    const allowed = ["pending_review", "compliant", "needs_action", "suspended"];
+    if (!allowed.includes(status)) throw new Error("Invalid merchant compliance status.");
+    merchant.compliance = { status, note: String(note || "").trim(), updatedAt: Date.now() };
+    this.save();
+  }
+
+  setMerchantEnabled(merchantId, enabled) {
+    const merchant = this.merchant(merchantId);
+    if (!merchant) throw new Error("Merchant not found.");
+    merchant.enabled = Boolean(enabled);
     this.save();
   }
 
@@ -256,50 +435,25 @@ export class AppStore {
     this.save();
   }
 
-  addMerchantWithPrimaryOutlet({ merchant, outlet }) {
-    if (!merchant?.id || !outlet?.id) throw new Error("Merchant and primary outlet are required.");
-    if (this.merchant(merchant.id) || this.outlet(outlet.id)) throw new Error("Merchant or outlet already exists.");
+  addMerchant(merchant) {
+    if (!merchant?.id) throw new Error("Merchant is required.");
+    if (this.merchant(merchant.id)) throw new Error("Merchant already exists.");
 
     this.state.merchants.push({
       enabled: true,
       contact: {},
+      prepMinutes: 20,
+      deliveryFee: 20,
+      minOrder: 30,
+      delivery: { enabled: true, radiusKm: 7, providerPreference: "goodkota_fleet" },
       deliveryCapability: { ownDrivers: false, acceptsGoodKotaFleet: true, thirdPartyAllowed: true },
       gatewayAccount: { id: null, status: "not_configured" },
       settlement: { bankName: "", accountHolder: "", maskedAccount: "", status: "not_configured" },
-      ...merchant,
-      primaryOutletId: outlet.id
-    });
-
-    this.state.outlets.push({
-      enabled: true,
-      prepMinutes: 20,
-      deliveryFee: 20,
-      minOrder: 30,
-      delivery: { enabled: true, radiusKm: 7, providerPreference: "goodkota_fleet" },
+      compliance: { status: "pending_review", note: "Awaiting GoodKota Office review" },
       qualityWorkflow: { status: "healthy", note: "" },
-      ...outlet,
-      merchantId: merchant.id
+      ...merchant
     });
 
-    this.refreshQualitySummaries(false);
-    this.save();
-  }
-
-  addOutlet(merchantId, outlet) {
-    const merchant = this.merchant(merchantId);
-    if (!merchant) throw new Error("Merchant not found.");
-    if (!outlet?.id || this.outlet(outlet.id)) throw new Error("A valid new outlet is required.");
-
-    this.state.outlets.push({
-      enabled: true,
-      prepMinutes: 20,
-      deliveryFee: 20,
-      minOrder: 30,
-      delivery: { enabled: true, radiusKm: 7, providerPreference: "goodkota_fleet" },
-      qualityWorkflow: { status: "healthy", note: "" },
-      ...outlet,
-      merchantId
-    });
     this.refreshQualitySummaries(false);
     this.save();
   }

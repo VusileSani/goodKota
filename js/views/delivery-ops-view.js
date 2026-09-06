@@ -11,21 +11,14 @@ export function renderDeliveryOpsView(app) {
 
   app.root.innerHTML = `
     <section class="section-head">
-      <div><span class="eyebrow">GoodKota Delivery Operations</span><h2>Dispatch & tracking control</h2><p>A delivery domain that can run GoodKota drivers, merchant drivers and future third-party adapters without changing the order model.</p></div>
+      <div><span class="eyebrow">Delivery Ops</span><h2>Dispatch</h2><p>Assign and monitor delivery jobs.</p></div>
     </section>
 
-    <div class="grid grid-4">
+    <div class="metric-strip">
       <div class="stat"><span class="muted">Active deliveries</span><b>${active.length}</b></div>
       <div class="stat"><span class="muted">Awaiting assignment</span><b>${dispatchable.length}</b></div>
       <div class="stat"><span class="muted">Available drivers</span><b>${availableDrivers.length}</b></div>
-      <div class="stat"><span class="muted">Delivered demo jobs</span><b>${delivered.length}</b></div>
     </div>
-
-    <section class="section grid grid-3">
-      <div class="card soft"><span class="eyebrow">Dispatch policy</span><h3>Best eligible driver</h3><p class="muted">Candidates are filtered by operator/fleet compatibility and availability, then ranked by distance to the pickup outlet. Production can add traffic, prep readiness, driver workload and SLA scoring.</p></div>
-      <div class="card"><span class="eyebrow">Hybrid fleet</span><h3>One task contract, many providers</h3><p class="muted">providerType can point to the GoodKota fleet, a merchant fleet or a future third-party delivery adapter. The customer/order interfaces do not need to change.</p></div>
-      <div class="card"><span class="eyebrow">Tracking stream</span><h3>Snapshot + event history</h3><p class="muted">Current driver location is separated from durable delivery events. This keeps real-time tracking fast while avoiding an unnecessary permanent history of every movement.</p></div>
-    </section>
 
     <section class="section">
       <div class="section-head"><div><h3>Delivery queue</h3><p>Assign drivers, monitor the hand-off and see the customer-facing delivery state.</p></div></div>
@@ -36,19 +29,7 @@ export function renderDeliveryOpsView(app) {
       <div class="section-head"><div><h3>Driver fleet</h3><p>GoodKota-owned and merchant-owned drivers share a common operational contract.</p></div></div>
       <div class="table-wrap">${driverTable(app, state.drivers)}</div>
     </section>
-
-    <section class="section grid grid-2">
-      <div class="card">
-        <span class="eyebrow">Near-term adapter boundary</span>
-        <h3>Third-party courier integration</h3>
-        <p class="muted">A provider adapter will receive a GoodKota delivery task, create the courier job externally, translate provider statuses back into GoodKota delivery events, and preserve the same customer tracking contract.</p>
-      </div>
-      <div class="card">
-        <span class="eyebrow">Operational analytics</span>
-        <h3>Designed for measurable delivery</h3>
-        <p class="muted">The event model can later calculate assignment time, driver-to-outlet time, pickup waiting time, delivery time, SLA breaches, cancellation causes and driver/outlet bottlenecks.</p>
-      </div>
-    </section>`;
+`;
 
   app.root.querySelectorAll("[data-assign-best]").forEach(button => {
     button.addEventListener("click", () => {

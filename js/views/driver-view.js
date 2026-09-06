@@ -22,7 +22,7 @@ export function renderDriverView(app) {
 
   app.root.innerHTML = `
     <section class="section-head">
-      <div><span class="eyebrow">Future driver application</span><h2>${escapeHtml(driver.name)}</h2><p>A thin operational surface for jobs, navigation state, tracking and proof of delivery.</p></div>
+      <div><span class="eyebrow">Driver</span><h2>${escapeHtml(driver.name)}</h2><p>Current job and handover.</p></div>
       <select id="driverSwitcher" class="btn ghost">
         ${drivers.map(item => `<option value="${item.id}" ${item.id === driver.id ? "selected" : ""}>${escapeHtml(item.name)} · ${escapeHtml(item.operatorType)}</option>`).join("")}
       </select>
@@ -35,7 +35,7 @@ export function renderDriverView(app) {
       <div class="stat"><span class="muted">Completed</span><b>${driver.completedDeliveries}</b></div>
     </div>
 
-    <section class="section grid grid-2">
+    <section class="section">
       <div class="card">
         <span class="eyebrow">Driver & vehicle</span>
         <h3 style="margin:8px 0">${escapeHtml(driver.name)}</h3>
@@ -45,23 +45,13 @@ export function renderDriverView(app) {
         <div class="summary-line"><span>Last location</span><strong>${location ? formatDateTime(location.recordedAt) : "No snapshot"}</strong></div>
         ${!driver.activeTaskId ? `<button class="btn ${driver.shiftStatus === "online" ? "danger" : "ok"}" id="shiftButton" style="margin-top:10px">${driver.shiftStatus === "online" ? "Go offline" : "Go online"}</button>` : '<div class="notice info" style="margin-top:12px">Shift state is locked while a delivery is active.</div>'}
       </div>
-      <div class="card soft">
-        <span class="eyebrow">Tracking principle</span>
-        <h3>Track the job, not the person.</h3>
-        <p class="muted">Production tracking should run only during an active shift/job, keep a current operational location snapshot, retain only the events needed for delivery evidence, and stop when the task is complete.</p>
-      </div>
     </section>
 
     ${task ? activeTaskMarkup(task, order, outlet, driver, events) : `
       <section class="section">
         <div class="empty"><strong>No active delivery.</strong><br>Dispatch can assign an eligible job when this driver is online and available.</div>
       </section>`}
-
-    <section class="section grid grid-3">
-      <div class="card"><span class="eyebrow">Near-term native layer</span><h3>Background GPS</h3><p class="muted">The future native/hybrid driver app can publish location snapshots while a job is active, even with the screen locked.</p></div>
-      <div class="card"><span class="eyebrow">Automation</span><h3>Geofence events</h3><p class="muted">Outlet arrival, pickup departure and customer approach can later be inferred from geofences instead of relying entirely on manual buttons.</p></div>
-      <div class="card"><span class="eyebrow">Proof of delivery</span><h3>Customer PIN</h3><p class="muted">A successful customer PIN confirmation closes the delivery, releases the driver and completes the order.</p></div>
-    </section>`;
+`;
 
   app.root.querySelector("#driverSwitcher").addEventListener("change", event => {
     app.demoDriverId = event.currentTarget.value;
@@ -139,7 +129,7 @@ function openPinDialog(app, driver) {
   app.openDialog(`
     <div class="dialog-inner">
       <div class="dialog-head"><h2>Confirm delivery</h2><button class="icon-btn" data-close-dialog>✕</button></div>
-      <div class="notice info">Ask the customer for their 4-digit delivery PIN. In production the server verifies a hashed/short-lived credential; the driver never sees the expected PIN.</div>
+      <div class="notice info">Ask the customer for their 4-digit delivery PIN.</div>
       <form id="pinForm" style="margin-top:14px">
         <label class="field">Customer PIN<input id="deliveryPin" inputmode="numeric" maxlength="4" autocomplete="one-time-code" required /></label>
         <button class="btn primary" style="width:100%;margin-top:14px">Verify & complete delivery</button>

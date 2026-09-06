@@ -1,4 +1,4 @@
-const CACHE = "goodkota-v3-shell";
+const CACHE = "goodkota-v4-shell";
 const SHELL = [
   "./",
   "./index.html",
@@ -17,7 +17,8 @@ const SHELL = [
   "./js/views/driver-view.js",
   "./js/views/delivery-ops-view.js",
   "./js/views/admin-view.js",
-  "./assets/icon.svg",
+  "./assets/goodkota-logo.png",
+  "./assets/goodkota-splash.jpg",
   "./manifest.webmanifest"
 ];
 

@@ -3,10 +3,15 @@
   "short_name": "GoodKota",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#f7f4ee",
-  "theme_color": "#111827",
+  "background_color": "#faf9f7",
+  "theme_color": "#F15A29",
   "description": "Find a good kota nearby, order with confidence and track delivery.",
   "icons": [
-    {"src":"./assets/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+    {
+      "src": "./assets/goodkota-logo.png",
+      "sizes": "300x300",
+      "type": "image/png",
+      "purpose": "any"
+    }
   ]
 }

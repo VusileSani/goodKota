@@ -1,16 +1,21 @@
-import { escapeHtml, money, uid } from "../core/utils.js";
+import { escapeHtml, formatDateTime, money, uid } from "../core/utils.js";
 import { qualityBadge } from "../services/quality-service.js";
 import { deliveryStatusLabel } from "../services/delivery-service.js";
 import { maskBankAccount } from "../services/payment-service.js";
 
 export function renderMerchantView(app) {
   const merchants = app.store.state.merchants;
-  if (!app.demoMerchantId || !app.store.merchant(app.demoMerchantId)) app.demoMerchantId = merchants[0]?.id;
+  if (!merchants.length) {
+    app.root.innerHTML = '<div class="empty">No merchants have been onboarded yet.</div>';
+    return;
+  }
+
+  if (!app.demoMerchantId || !app.store.merchant(app.demoMerchantId)) app.demoMerchantId = merchants[0].id;
   const merchant = app.store.merchant(app.demoMerchantId);
   const outlets = app.store.state.outlets.filter(outlet => outlet.merchantId === merchant.id);
   const orders = app.store.state.orders.filter(order => order.merchantId === merchant.id);
   const products = app.store.state.products.filter(product => product.merchantId === merchant.id);
-  const paidRevenue = orders.filter(order => order.paymentStatus === "paid").reduce((sum, order) => sum + order.amount, 0);
+  const needsAction = orders.filter(order => ["pending", "accepted", "ready"].includes(order.status)).length;
   const activeDeliveries = orders.filter(order => {
     const task = app.store.deliveryTaskForOrder(order.id);
     return task && !["delivered", "cancelled"].includes(task.status);
@@ -18,56 +23,40 @@ export function renderMerchantView(app) {
 
   app.root.innerHTML = `
     <section class="section-head">
-      <div><span class="eyebrow">Merchant workspace</span><h2>${escapeHtml(merchant.name)}</h2><p>Orders, outlets, catalogue, quality, delivery hand-off and settlement onboarding.</p></div>
+      <div><span class="eyebrow">Merchant</span><h2>${escapeHtml(merchant.name)}</h2><p>Orders and menu.</p></div>
       <select id="merchantSwitcher" class="btn ghost">
         ${merchants.map(item => `<option value="${item.id}" ${item.id === merchant.id ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}
       </select>
     </section>
 
-    <div class="grid grid-4">
-      <div class="stat"><span class="muted">Paid order value</span><b>${money(paidRevenue)}</b></div>
-      <div class="stat"><span class="muted">Orders</span><b>${orders.length}</b></div>
+    <div class="metric-strip">
+      <div class="stat"><span class="muted">Orders needing action</span><b>${needsAction}</b></div>
       <div class="stat"><span class="muted">Active deliveries</span><b>${activeDeliveries}</b></div>
-      <div class="stat"><span class="muted">Settlement</span><b style="font-size:1rem">${escapeHtml(merchant.settlement.status)}</b></div>
+      <div class="stat"><span class="muted">Settlement</span><b style="font-size:1rem">${escapeHtml(merchant.settlement?.status || "not configured")}</b></div>
     </div>
 
-    <section class="section grid grid-3">
-      <div class="card">
-        <div class="section-head"><div><h3>Direct settlement</h3><p>GoodKota configures the gateway. You provide accurate merchant/KYC and banking information.</p></div></div>
-        <div class="summary-line"><span>Gateway account</span><strong>${escapeHtml(merchant.gatewayAccount?.status || "not configured")}</strong></div>
-        <div class="summary-line"><span>Bank</span><strong>${escapeHtml(merchant.settlement.bankName || "Not supplied")}</strong></div>
-        <div class="summary-line"><span>Account</span><strong>${escapeHtml(merchant.settlement.maskedAccount || "Not supplied")}</strong></div>
-        <div class="summary-line"><span>Food proceeds</span><strong>Direct to merchant</strong></div>
-        <div class="summary-line"><span>Delivery fee</span><strong>Provider-specific allocation</strong></div>
-        <button class="btn dark" id="bankingButton" style="margin-top:10px">${merchant.settlement.status === "verified" ? "Update settlement details" : "Complete settlement onboarding"}</button>
-      </div>
-      <div class="card">
-        <div class="section-head"><div><h3>Delivery hand-off</h3><p>The merchant prepares the food; delivery is a separate operational task.</p></div></div>
-        <div class="summary-line"><span>Own drivers</span><strong>${merchant.deliveryCapability?.ownDrivers ? "Supported" : "No"}</strong></div>
-        <div class="summary-line"><span>GoodKota fleet</span><strong>${merchant.deliveryCapability?.acceptsGoodKotaFleet ? "Allowed" : "Disabled"}</strong></div>
-        <div class="summary-line"><span>Third-party adapters</span><strong>${merchant.deliveryCapability?.thirdPartyAllowed ? "Future-ready" : "Disabled"}</strong></div>
-        <p class="muted small">When a delivery order is marked ready, the delivery task becomes dispatchable. Merchants do not need to manage GoodKota drivers themselves.</p>
-      </div>
-      <div class="card">
-        <div class="section-head"><div><h3>GoodKota Standard</h3><p>Quality remains operational, not decorative.</p></div></div>
-        ${outlets.map(outlet => {
-          const badge = qualityBadge(outlet.qualityWorkflow.status, outlet.qualitySummary.signal);
-          return `<div style="padding:8px 0;border-bottom:1px solid var(--line)">
-            <div class="outlet-title"><strong>${escapeHtml(outlet.name)}</strong><span class="badge ${badge.tone}">${badge.label}</span></div>
-            <div class="rating-line"><span>⭐</span><strong>${outlet.qualitySummary.overall.toFixed(1)}</strong><span class="muted small">Food ${outlet.qualitySummary.food.toFixed(1)} · Service ${outlet.qualitySummary.service.toFixed(1)}</span></div>
-          </div>`;
-        }).join("")}
-      </div>
-    </section>
-
     <section class="section">
-      <div class="section-head"><div><h3>Orders</h3><p>Payment is confirmed first. Delivery orders hand off to the delivery domain when the food is ready.</p></div></div>
+      <div class="section-head"><div><h3>Orders</h3><p>Open any order to see the full detail.</p></div></div>
       <div class="table-wrap">${ordersTable(app, orders)}</div>
     </section>
 
     <section class="section">
-      <div class="section-head"><div><h3>Catalogue</h3><p>Products belong to the merchant and can be offered at one or more outlets.</p></div><button class="btn dark" id="addProductButton">+ Add menu item</button></div>
+      <div class="section-head"><div><h3>Menu</h3><p>${products.length} ${products.length === 1 ? "item" : "items"}</p></div><button class="btn primary" id="addProductButton">+ Add item</button></div>
       <div class="table-wrap">${catalogueTable(app, products)}</div>
+    </section>
+
+    <section class="section grid grid-2">
+      <div class="card action-card">
+        <div><strong>Settlement</strong><div class="muted small">${escapeHtml(merchant.settlement?.status || "not configured")}</div></div>
+        <button class="btn ghost small" id="bankingButton">${merchant.settlement?.status === "verified" ? "Update" : "Set up"}</button>
+      </div>
+      <div class="card">
+        <strong>Outlet quality</strong>
+        <div style="margin-top:10px">${outlets.map(outlet => {
+          const badge = qualityBadge(outlet.qualityWorkflow.status, outlet.qualitySummary.signal);
+          return `<div class="summary-line"><span>${escapeHtml(outlet.name)}</span><span class="badge ${badge.tone}">${badge.label}</span></div>`;
+        }).join("") || '<span class="muted small">No outlets.</span>'}</div>
+      </div>
     </section>`;
 
   app.root.querySelector("#merchantSwitcher").addEventListener("change", event => {
@@ -76,59 +65,132 @@ export function renderMerchantView(app) {
   });
   app.root.querySelector("#bankingButton").addEventListener("click", () => openBanking(app, merchant));
   app.root.querySelector("#addProductButton").addEventListener("click", () => openProduct(app, merchant, outlets));
-  app.root.querySelectorAll("[data-order-status]").forEach(button => {
-    button.addEventListener("click", () => {
-      app.store.updateOrderStatus(button.dataset.orderId, button.dataset.orderStatus);
-      app.render();
-    });
+
+  bindOrderActions(app, app.root);
+  app.root.querySelectorAll("[data-open-order]").forEach(button => {
+    button.addEventListener("click", () => openOrderDetails(app, button.dataset.openOrder));
   });
 }
 
 function ordersTable(app, orders) {
   if (!orders.length) return '<div class="empty">No orders yet.</div>';
-  return `<table><thead><tr><th>Order</th><th>Outlet</th><th>Fulfilment</th><th>Amount</th><th>Payment</th><th>Kitchen</th><th>Delivery</th><th>Action</th></tr></thead><tbody>${orders.map(order => {
-    const outlet = app.store.outlet(order.outletId);
-    const task = app.store.deliveryTaskForOrder(order.id);
-    return `<tr>
-      <td><strong>${order.id}</strong><div class="muted small">${escapeHtml(order.customer)}</div></td>
-      <td>${escapeHtml(outlet?.name || "")}</td>
-      <td><span class="badge ${task ? "info" : ""}">${task ? "Delivery" : "Pickup"}</span></td>
-      <td>${money(order.amount)}</td>
-      <td><span class="badge ${order.paymentStatus === "paid" ? "ok" : "warn"}">${escapeHtml(order.paymentStatus)}</span></td>
-      <td><span class="badge info">${escapeHtml(order.status)}</span></td>
-      <td>${task ? `<span class="badge dark">${escapeHtml(deliveryStatusLabel(task.status))}</span>` : '<span class="muted small">—</span>'}</td>
-      <td>${orderActions(order, task)}</td>
-    </tr>`;
-  }).join("")}</tbody></table>`;
+  return `<table>
+    <thead><tr><th>Order</th><th>Outlet</th><th>Total</th><th>Status</th><th>Next step</th></tr></thead>
+    <tbody>${orders.map(order => {
+      const outlet = app.store.outlet(order.outletId);
+      const task = app.store.deliveryTaskForOrder(order.id);
+      return `<tr>
+        <td><button class="order-link" data-open-order="${order.id}">${order.id}</button><div class="muted small">${escapeHtml(order.customer)}</div></td>
+        <td>${escapeHtml(outlet?.name || "")}</td>
+        <td><strong>${money(order.amount)}</strong><div class="muted small">${task ? "Delivery" : "Pickup"}</div></td>
+        <td><span class="badge ${order.status === "completed" ? "ok" : "info"}">${escapeHtml(order.status)}</span>${task ? `<div class="muted small" style="margin-top:5px">${escapeHtml(deliveryStatusLabel(task.status))}</div>` : ""}</td>
+        <td><div class="row-actions"><button class="btn ghost small" data-open-order="${order.id}">Open</button>${orderActionButton(order, task)}</div></td>
+      </tr>`;
+    }).join("")}</tbody>
+  </table>`;
 }
 
-function orderActions(order, task) {
-  if (order.status === "pending") return `<button class="btn ok small" data-order-id="${order.id}" data-order-status="accepted">Accept</button>`;
-  if (order.status === "accepted") return `<button class="btn small" data-order-id="${order.id}" data-order-status="ready">Mark ready</button>`;
-  if (order.status === "ready" && task) return '<span class="muted small">Ready for dispatch</span>';
-  if (order.status === "ready" && !task) return `<button class="btn ok small" data-order-id="${order.id}" data-order-status="completed">Complete pickup</button>`;
-  if (order.status === "out_for_delivery") return '<span class="muted small">With driver</span>';
-  return '<span class="muted small">No action</span>';
+function orderActionButton(order, task) {
+  if (order.status === "pending") return `<button class="btn primary small" data-order-id="${order.id}" data-order-status="accepted">Accept</button>`;
+  if (order.status === "accepted") return `<button class="btn primary small" data-order-id="${order.id}" data-order-status="ready">Mark ready</button>`;
+  if (order.status === "ready" && !task) return `<button class="btn primary small" data-order-id="${order.id}" data-order-status="completed">Complete pickup</button>`;
+  return "";
+}
+
+function bindOrderActions(app, root) {
+  root.querySelectorAll("[data-order-status]").forEach(button => {
+    button.addEventListener("click", () => {
+      app.store.updateOrderStatus(button.dataset.orderId, button.dataset.orderStatus);
+      app.closeDialog();
+      app.render();
+    });
+  });
+}
+
+function openOrderDetails(app, orderId) {
+  const order = app.store.order(orderId);
+  if (!order) return;
+  const outlet = app.store.outlet(order.outletId);
+  const task = app.store.deliveryTaskForOrder(order.id);
+  const driver = task?.assignedDriverId ? app.store.driver(task.assignedDriverId) : null;
+  const deliveryEvents = task
+    ? app.store.state.deliveryEvents.filter(event => event.taskId === task.id).sort((a, b) => b.createdAt - a.createdAt)
+    : [];
+
+  app.openDialog(`
+    <div class="dialog-inner">
+      <div class="dialog-head">
+        <div>
+          <div class="order-meta"><span class="eyebrow">Order ${escapeHtml(order.id)}</span><span class="badge ${order.paymentStatus === "paid" ? "ok" : "warn"}">${escapeHtml(order.paymentStatus)}</span></div>
+          <h2 style="margin:6px 0 0">${escapeHtml(outlet?.name || "Order details")}</h2>
+        </div>
+        <button class="icon-btn" data-close-dialog>✕</button>
+      </div>
+
+      <div class="order-summary">
+        <div class="summary-line"><span>Status</span><strong>${escapeHtml(order.status)}</strong></div>
+        <div class="summary-line"><span>Fulfilment</span><strong>${task ? "Home delivery" : "Pickup"}</strong></div>
+        ${task ? `<div class="summary-line"><span>Delivery</span><strong>${escapeHtml(deliveryStatusLabel(task.status))}</strong></div>` : ""}
+      </div>
+
+      <div class="detail-section">
+        <h3>Items</h3>
+        <div class="order-items">
+          ${order.items.map(item => `<div class="order-item"><div><strong>${item.qty} × ${escapeHtml(item.name)}</strong><div class="muted small">${money(item.price)} each</div></div><strong>${money(item.qty * item.price)}</strong></div>`).join("")}
+        </div>
+        ${Number(order.deliveryFee || 0) > 0 ? `<div class="summary-line"><span>Delivery</span><strong>${money(order.deliveryFee)}</strong></div>` : ""}
+        <div class="summary-line total"><span>Total paid</span><strong>${money(order.amount)}</strong></div>
+      </div>
+
+      <div class="detail-section">
+        <h3>Customer</h3>
+        <div class="summary-line"><span>Name</span><strong>${escapeHtml(order.customer)}</strong></div>
+        ${order.phone ? `<div class="summary-line"><span>Phone</span><strong>${escapeHtml(order.phone)}</strong></div>` : ""}
+        ${task?.dropoff?.address ? `<div class="summary-line"><span>Deliver to</span><strong>${escapeHtml(task.dropoff.address)}</strong></div>` : ""}
+        ${order.notes ? `<div class="notice" style="margin-top:10px"><strong>Order note</strong><div class="small" style="margin-top:4px">${escapeHtml(order.notes)}</div></div>` : ""}
+      </div>
+
+      ${task ? `<div class="detail-section">
+        <h3>Delivery</h3>
+        <div class="summary-line"><span>Current status</span><strong>${escapeHtml(deliveryStatusLabel(task.status))}</strong></div>
+        ${driver ? `<div class="summary-line"><span>Driver</span><strong>${escapeHtml(driver.name)}</strong></div>` : '<div class="summary-line"><span>Driver</span><strong>Not assigned yet</strong></div>'}
+      </div>` : ""}
+
+      <details class="details-disclosure">
+        <summary>More details</summary>
+        <div style="margin-top:10px">
+          <div class="summary-line"><span>Placed</span><strong>${formatDateTime(order.createdAt)}</strong></div>
+          ${order.email ? `<div class="summary-line"><span>Email</span><strong>${escapeHtml(order.email)}</strong></div>` : ""}
+          ${order.paymentId ? `<div class="summary-line"><span>Payment reference</span><strong>${escapeHtml(order.paymentId)}</strong></div>` : ""}
+          ${deliveryEvents.length ? `<div style="margin-top:12px"><strong class="small">Delivery events</strong><div class="timeline" style="margin-top:10px">${deliveryEvents.map(event => `<div class="timeline-item"><span class="timeline-dot"></span><div><strong>${escapeHtml(event.message)}</strong><div class="muted small">${formatDateTime(event.createdAt)}</div></div></div>`).join("")}</div></div>` : ""}
+        </div>
+      </details>
+
+      ${orderActionButton(order, task) ? `<div class="detail-section"><div class="inline-actions">${orderActionButton(order, task)}</div></div>` : ""}
+    </div>`);
+
+  bindOrderActions(app, app.dialog);
 }
 
 function catalogueTable(app, products) {
   if (!products.length) return '<div class="empty">No menu items yet.</div>';
-  return `<table><thead><tr><th>Item</th><th>Category</th><th>Price</th><th>Outlets</th><th>Status</th></tr></thead><tbody>${products.map(product => `<tr>
-    <td>${product.emoji || "🥪"} <strong>${escapeHtml(product.name)}</strong></td><td>${escapeHtml(product.category)}</td><td>${money(product.price)}</td>
-    <td>${product.outletIds.map(id => escapeHtml(app.store.outlet(id)?.name || id)).join("<br>")}</td><td><span class="badge ${product.enabled ? "ok" : "danger"}">${product.enabled ? "Enabled" : "Disabled"}</span></td>
+  return `<table><thead><tr><th>Item</th><th>Price</th><th>Available at</th><th>Status</th></tr></thead><tbody>${products.map(product => `<tr>
+    <td>${product.emoji || "🥪"} <strong>${escapeHtml(product.name)}</strong><div class="muted small">${escapeHtml(product.category)}</div></td>
+    <td>${money(product.price)}</td>
+    <td>${product.outletIds.map(id => escapeHtml(app.store.outlet(id)?.name || id)).join("<br>")}</td>
+    <td><span class="badge ${product.enabled ? "ok" : "danger"}">${product.enabled ? "Enabled" : "Disabled"}</span></td>
   </tr>`).join("")}</tbody></table>`;
 }
 
 function openBanking(app, merchant) {
   app.openDialog(`
     <div class="dialog-inner">
-      <div class="dialog-head"><h2>Settlement onboarding</h2><button class="icon-btn" data-close-dialog>✕</button></div>
-      <div class="notice info">GoodKota controls the gateway integration. In production these details should be handed to the payment provider for verification/tokenisation rather than stored raw by GoodKota.</div>
-      <form id="bankingForm" class="form-grid" style="margin-top:14px">
+      <div class="dialog-head"><h2>Settlement details</h2><button class="icon-btn" data-close-dialog>✕</button></div>
+      <form id="bankingForm" class="form-grid">
         <label class="field">Account holder<input id="bankHolder" value="${escapeHtml(merchant.legalName)}" required /></label>
         <label class="field">Bank<select id="bankName"><option>Demo Bank</option><option>Other SA Bank</option></select></label>
-        <label class="field">Account number<input id="bankAccount" inputmode="numeric" placeholder="Enter account number" required /></label>
-        <label class="field">Branch code<input id="branchCode" inputmode="numeric" placeholder="000000" required /></label>
+        <label class="field">Account number<input id="bankAccount" inputmode="numeric" required /></label>
+        <label class="field">Branch code<input id="branchCode" inputmode="numeric" required /></label>
         <button class="btn primary field full">Submit for verification</button>
       </form>
     </div>`);
@@ -147,7 +209,7 @@ function openBanking(app, merchant) {
       { id: merchant.gatewayAccount?.id || uid("sub_demo"), status: "pending" }
     );
     app.closeDialog();
-    app.toast("Settlement details captured and marked pending verification. Raw account number was not persisted by this demo.");
+    app.toast("Settlement details submitted for verification.");
     app.render();
   });
 }
@@ -163,7 +225,7 @@ function openProduct(app, merchant, outlets) {
         <label class="field">Emoji<input id="productEmoji" value="🥪" maxlength="4" /></label>
         <label class="field full">Description<textarea id="productDescription" rows="3"></textarea></label>
         <div class="field full"><span>Available outlets</span>${outlets.map(outlet => `<label style="font-weight:500"><input type="checkbox" name="productOutlet" value="${outlet.id}" checked style="width:auto"> ${escapeHtml(outlet.name)}</label>`).join("")}</div>
-        <button class="btn primary field full">Save menu item</button>
+        <button class="btn primary field full">Save item</button>
       </form>
     </div>`);
 
@@ -172,12 +234,15 @@ function openProduct(app, merchant, outlets) {
     const outletIds = [...app.dialog.querySelectorAll('[name="productOutlet"]:checked')].map(input => input.value);
     if (!outletIds.length) return alert("Select at least one outlet.");
     app.store.addProduct({
-      id: uid("product"), merchantId: merchant.id, outletIds,
+      id: uid("product"),
+      merchantId: merchant.id,
+      outletIds,
       name: app.dialog.querySelector("#productName").value.trim(),
       price: Number(app.dialog.querySelector("#productPrice").value),
       category: app.dialog.querySelector("#productCategory").value.trim() || "Other",
       desc: app.dialog.querySelector("#productDescription").value.trim(),
-      emoji: app.dialog.querySelector("#productEmoji").value || "🥪", enabled: true
+      emoji: app.dialog.querySelector("#productEmoji").value || "🥪",
+      enabled: true
     });
     app.closeDialog();
     app.toast("Menu item added.");

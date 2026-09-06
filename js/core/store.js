@@ -3,7 +3,7 @@ import { assessQuality, summariseRatings } from "../services/quality-service.js"
 import { nextDriverStatus, statusEvent, taskForOrder } from "../services/delivery-service.js";
 import { uid } from "./utils.js";
 
-const STORAGE_KEY = "goodkota_foundation_v3";
+const STORAGE_KEY = "goodkota_foundation_v4";
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -51,6 +51,7 @@ export class AppStore {
   driver(id) { return this.state.drivers.find(item => item.id === id); }
   vehicle(id) { return this.state.driverVehicles.find(item => item.id === id); }
   deliveryTask(id) { return this.state.deliveryTasks.find(item => item.id === id); }
+  order(id) { return this.state.orders.find(item => item.id === id); }
   deliveryTaskForOrder(orderId) { return taskForOrder(this.state, orderId); }
 
   productsForOutlet(outletId) {
@@ -252,6 +253,54 @@ export class AppStore {
     if (!merchant) return;
     merchant.settlement = settlement;
     merchant.gatewayAccount = gatewayAccount;
+    this.save();
+  }
+
+  addMerchantWithPrimaryOutlet({ merchant, outlet }) {
+    if (!merchant?.id || !outlet?.id) throw new Error("Merchant and primary outlet are required.");
+    if (this.merchant(merchant.id) || this.outlet(outlet.id)) throw new Error("Merchant or outlet already exists.");
+
+    this.state.merchants.push({
+      enabled: true,
+      contact: {},
+      deliveryCapability: { ownDrivers: false, acceptsGoodKotaFleet: true, thirdPartyAllowed: true },
+      gatewayAccount: { id: null, status: "not_configured" },
+      settlement: { bankName: "", accountHolder: "", maskedAccount: "", status: "not_configured" },
+      ...merchant,
+      primaryOutletId: outlet.id
+    });
+
+    this.state.outlets.push({
+      enabled: true,
+      prepMinutes: 20,
+      deliveryFee: 20,
+      minOrder: 30,
+      delivery: { enabled: true, radiusKm: 7, providerPreference: "goodkota_fleet" },
+      qualityWorkflow: { status: "healthy", note: "" },
+      ...outlet,
+      merchantId: merchant.id
+    });
+
+    this.refreshQualitySummaries(false);
+    this.save();
+  }
+
+  addOutlet(merchantId, outlet) {
+    const merchant = this.merchant(merchantId);
+    if (!merchant) throw new Error("Merchant not found.");
+    if (!outlet?.id || this.outlet(outlet.id)) throw new Error("A valid new outlet is required.");
+
+    this.state.outlets.push({
+      enabled: true,
+      prepMinutes: 20,
+      deliveryFee: 20,
+      minOrder: 30,
+      delivery: { enabled: true, radiusKm: 7, providerPreference: "goodkota_fleet" },
+      qualityWorkflow: { status: "healthy", note: "" },
+      ...outlet,
+      merchantId
+    });
+    this.refreshQualitySummaries(false);
     this.save();
   }
 

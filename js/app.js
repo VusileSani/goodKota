@@ -27,6 +27,10 @@ class GoodKotaApp {
     this.bindShell();
     registerServiceWorker();
     this.render();
+
+    const splash = document.querySelector("#brandSplash");
+    window.setTimeout(() => splash?.classList.add("is-hidden"), 650);
+    window.setTimeout(() => splash?.remove(), 1100);
   }
 
   bindShell() {
@@ -120,7 +124,7 @@ class GoodKotaApp {
     toast.textContent = message;
     Object.assign(toast.style, {
       position: "fixed", right: "18px", bottom: "18px", zIndex: 200, maxWidth: "420px",
-      background: "#111827", color: "white", padding: "13px 16px", borderRadius: "12px",
+      background: "#2b211e", color: "white", padding: "13px 16px", borderRadius: "12px",
       boxShadow: "0 12px 30px rgba(0,0,0,.24)"
     });
     document.body.appendChild(toast);

@@ -33,6 +33,7 @@ export const seed = {
   merchants: [
     {
       id: "m1",
+      primaryOutletId: "o1",
       name: "Kasi Bites Group",
       legalName: "Kasi Bites (Pty) Ltd",
       enabled: true,
@@ -42,6 +43,7 @@ export const seed = {
     },
     {
       id: "m2",
+      primaryOutletId: "o2",
       name: "Tembisa Kota Co.",
       legalName: "Tembisa Kota Company (Pty) Ltd",
       enabled: true,
@@ -51,6 +53,7 @@ export const seed = {
     },
     {
       id: "m3",
+      primaryOutletId: "o3",
       name: "Centurion Kota Works",
       legalName: "Centurion Kota Works CC",
       enabled: true,

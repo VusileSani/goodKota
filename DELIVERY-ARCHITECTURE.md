@@ -50,7 +50,7 @@ GoodKota should continue to expose its own stable delivery statuses to customers
 
 ## Dispatch evolution
 
-Foundation v3 ranks available eligible drivers by straight-line distance to the outlet after the outlet marks the food ready.
+This foundation ranks available eligible drivers by straight-line distance to the outlet after the outlet marks the food ready.
 
 Future dispatch scoring can become:
 

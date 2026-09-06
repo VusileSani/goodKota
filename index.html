@@ -3,17 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#111827" />
+  <meta name="theme-color" content="#F15A29" />
   <meta name="description" content="GoodKota — location-first kota discovery, verified quality, ordering and delivery-ready fulfilment." />
-  <title>GoodKota — Foundation v3 Delivery Ready</title>
+  <title>GoodKota — Foundation v4</title>
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
+  <link rel="icon" href="./assets/goodkota-logo.png" type="image/png" />
   <link rel="stylesheet" href="./css/styles.css" />
 </head>
 <body>
+  <div id="brandSplash" class="brand-splash" aria-hidden="true">
+    <img class="brand-splash-logo" src="./assets/goodkota-logo.png" alt="" />
+  </div>
+
   <header class="app-header">
     <button class="brand" id="brandHome" aria-label="GoodKota home">
-      <span class="brand-mark">GK</span>
+      <img class="brand-logo" src="./assets/goodkota-logo.png" alt="" />
       <span>GoodKota</span>
     </button>
 
@@ -31,8 +35,8 @@
   <dialog id="appDialog" class="dialog"></dialog>
 
   <footer class="app-footer">
-    <strong>GoodKota Foundation v3 — Delivery Ready</strong>
-    <span>Location-first discovery · Verified quality · Direct merchant settlement · Driver/dispatch-ready fulfilment</span>
+    <strong>GoodKota</strong>
+    <span>Find it nearby. Order it. Enjoy it.</span>
   </footer>
 
   <script type="module" src="./js/app.js"></script>

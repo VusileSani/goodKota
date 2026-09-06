@@ -1,4 +1,4 @@
-# GoodKota Firebase data contract — Foundation v3
+# GoodKota Firebase data contract — Foundation v4
 
 Target stack: Firebase Authentication + Cloud Firestore + Cloud Functions + Firebase Cloud Messaging.
 
@@ -31,6 +31,8 @@ proofsOfDelivery/{proofId}
 {
   "name": "Kasi Bites Group",
   "legalName": "Kasi Bites (Pty) Ltd",
+  "primaryOutletId": "o1",
+  "contact": { "email": "owner@example.com" },
   "enabled": true,
   "deliveryCapability": {
     "ownDrivers": false,
@@ -47,6 +49,19 @@ proofsOfDelivery/{proofId}
 ```
 
 Sensitive bank data should preferably be collected/tokenised by the payment provider. GoodKota stores safe provider identifiers and verification state when possible.
+
+### Office onboarding rule
+
+The normal Office flow creates a merchant and its first physical outlet in one user action, while persisting them as separate documents:
+
+```text
+Add Merchant form
+  → create merchants/{merchantId}
+  → create outlets/{primaryOutletId} with merchantId
+  → set merchants/{merchantId}.primaryOutletId
+```
+
+Additional outlets are created later from the merchant detail view. Do not duplicate outlet location or operational fields inside the merchant document.
 
 ## Outlet
 

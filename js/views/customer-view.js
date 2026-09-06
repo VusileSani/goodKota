@@ -134,9 +134,9 @@ export function renderCustomerView(app) {
   app.root.innerHTML = `
     <section class="hero">
       <div>
-        <span class="eyebrow">📍 Location-first kota discovery</span>
+        <span class="eyebrow">📍 Nearby kota</span>
         <h1>Find a good kota nearby.</h1>
-        <p>GoodKota puts the closest eligible outlet first, then gives you verified quality signals before you order.</p>
+        <p>The closest eligible GoodKota outlets come first, with verified quality visible before you order.</p>
         <div class="location-bar">
           <input id="areaSearch" value="${escapeHtml(app.location.label)}" placeholder="Midrand, Tembisa, Soweto..." aria-label="Search area" />
           <button class="btn primary" id="searchArea">Search area</button>
@@ -150,6 +150,7 @@ export function renderCustomerView(app) {
         <p>Verified order ratings feed a quality system. Consistent problems are flagged to GoodKota Office for intervention with the outlet owner.</p>
         <div class="summary-line"><span>Nearby quality outlets</span><strong>${nearbyEligible}</strong></div>
         <div class="summary-line"><span>Closest outlet</span><strong>${ranked[0] ? ranked[0].distanceKm.toFixed(1) + " km" : "—"}</strong></div>
+        <button class="btn ghost small" id="notificationButton" style="margin-top:10px;color:#fff;border-color:#7c6961">${customer.notificationPreferences.nearbyQualityOutlets ? "Nearby alerts on" : "Enable nearby alerts"}</button>
       </aside>
     </section>
 
@@ -179,20 +180,6 @@ export function renderCustomerView(app) {
           </aside>
         </div>
       </section>` : ""}
-
-    <section class="section grid grid-2">
-      <div class="card soft">
-        <span class="eyebrow">Future pass-by discovery</span>
-        <h3>Notify me when a highly rated GoodKota is nearby</h3>
-        <p class="muted">This web build stores your preference and can request normal browser notifications. True background geofencing remains a later native/hybrid capability.</p>
-        <button class="btn dark" id="notificationButton">${customer.notificationPreferences.nearbyQualityOutlets ? "Nearby alerts enabled" : "Enable nearby alerts"}</button>
-      </div>
-      <div class="card">
-        <span class="eyebrow">Delivery-ready foundation</span>
-        <h3>Orders can now become tracked delivery tasks</h3>
-        <p class="muted">Delivery jobs are separate from orders, with driver assignment, current-location snapshots, event history and PIN proof-of-delivery already modelled.</p>
-      </div>
-    </section>
 
     <section class="section">
       <div class="section-head"><div><h2>Your recent orders</h2><p>Track active deliveries and rate completed GoodKota orders.</p></div></div>
@@ -234,15 +221,13 @@ function openCheckout(app) {
   app.openDialog(`
     <div class="dialog-inner">
       <div class="dialog-head"><h2>Secure checkout</h2><button class="icon-btn" data-close-dialog>✕</button></div>
-      <div class="notice info"><strong>Direct merchant settlement:</strong> GoodKota initiates the payment, while the marketplace gateway settles this outlet's proceeds to its verified merchant account.</div>
-      <div class="form-grid" style="margin-top:14px">
+      <div class="form-grid">
         <label class="field">Name<input id="checkoutName" value="${escapeHtml(customer.name)}" /></label>
         <label class="field">Phone<input id="checkoutPhone" value="${escapeHtml(customer.phone)}" /></label>
         <label class="field">Email<input id="checkoutEmail" type="email" value="${escapeHtml(customer.email)}" /></label>
         ${app.deliveryMode === "Home Delivery" ? '<label class="field">Delivery address<input id="checkoutAddress" placeholder="Street / complex / suburb" required /></label>' : ""}
         <label class="field full">Order notes<textarea id="checkoutNotes" rows="3" placeholder="No onions, extra sauce..."></textarea></label>
       </div>
-      ${app.deliveryMode === "Home Delivery" ? '<div class="notice" style="margin-top:12px"><strong>Delivery demo:</strong> the typed address is stored for display; this prototype uses your currently selected area/GPS point as the drop-off coordinates. Production will geocode and validate the actual address.</div>' : ""}
       <div class="card soft" style="margin-top:14px">
         <div class="summary-line"><span>Outlet</span><strong>${escapeHtml(outlet.name)}</strong></div>
         <div class="summary-line"><span>Subtotal</span><strong>${money(subtotal)}</strong></div>
@@ -250,7 +235,7 @@ function openCheckout(app) {
         <div class="summary-line total"><span>To pay</span><strong>${money(total)}</strong></div>
       </div>
       <button class="btn primary" id="payButton" style="width:100%;margin-top:14px">Pay ${money(total)} securely</button>
-      <div class="muted small" style="margin-top:8px">Foundation demo: no card details are collected. Payment success is simulated through the gateway adapter.</div>
+      <div class="muted small" style="margin-top:8px">Prototype checkout — payment is simulated.</div>
     </div>`);
 
   app.dialog.querySelector("#payButton")?.addEventListener("click", async event => {
@@ -358,7 +343,7 @@ function openTracking(app, orderId) {
           ` : '<div class="muted" style="margin-top:8px">A driver has not been assigned yet.</div>'}
         </div>
       </div>
-      ${task.status !== "delivered" && task.verification?.demoPin ? `<div class="notice info" style="margin-top:14px"><strong>Demo delivery PIN: ${escapeHtml(task.verification.demoPin)}</strong><br><span class="small">Only give this PIN to the driver when the order is physically being handed to you. Production will never store this PIN in readable form.</span></div>` : ""}
+      ${task.status !== "delivered" && task.verification?.demoPin ? `<div class="notice info" style="margin-top:14px"><strong>Delivery PIN: ${escapeHtml(task.verification.demoPin)}</strong><br><span class="small">Give this PIN to the driver only when your order is handed to you.</span></div>` : ""}
       <h3 style="margin-top:20px">Delivery timeline</h3>
       <div class="timeline">${events.map(event => `<div class="timeline-item"><span class="timeline-dot"></span><div><strong>${escapeHtml(event.message)}</strong><div class="muted small">${formatDateTime(event.createdAt)}</div></div></div>`).join("")}</div>
       <button class="btn ghost" id="refreshTracking" style="width:100%;margin-top:14px">Refresh tracking snapshot</button>
@@ -400,7 +385,7 @@ function openRating(app, orderId) {
     if (!values.overall || !values.food || !values.service) return alert("Please rate the overall experience, food and service.");
     app.store.addRating({ orderId, ...values, comment: app.dialog.querySelector("#ratingComment").value });
     app.closeDialog();
-    app.toast("Verified rating recorded. It now contributes to the outlet's GoodKota quality signal.");
+    app.toast("Thanks. Your verified rating was recorded.");
     app.render();
   });
 }

@@ -1,4 +1,4 @@
-# GoodKota Firebase data contract — Foundation v4.2
+# GoodKota Firebase data contract — v6.0
 
 Target stack: Firebase Authentication + Cloud Firestore + Cloud Functions + Firebase Cloud Messaging.
 
@@ -10,18 +10,101 @@ merchants/{merchantId}
 products/{productId}
 orders/{orderId}
 ratings/{ratingId}
-payments/{paymentId}
+paymentTransactions/{paymentId}
+paymentEvents/{eventId}
+refunds/{refundId}
+merchantPayouts/{payoutId}
+settlementEvents/{eventId}
+feeAllocations/{allocationId}
+reconciliationRuns/{runId}
 qualityCases/{caseId}
 notificationSubscriptions/{subscriptionId}
 promotions/{promotionId}
+platformStaff/{staffId}
+supportCases/{caseId}
+supportCaseEvents/{eventId}
+announcements/{announcementId}
+orderEvents/{eventId}
+merchantComplianceEvents/{eventId}
+commercialStatusEvents/{eventId}
+platformAudit/{auditEventId}
+platformConfig/current
 
 drivers/{driverId}
 driverVehicles/{vehicleId}
 driverLocations/{driverId}
 deliveryTasks/{taskId}
+deliveryCredentials/{taskId}
 deliveryAssignments/{assignmentId}
 deliveryEvents/{eventId}
 proofsOfDelivery/{proofId}
+```
+
+## Platform governance
+
+Platform authority is distinct from venue/merchant operations. Recommended server-issued custom claims are `goodkotaOwner` and `goodkotaAdmin`. Never allow a browser client to grant these claims to itself.
+
+### Platform staff
+
+```json
+{
+  "name": "Platform Operations",
+  "email": "operations@goodkota.co.za",
+  "role": "admin",
+  "active": true,
+  "createdAt": "server timestamp"
+}
+```
+
+Only an authenticated Owner may create/change platform authority. A trusted server function must reject any change that would leave zero active Owners.
+
+### Platform config
+
+```json
+{
+  "maintenanceMode": false,
+  "orderingEnabled": true,
+  "paymentsEnabled": true,
+  "deliveryEnabled": true,
+  "merchantOnboardingEnabled": true
+}
+```
+
+Protected control writes are Owner-only and must create an immutable audit event containing actor, target, old/new state, reason and server timestamp.
+
+### Support case
+
+```json
+{
+  "source": "merchant",
+  "merchantId": "m1",
+  "subject": "Settlement verification",
+  "message": "...",
+  "priority": "normal",
+  "status": "open",
+  "assignedTo": "staffUid",
+  "resolutionNote": "",
+  "createdAt": "server timestamp",
+  "updatedAt": "server timestamp"
+}
+```
+
+### Platform audit
+
+Audit events should be append-only. Do not provide ordinary update/delete permissions on historical audit entries.
+
+```json
+{
+  "actorUid": "uid",
+  "actorRole": "owner",
+  "action": "platform_control_changed",
+  "targetType": "platform_control",
+  "targetId": "paymentsEnabled",
+  "reason": "Incident response",
+  "before": true,
+  "after": false,
+  "createdAt": "server timestamp"
+}
 ```
 
 ## Merchant
@@ -64,6 +147,11 @@ A merchant is the real operating store/location. Location and operating fields l
   },
   "qualityWorkflow": {
     "status": "healthy",
+    "note": ""
+  },
+  "commercial": {
+    "plan": "Standard",
+    "status": "active",
     "note": ""
   }
 }
@@ -197,6 +285,24 @@ awaiting_prep
 
 `cancelled` is terminal.
 
+
+## Customer delivery credential
+
+The delivery task contains only the server-side hash of the PIN. The customer-readable PIN is kept separately so the driver client cannot read the expected value.
+
+```json
+{
+  "taskId": "dt1",
+  "orderId": "orderId",
+  "customerId": "uid",
+  "pin": "4827",
+  "createdAt": "server timestamp",
+  "expiresAt": "TTL timestamp"
+}
+```
+
+Security Rules allow only the owning customer to read this document. Cloud Functions create/delete it; TTL removes stale credentials. Drivers never receive read access.
+
 ## Delivery assignment
 
 ```json
@@ -271,5 +377,10 @@ Delivery quality should later be a separate dimension so logistics problems do n
 - disabled or quality-suspended merchants cannot accept new GoodKota orders
 - only the relevant merchant/authorized merchant user can change its order preparation state
 - a delivery cannot be assigned until the merchant marks the order ready
-- driver location reads are restricted to authorized operations and the assigned customer context
+- driver location reads are restricted to authorized operations, the driver, and the assigned customer context
 - delivery proof is server-verified and cannot rely on a credential readable by the driver client
+
+
+## v6 operational event and retention collections
+
+Additional production collections include `idempotencyRecords`, `jobs`, `rateLimits`, `operationalAlerts`, `analyticsEvents`, `telemetryEvents`, `merchantQualityAggregates` and materialized/aggregate documents. Ephemeral collections use TTL where appropriate; audit and financial histories are never client-deletable.

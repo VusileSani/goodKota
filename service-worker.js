@@ -1,25 +1,38 @@
-const CACHE = "goodkota-v4-3-shell";
+const CACHE = "goodkota-v6-scale-foundation-shell";
 const SHELL = [
   "./",
   "./index.html",
   "./css/styles.css",
+  "./manifest.webmanifest",
+  "./assets/goodkota-logo.png",
+  "./assets/goodkota-splash.jpg",
   "./js/app.js",
   "./js/core/store.js",
   "./js/core/utils.js",
   "./js/data/seed.js",
+  "./js/infrastructure/local-database.js",
+  "./js/repositories/repository-hub.js",
+  "./js/services/authorization-service.js",
+  "./js/services/command-service.js",
+  "./js/services/delivery-service.js",
+  "./js/services/feature-flag-service.js",
+  "./js/services/financial-ledger-service.js",
+  "./js/services/geocoding-service.js",
+  "./js/services/geohash-service.js",
+  "./js/services/job-service.js",
   "./js/services/location-service.js",
   "./js/services/notification-service.js",
   "./js/services/payment-service.js",
   "./js/services/quality-service.js",
-  "./js/services/delivery-service.js",
+  "./js/services/retention-service.js",
+  "./js/services/search-service.js",
+  "./js/services/telemetry-service.js",
   "./js/views/customer-view.js",
   "./js/views/merchant-view.js",
   "./js/views/driver-view.js",
   "./js/views/delivery-ops-view.js",
   "./js/views/admin-view.js",
-  "./assets/goodkota-logo.png",
-  "./assets/goodkota-splash.jpg",
-  "./manifest.webmanifest"
+  "./js/views/owner-view.js"
 ];
 
 self.addEventListener("install", event => {

@@ -1,5 +1,3 @@
-import { distanceKm } from "./location-service.js";
-
 export const DELIVERY_STATUS_ORDER = [
   "awaiting_prep",
   "ready_for_dispatch",
@@ -12,21 +10,20 @@ export const DELIVERY_STATUS_ORDER = [
   "delivered"
 ];
 
-const LABELS = {
-  awaiting_prep: "Preparing",
-  ready_for_dispatch: "Ready for driver",
-  assigned: "Driver assigned",
-  driver_to_pickup: "Driver heading to merchant",
-  at_pickup: "Driver at merchant",
-  picked_up: "Picked up",
-  en_route: "On the way",
-  arriving: "Arriving",
-  delivered: "Delivered",
-  cancelled: "Cancelled"
-};
-
 export function deliveryStatusLabel(status) {
-  return LABELS[status] || String(status || "Unknown");
+  const labels = {
+    awaiting_prep: "Merchant preparing",
+    ready_for_dispatch: "Ready for driver",
+    assigned: "Driver assigned",
+    driver_to_pickup: "Driver heading to merchant",
+    at_pickup: "Driver at merchant",
+    picked_up: "Order collected",
+    en_route: "On the way",
+    arriving: "Arriving",
+    delivered: "Delivered",
+    cancelled: "Cancelled"
+  };
+  return labels[status] || String(status || "").replaceAll("_", " ");
 }
 
 export function deliveryProgress(status) {
@@ -38,46 +35,6 @@ export function deliveryProgress(status) {
 
 export function isActiveDelivery(task) {
   return Boolean(task) && !["delivered", "cancelled"].includes(task.status);
-}
-
-export function taskForOrder(state, orderId) {
-  return state.deliveryTasks.find(task => task.orderId === orderId) || null;
-}
-
-export function currentDriverLocation(state, driverId) {
-  return state.driverLocations
-    .filter(item => item.driverId === driverId)
-    .sort((a, b) => b.recordedAt - a.recordedAt)[0] || null;
-}
-
-export function trackingEvents(state, taskId) {
-  return state.deliveryEvents
-    .filter(event => event.taskId === taskId)
-    .sort((a, b) => a.createdAt - b.createdAt);
-}
-
-export function recommendDrivers(state, task) {
-  const pickup = { lat: task.pickup.latitude, lng: task.pickup.longitude };
-  const merchant = state.merchants.find(item => item.id === task.merchantId);
-
-  return state.drivers
-    .filter(driver => driver.enabled && driver.shiftStatus === "online" && driver.availability === "available")
-    .filter(driver => {
-      if (task.providerType === "merchant_fleet") return driver.operatorType === "merchant" && driver.operatorId === task.merchantId;
-      if (task.providerType === "goodkota_fleet") return driver.operatorType === "goodkota";
-      if (task.providerType === "hybrid") {
-        return driver.operatorType === "goodkota" || (driver.operatorType === "merchant" && driver.operatorId === merchant?.id);
-      }
-      return true;
-    })
-    .map(driver => {
-      const location = currentDriverLocation(state, driver.id);
-      const distanceToPickupKm = location
-        ? distanceKm({ lat: location.latitude, lng: location.longitude }, pickup)
-        : Number.POSITIVE_INFINITY;
-      return { driver, location, distanceToPickupKm };
-    })
-    .sort((a, b) => a.distanceToPickupKm - b.distanceToPickupKm);
 }
 
 export function estimateMinutes(distance, assumedKmh = 28) {

@@ -1,13 +1,13 @@
 import { escapeHtml, formatDateTime, money } from "../core/utils.js";
-import { currentDriverLocation, deliveryStatusLabel, estimateMinutes, isActiveDelivery, recommendDrivers } from "../services/delivery-service.js";
+import { deliveryStatusLabel, estimateMinutes, isActiveDelivery } from "../services/delivery-service.js";
 
 export function renderDeliveryOpsView(app) {
-  const { state } = app.store;
-  const tasks = state.deliveryTasks;
+  const deliveryEnabled = app.repos.platform.controls().deliveryEnabled;
+  const tasks = app.repos.delivery.listQueue({ limit: 50 }).items;
+  const drivers = app.repos.delivery.listDrivers({ limit: 50 }).items;
   const active = tasks.filter(isActiveDelivery);
   const dispatchable = tasks.filter(task => task.status === "ready_for_dispatch" && !task.assignedDriverId);
-  const availableDrivers = state.drivers.filter(driver => driver.enabled && driver.shiftStatus === "online" && driver.availability === "available");
-  const delivered = tasks.filter(task => task.status === "delivered");
+  const availableDrivers = app.repos.delivery.listDrivers({ limit: 50, enabled: true, shiftStatus: "online", availability: "available" }).items;
 
   app.root.innerHTML = `
     <section class="section-head">
@@ -20,6 +20,7 @@ export function renderDeliveryOpsView(app) {
       <div class="stat"><span class="muted">Available drivers</span><b>${availableDrivers.length}</b></div>
     </div>
 
+    ${!deliveryEnabled ? '<div class="notice"><strong>Delivery operations are paused by the GoodKota Owner.</strong><div class="small" style="margin-top:4px">The queue remains visible for incident handling, but new dispatch assignments are disabled.</div></div>' : ""}
     <section class="section">
       <div class="section-head"><div><h3>Delivery queue</h3><p>Assign drivers, monitor the hand-off and see the customer-facing delivery state.</p></div></div>
       <div class="table-wrap">${taskTable(app, tasks)}</div>
@@ -27,18 +28,20 @@ export function renderDeliveryOpsView(app) {
 
     <section class="section">
       <div class="section-head"><div><h3>Driver fleet</h3><p>GoodKota-owned and merchant-owned drivers share a common operational contract.</p></div></div>
-      <div class="table-wrap">${driverTable(app, state.drivers)}</div>
+      <div class="table-wrap">${driverTable(app, drivers)}</div>
     </section>
 `;
 
   app.root.querySelectorAll("[data-assign-best]").forEach(button => {
+    button.disabled = !deliveryEnabled;
     button.addEventListener("click", () => {
-      const task = app.store.deliveryTask(button.dataset.assignBest);
-      const recommendations = recommendDrivers(app.store.state, task);
+      if (!deliveryEnabled) return alert("GoodKota delivery operations are temporarily paused.");
+      const task = app.repos.delivery.task(button.dataset.assignBest);
+      const recommendations = app.repos.delivery.recommendDrivers(task, { limit: 10 });
       if (!recommendations.length) return alert("No eligible available driver is currently online for this delivery provider.");
       try {
-        app.store.assignDriver(task.id, recommendations[0].driver.id, "delivery_ops_demo");
-        app.toast(`${recommendations[0].driver.name} assigned to ${task.orderId}.`);
+        app.commands.assignDriver({ taskId: task.id, driverId: recommendations[0].driver.id, actorId: "delivery_ops" });
+        app.toast(`${recommendations[0].driver.name} assigned to ${app.repos.orders.get(task.orderId)?.orderNumber || task.orderId}.`);
         app.render();
       } catch (error) { alert(error.message); }
     });
@@ -48,18 +51,18 @@ export function renderDeliveryOpsView(app) {
 function taskTable(app, tasks) {
   if (!tasks.length) return '<div class="empty">No delivery tasks yet. Place a Home Delivery order from Customer view.</div>';
   return `<table><thead><tr><th>Delivery</th><th>Merchant → Customer</th><th>Provider</th><th>Status</th><th>Driver</th><th>Fee</th><th>Dispatch</th></tr></thead><tbody>${tasks.map(task => {
-    const order = app.store.state.orders.find(item => item.id === task.orderId);
-    const merchant = app.store.merchant(task.merchantId);
-    const driver = task.assignedDriverId ? app.store.driver(task.assignedDriverId) : null;
-    const recommendations = !driver && ["awaiting_prep", "ready_for_dispatch"].includes(task.status) ? recommendDrivers(app.store.state, task) : [];
+    const order = app.repos.orders.get(task.orderId);
+    const merchant = app.repos.merchants.get(task.merchantId);
+    const driver = task.assignedDriverId ? app.repos.delivery.driver(task.assignedDriverId) : null;
+    const recommendations = !driver && ["awaiting_prep", "ready_for_dispatch"].includes(task.status) ? app.repos.delivery.recommendDrivers(task, { limit: 10 }) : [];
     const best = recommendations[0];
     return `<tr>
-      <td><strong>${escapeHtml(task.orderId)}</strong><div class="muted small">${formatDateTime(task.createdAt)}</div></td>
+      <td><strong>${escapeHtml(order?.orderNumber || task.orderId)}</strong><div class="muted small">${formatDateTime(task.createdAt)}</div></td>
       <td><strong>${escapeHtml(merchant?.name || task.pickup.address)}</strong><div class="muted small">→ ${escapeHtml(order?.customer || "Customer")} · ${escapeHtml(task.dropoff.address)}</div></td>
       <td><span class="badge">${escapeHtml(task.providerType)}</span></td>
       <td><span class="badge ${task.status === "delivered" ? "ok" : "info"}">${escapeHtml(deliveryStatusLabel(task.status))}</span></td>
       <td>${driver ? `<strong>${escapeHtml(driver.name)}</strong><div class="muted small">${escapeHtml(driver.operatorType)}</div>` : '<span class="muted">Unassigned</span>'}</td>
-      <td>${money(task.deliveryFee)}</td>
+      <td>${money(task.deliveryFeeCents)}</td>
       <td>${driver
         ? '<span class="muted small">Assigned</span>'
         : task.status === "awaiting_prep"
@@ -75,16 +78,16 @@ function taskTable(app, tasks) {
 
 function driverTable(app, drivers) {
   return `<table><thead><tr><th>Driver</th><th>Fleet</th><th>Vehicle</th><th>Shift</th><th>Availability</th><th>Current job</th><th>Location snapshot</th></tr></thead><tbody>${drivers.map(driver => {
-    const vehicle = app.store.vehicle(driver.vehicleId);
-    const location = currentDriverLocation(app.store.state, driver.id);
-    const task = driver.activeTaskId ? app.store.deliveryTask(driver.activeTaskId) : null;
+    const vehicle = app.repos.delivery.vehicle(driver.vehicleId);
+    const location = app.repos.delivery.currentLocation(driver.id);
+    const task = driver.activeTaskId ? app.repos.delivery.task(driver.activeTaskId) : null;
     return `<tr>
       <td><strong>${escapeHtml(driver.name)}</strong><div class="muted small">⭐ ${Number(driver.rating || 0).toFixed(1)} · ${driver.completedDeliveries} completed</div></td>
-      <td>${driver.operatorType === "goodkota" ? "GoodKota" : escapeHtml(app.store.merchant(driver.operatorId)?.name || "Merchant")}</td>
+      <td>${driver.operatorType === "goodkota" ? "GoodKota" : escapeHtml(app.repos.merchants.get(driver.operatorId)?.name || "Merchant")}</td>
       <td>${escapeHtml(vehicle?.type || "—")}<div class="muted small">${escapeHtml(vehicle?.registration || "")}</div></td>
       <td><span class="badge ${driver.shiftStatus === "online" ? "ok" : ""}">${escapeHtml(driver.shiftStatus)}</span></td>
       <td>${escapeHtml(driver.availability)}</td>
-      <td>${task ? `<strong>${escapeHtml(task.orderId)}</strong><div class="muted small">${escapeHtml(deliveryStatusLabel(task.status))}</div>` : "—"}</td>
+      <td>${task ? `<strong>${escapeHtml(order?.orderNumber || task.orderId)}</strong><div class="muted small">${escapeHtml(deliveryStatusLabel(task.status))}</div>` : "—"}</td>
       <td>${location ? formatDateTime(location.recordedAt) : "—"}</td>
     </tr>`;
   }).join("")}</tbody></table>`;

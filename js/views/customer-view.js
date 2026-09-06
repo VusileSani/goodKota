@@ -1,11 +1,11 @@
-import { escapeHtml, formatDateTime, money } from "../core/utils.js";
+import { escapeHtml, formatDateTime, money, uid } from "../core/utils.js";
 import { qualityBadge, isEligibleForProximityRecommendation } from "../services/quality-service.js";
-import { currentDriverLocation, deliveryProgress, deliveryStatusLabel, trackingEvents } from "../services/delivery-service.js";
+import { deliveryProgress, deliveryStatusLabel } from "../services/delivery-service.js";
 
 function cartSubtotal(app) {
   return app.cart.reduce((total, line) => {
-    const product = app.store.product(line.productId);
-    return total + (product?.price || 0) * line.qty;
+    const product = app.repos.products.get(line.productId);
+    return total + (product?.priceCents || 0) * line.qty;
   }, 0);
 }
 
@@ -14,7 +14,7 @@ function cartCount(app) {
 }
 
 function cartTotal(app, merchant) {
-  const delivery = app.deliveryMode === "Home Delivery" && merchant ? merchant.deliveryFee : 0;
+  const delivery = app.deliveryMode === "Home Delivery" && merchant ? merchant.deliveryFeeCents : 0;
   return cartSubtotal(app) + delivery;
 }
 
@@ -99,7 +99,7 @@ function productCard(product) {
         <span class="muted small">${escapeHtml(product.category)}</span>
         <h3>${escapeHtml(product.name)}</h3>
         <p>${escapeHtml(product.desc || "")}</p>
-        <strong class="price">${money(product.price)}</strong>
+        <strong class="price">${money(product.priceCents)}</strong>
       </div>
       <div class="customer-product-visual" aria-hidden="true">${product.emoji || "🥪"}</div>
       <button class="customer-add-button" data-add-product="${product.id}" aria-label="Add ${escapeHtml(product.name)} to cart">+</button>
@@ -108,27 +108,27 @@ function productCard(product) {
 
 function cartLines(app) {
   return app.cart.map(line => {
-    const product = app.store.product(line.productId);
+    const product = app.repos.products.get(line.productId);
     if (!product) return "";
     return `
       <div class="customer-cart-line">
         <div class="customer-cart-line-copy">
           <strong>${escapeHtml(product.name)}</strong>
-          <span class="muted small">${money(product.price)} each</span>
+          <span class="muted small">${money(product.priceCents)} each</span>
         </div>
         <div class="qty" aria-label="Quantity controls for ${escapeHtml(product.name)}">
           <button data-qty="-1" data-product="${product.id}" aria-label="Decrease quantity">−</button>
           <strong>${line.qty}</strong>
           <button data-qty="1" data-product="${product.id}" aria-label="Increase quantity">+</button>
         </div>
-        <strong>${money(product.price * line.qty)}</strong>
+        <strong>${money(product.priceCents * line.qty)}</strong>
       </div>`;
   }).join("");
 }
 
 function cartSummary(app, merchant, includeCheckout = true) {
   const subtotal = cartSubtotal(app);
-  const delivery = app.deliveryMode === "Home Delivery" && merchant ? merchant.deliveryFee : 0;
+  const delivery = app.deliveryMode === "Home Delivery" && merchant ? merchant.deliveryFeeCents : 0;
   return `
     ${app.cart.length ? cartLines(app) : '<div class="empty">Your cart is empty.</div>'}
     ${app.cart.length ? `
@@ -137,24 +137,24 @@ function cartSummary(app, merchant, includeCheckout = true) {
         <div class="summary-line"><span>Delivery</span><strong>${money(delivery)}</strong></div>
         <div class="summary-line total"><span>Total</span><strong>${money(subtotal + delivery)}</strong></div>
       </div>
-      ${includeCheckout ? `<button class="btn primary customer-primary-action" id="checkoutButton">Checkout · ${money(subtotal + delivery)}</button>` : ""}` : ""}`;
+      ${includeCheckout ? (app.repos.platform.controls().orderingEnabled ? `<button class="btn primary customer-primary-action" id="checkoutButton">Checkout · ${money(subtotal + delivery)}</button>` : `<div class="notice" style="margin-top:12px">New ordering is temporarily paused.</div>`) : ""}` : ""}`;
 }
 
 function recentOrders(app) {
-  const customer = app.store.customer;
-  const orders = app.store.state.orders.filter(order => order.customerId === customer.id).slice(0, 10);
+  const customer = app.repos.users.customer();
+  const orders = app.repos.orders.listForCustomer(customer.id, { limit: 10 }).items;
   if (!orders.length) return '<div class="empty">No orders yet.</div>';
 
   return orders.map(order => {
-    const merchant = app.store.merchant(order.merchantId);
-    const task = app.store.deliveryTaskForOrder(order.id);
+    const merchant = app.repos.merchants.get(order.merchantId);
+    const task = app.repos.delivery.taskForOrder(order.id);
     const canRate = order.status === "completed" && !order.rated;
     const trackable = task && !["cancelled"].includes(task.status);
     return `
       <article class="customer-order-card">
         <div class="customer-order-topline">
-          <div><strong>${escapeHtml(merchant?.name || "GoodKota merchant")}</strong><div class="muted small">${order.id} · ${formatDateTime(order.createdAt)}</div></div>
-          <strong>${money(order.amount)}</strong>
+          <div><strong>${escapeHtml(merchant?.name || "GoodKota merchant")}</strong><div class="muted small">${escapeHtml(order.orderNumber || order.id)} · ${formatDateTime(order.createdAt)}</div></div>
+          <strong>${money(order.amountCents)}</strong>
         </div>
         <div class="customer-order-status">
           <span class="badge ${order.status === "completed" ? "ok" : "info"}">${escapeHtml(order.status)}</span>
@@ -169,7 +169,7 @@ function recentOrders(app) {
 }
 
 function renderHome(app, ranked) {
-  const customer = app.store.customer;
+  const customer = app.repos.users.customer();
   const eligible = ranked.filter(isEligibleForProximityRecommendation).length;
   return `
     ${locationStrip(app)}
@@ -191,7 +191,7 @@ function renderHome(app, ranked) {
       </div>
 
       <div class="customer-merchant-list" id="merchantList">
-        ${ranked.map((merchant, index) => merchantCard(merchant, index)).join("") || '<div class="empty">No GoodKota merchants available near this demo area yet.</div>'}
+        ${ranked.map((merchant, index) => merchantCard(merchant, index)).join("") || '<div class="empty">No GoodKota merchants are available near this location yet.</div>'}
       </div>
     </section>`;
 }
@@ -230,7 +230,7 @@ function renderBrowse(app, selectedMerchant, products) {
 
       <div class="customer-fulfilment-toggle" role="group" aria-label="Fulfilment method">
         <button class="${app.deliveryMode === "Takeaway" ? "active" : ""}" data-delivery-mode="Takeaway">Takeaway</button>
-        ${selectedMerchant.delivery?.enabled ? `<button class="${app.deliveryMode === "Home Delivery" ? "active" : ""}" data-delivery-mode="Home Delivery">Delivery · ${money(selectedMerchant.deliveryFee)}</button>` : ""}
+        ${selectedMerchant.delivery?.enabled && app.repos.platform.controls().deliveryEnabled ? `<button class="${app.deliveryMode === "Home Delivery" ? "active" : ""}" data-delivery-mode="Home Delivery">Delivery · ${money(selectedMerchant.deliveryFeeCents)}</button>` : ""}
       </div>
 
       <label class="customer-search customer-menu-search" aria-label="Search menu">
@@ -269,7 +269,7 @@ function renderCart(app, selectedMerchant) {
       ${selectedMerchant ? `
         <div class="customer-fulfilment-toggle" role="group" aria-label="Fulfilment method">
           <button class="${app.deliveryMode === "Takeaway" ? "active" : ""}" data-delivery-mode="Takeaway">Takeaway</button>
-          ${selectedMerchant.delivery?.enabled ? `<button class="${app.deliveryMode === "Home Delivery" ? "active" : ""}" data-delivery-mode="Home Delivery">Delivery · ${money(selectedMerchant.deliveryFee)}</button>` : ""}
+          ${selectedMerchant.delivery?.enabled && app.repos.platform.controls().deliveryEnabled ? `<button class="${app.deliveryMode === "Home Delivery" ? "active" : ""}" data-delivery-mode="Home Delivery">Delivery · ${money(selectedMerchant.deliveryFeeCents)}</button>` : ""}
         </div>
         <div class="card customer-cart-card">${cartSummary(app, selectedMerchant)}</div>
         ${!app.cart.length ? '<button class="btn primary customer-primary-action" data-customer-section="browse">Browse menu</button>' : ""}
@@ -283,11 +283,11 @@ function renderCart(app, selectedMerchant) {
 }
 
 function renderAccount(app) {
-  const customer = app.store.customer;
+  const customer = app.repos.users.customer();
   return `
     ${locationStrip(app)}
     <section class="customer-screen">
-      <div class="customer-screen-title"><h1>Account</h1><p>Only the essentials for this prototype.</p></div>
+      <div class="customer-screen-title"><h1>Account</h1><p>Your GoodKota account essentials.</p></div>
       <div class="card customer-account-card">
         <div class="customer-account-row"><span>Name</span><strong>${escapeHtml(customer.name)}</strong></div>
         <div class="customer-account-row"><span>Phone</span><strong>${escapeHtml(customer.phone)}</strong></div>
@@ -300,6 +300,10 @@ function renderAccount(app) {
         </div>
         <button class="btn ${customer.notificationPreferences.nearbyQualityMerchants ? "dark" : "primary"}" id="notificationButton">${customer.notificationPreferences.nearbyQualityMerchants ? "Turn off" : "Enable alerts"}</button>
       </div>
+      <div class="card customer-account-card action-card">
+        <div><strong>Help & support</strong><p class="muted small">Send an issue to the GoodKota support team.</p></div>
+        <button class="btn ghost" id="customerSupportButton">Get help</button>
+      </div>
     </section>`;
 }
 
@@ -310,9 +314,9 @@ export function renderCustomerView(app) {
     app.cart = [];
   }
 
-  const selectedMerchant = app.selectedMerchantId ? app.store.merchant(app.selectedMerchantId) : null;
-  if (selectedMerchant && !selectedMerchant.delivery?.enabled && app.deliveryMode === "Home Delivery") app.deliveryMode = "Takeaway";
-  const products = selectedMerchant ? app.store.productsForMerchant(selectedMerchant.id) : [];
+  const selectedMerchant = app.selectedMerchantId ? app.repos.merchants.get(app.selectedMerchantId) : null;
+  if (selectedMerchant && (!selectedMerchant.delivery?.enabled || !app.repos.platform.controls().deliveryEnabled) && app.deliveryMode === "Home Delivery") app.deliveryMode = "Takeaway";
+  const products = selectedMerchant ? app.repos.products.listForMerchant(selectedMerchant.id, { limit: 100, enabled: true }).items : [];
 
   let screen;
   if (app.customerSection === "browse") screen = renderBrowse(app, selectedMerchant, products);
@@ -407,6 +411,7 @@ function bindCustomerEvents(app) {
 
   app.root.querySelector("#checkoutButton")?.addEventListener("click", () => openCheckout(app));
   app.root.querySelector("#notificationButton")?.addEventListener("click", () => app.enableNearbyNotifications());
+  app.root.querySelector("#customerSupportButton")?.addEventListener("click", () => openCustomerSupport(app));
   app.root.querySelectorAll("[data-rate-order]").forEach(button => button.addEventListener("click", () => openRating(app, button.dataset.rateOrder)));
   app.root.querySelectorAll("[data-track-order]").forEach(button => button.addEventListener("click", () => openTracking(app, button.dataset.trackOrder)));
 }
@@ -438,9 +443,17 @@ function openLocationDialog(app) {
       <div class="muted small" id="locationMessage">Location is used to rank the nearest merchants first.</div>
     </div>`);
 
-  const submitArea = () => {
+  const submitArea = async () => {
     const value = app.dialog.querySelector("#areaSearch")?.value || "";
-    if (app.searchArea(value)) app.closeDialog();
+    const message = app.dialog.querySelector("#locationMessage");
+    if (!value.trim()) return;
+    message.textContent = "Finding that location…";
+    try {
+      await app.searchArea(value);
+      app.closeDialog();
+    } catch (error) {
+      message.textContent = error.message;
+    }
   };
 
   app.dialog.querySelector("#searchArea")?.addEventListener("click", submitArea);
@@ -460,8 +473,28 @@ function openLocationDialog(app) {
   });
 }
 
+function openCustomerSupport(app) {
+  const customer = app.repos.users.customer();
+  app.openDialog(`
+    <div class="dialog-inner customer-dialog-inner">
+      <div class="dialog-head"><div><span class="eyebrow">GoodKota support</span><h2>How can we help?</h2></div><button class="icon-btn" data-close-dialog>✕</button></div>
+      <form id="customerSupportForm" class="form-grid">
+        <label class="field full">Subject<input id="customerSupportSubject" required /></label>
+        <label class="field full">Message<textarea id="customerSupportMessage" rows="5" required></textarea></label>
+        <button class="btn primary field full">Send to GoodKota</button>
+      </form>
+    </div>`);
+  app.dialog.querySelector("#customerSupportForm").addEventListener("submit", event => {
+    event.preventDefault();
+    app.commands.createSupportCase({ source: "customer", sourceId: customer.id, sourceName: customer.name, subject: app.dialog.querySelector("#customerSupportSubject").value, message: app.dialog.querySelector("#customerSupportMessage").value, priority: "normal" });
+    app.closeDialog();
+    app.toast("Support request sent to GoodKota.");
+    app.render();
+  });
+}
+
 function openProduct(app, productId) {
-  const product = app.store.product(productId);
+  const product = app.repos.products.get(productId);
   if (!product) return;
 
   app.openDialog(`
@@ -470,7 +503,7 @@ function openProduct(app, productId) {
       <div class="customer-product-detail-visual" aria-hidden="true">${product.emoji || "🥪"}</div>
       <span class="badge">${escapeHtml(product.category)}</span>
       <p>${escapeHtml(product.desc || "")}</p>
-      <div class="summary-line total"><span>Price</span><strong>${money(product.price)}</strong></div>
+      <div class="summary-line total"><span>Price</span><strong>${money(product.priceCents)}</strong></div>
       <button class="btn primary customer-primary-action" id="dialogAddProduct">Add to order</button>
     </div>`);
 
@@ -482,12 +515,15 @@ function openProduct(app, productId) {
 }
 
 function openCheckout(app) {
-  const merchant = app.store.merchant(app.selectedMerchantId);
+  const controls = app.repos.platform.controls();
+  if (!controls.orderingEnabled) return alert("GoodKota ordering is temporarily paused.");
+  if (!controls.paymentsEnabled) return alert("GoodKota payments are temporarily unavailable.");
+  const merchant = app.repos.merchants.get(app.selectedMerchantId);
   if (!merchant || !app.cart.length) return;
   const subtotal = cartSubtotal(app);
-  const delivery = app.deliveryMode === "Home Delivery" ? merchant.deliveryFee : 0;
+  const delivery = app.deliveryMode === "Home Delivery" ? merchant.deliveryFeeCents : 0;
   const total = subtotal + delivery;
-  const customer = app.store.customer;
+  const customer = app.repos.users.customer();
 
   app.openDialog(`
     <div class="dialog-inner customer-dialog-inner">
@@ -506,15 +542,14 @@ function openCheckout(app) {
         <div class="summary-line total"><span>To pay</span><strong>${money(total)}</strong></div>
       </div>
       <button class="btn primary customer-primary-action" id="payButton">Pay ${money(total)} securely</button>
-      <div class="muted small" style="margin-top:8px">Prototype checkout — payment is simulated.</div>
     </div>`);
 
+  const checkoutIdempotencyKey = uid("checkout");
   app.dialog.querySelector("#payButton")?.addEventListener("click", async event => {
     const button = event.currentTarget;
     button.disabled = true;
     button.textContent = "Confirming payment…";
     try {
-      const orderId = `GK${String(3000 + app.store.state.orders.length + 1)}`;
       const customerDetails = {
         name: app.dialog.querySelector("#checkoutName").value.trim(),
         phone: app.dialog.querySelector("#checkoutPhone").value.trim(),
@@ -522,7 +557,8 @@ function openCheckout(app) {
       };
       const deliveryAddress = app.dialog.querySelector("#checkoutAddress")?.value.trim() || "";
       if (!customerDetails.name || !customerDetails.phone || !customerDetails.email) throw new Error("Name, phone and email are required.");
-      if (subtotal < merchant.minOrder) throw new Error(`Minimum order is ${money(merchant.minOrder)}.`);
+      if (subtotal < merchant.minOrderCents) throw new Error(`Minimum order is ${money(merchant.minOrderCents)}.`);
+      if (app.deliveryMode === "Home Delivery" && !app.repos.platform.controls().deliveryEnabled) throw new Error("GoodKota delivery is temporarily unavailable.");
       if (app.deliveryMode === "Home Delivery" && !deliveryAddress) throw new Error("Delivery address is required.");
 
       const fulfilment = app.deliveryMode === "Home Delivery"
@@ -533,44 +569,28 @@ function openCheckout(app) {
           }
         : { type: "pickup" };
 
-      const payment = await app.paymentService.createPayment({
-        amount: total,
-        orderId,
-        merchant,
-        customer: customerDetails,
-        breakdown: { foodAmount: subtotal, deliveryAmount: delivery },
-        fulfilment
-      });
-      app.store.addPayment(payment);
-      app.store.addOrder({
-        id: orderId,
-        customerId: customer.id,
+      const result = await app.commands.checkout({
         merchantId: merchant.id,
-        customer: customerDetails.name,
-        phone: customerDetails.phone,
-        email: customerDetails.email,
+        customerId: customer.id,
+        customerDetails,
         mode: app.deliveryMode,
         address: deliveryAddress,
         notes: app.dialog.querySelector("#checkoutNotes").value.trim(),
-        amount: total,
-        deliveryFee: delivery,
+        amountCents: total,
+        deliveryFeeCents: delivery,
         fulfilment,
-        status: "pending",
-        paymentStatus: "paid",
-        paymentId: payment.paymentId,
-        createdAt: Date.now(),
+        idempotencyKey: checkoutIdempotencyKey,
         items: app.cart.map(line => {
-          const product = app.store.product(line.productId);
-          return { productId: product.id, name: product.name, qty: line.qty, price: product.price };
-        }),
-        rated: false
+          const product = app.repos.products.get(line.productId);
+          return { productId: product.id, name: product.name, qty: line.qty, priceCents: product.priceCents };
+        })
       });
       app.cart = [];
       app.customerSection = "orders";
       app.closeDialog();
       app.toast(app.deliveryMode === "Home Delivery"
-        ? `Payment confirmed. Order ${orderId} sent to ${merchant.name}; delivery task created.`
-        : `Payment confirmed. Order ${orderId} sent to ${merchant.name}.`);
+        ? `Payment verified. Order ${result.orderNumber} sent to ${merchant.name}; delivery task created.`
+        : `Payment verified. Order ${result.orderNumber} sent to ${merchant.name}.`);
       app.render();
     } catch (error) {
       button.disabled = false;
@@ -581,21 +601,21 @@ function openCheckout(app) {
 }
 
 function openTracking(app, orderId) {
-  const order = app.store.order(orderId);
-  const task = app.store.deliveryTaskForOrder(orderId);
+  const order = app.repos.orders.get(orderId);
+  const task = app.repos.delivery.taskForOrder(orderId);
   if (!order || !task) return;
-  const merchant = app.store.merchant(task.merchantId);
-  const driver = task.assignedDriverId ? app.store.driver(task.assignedDriverId) : null;
-  const vehicle = driver ? app.store.vehicle(driver.vehicleId) : null;
-  const location = driver ? currentDriverLocation(app.store.state, driver.id) : null;
-  const events = trackingEvents(app.store.state, task.id).slice().reverse();
+  const merchant = app.repos.merchants.get(task.merchantId);
+  const driver = task.assignedDriverId ? app.repos.delivery.driver(task.assignedDriverId) : null;
+  const vehicle = driver ? app.repos.delivery.vehicle(driver.vehicleId) : null;
+  const location = driver ? app.repos.delivery.currentLocation(driver.id) : null;
+  const events = app.repos.delivery.events(task.id, { limit: 50, direction: "desc" }).items;
   const progress = deliveryProgress(task.status);
   const eta = task.estimatedArrivalAt && task.status !== "delivered" ? formatDateTime(task.estimatedArrivalAt) : "—";
 
   app.openDialog(`
     <div class="dialog-inner customer-dialog-inner">
       <div class="dialog-head"><h2>Delivery tracking</h2><button class="icon-btn" data-close-dialog>✕</button></div>
-      <div class="merchant-title"><strong>${order.id}</strong><span class="badge dark">${escapeHtml(deliveryStatusLabel(task.status))}</span></div>
+      <div class="merchant-title"><strong>${escapeHtml(order.orderNumber || order.id)}</strong><span class="badge dark">${escapeHtml(deliveryStatusLabel(task.status))}</span></div>
       <div class="progress delivery-progress" style="margin:14px 0"><span style="width:${progress}%"></span></div>
       <div class="grid grid-2">
         <div class="card soft">
@@ -614,7 +634,7 @@ function openTracking(app, orderId) {
           ` : '<div class="muted" style="margin-top:8px">A driver has not been assigned yet.</div>'}
         </div>
       </div>
-      ${task.status !== "delivered" && task.verification?.demoPin ? `<div class="notice info" style="margin-top:14px"><strong>Delivery PIN: ${escapeHtml(task.verification.demoPin)}</strong><br><span class="small">Give this PIN to the driver only when your order is handed to you.</span></div>` : ""}
+      ${task.status !== "delivered" && task.verification?.pin ? `<div class="notice info" style="margin-top:14px"><strong>Delivery PIN: ${escapeHtml(task.verification.pin)}</strong><br><span class="small">Give this PIN to the driver only when your order is handed to you.</span></div>` : ""}
       <h3 style="margin-top:20px">Delivery timeline</h3>
       <div class="timeline">${events.map(event => `<div class="timeline-item"><span class="timeline-dot"></span><div><strong>${escapeHtml(event.message)}</strong><div class="muted small">${formatDateTime(event.createdAt)}</div></div></div>`).join("")}</div>
       <button class="btn ghost customer-primary-action" id="refreshTracking">Refresh tracking snapshot</button>
@@ -624,13 +644,13 @@ function openTracking(app, orderId) {
 }
 
 function openRating(app, orderId) {
-  const order = app.store.order(orderId);
-  const merchant = app.store.merchant(order.merchantId);
+  const order = app.repos.orders.get(orderId);
+  const merchant = app.repos.merchants.get(order.merchantId);
 
   app.openDialog(`
     <div class="dialog-inner customer-dialog-inner">
       <div class="dialog-head"><h2>Rate your kota</h2><button class="icon-btn" data-close-dialog>✕</button></div>
-      <div class="notice"><strong>Verified GoodKota Order</strong><br><span class="small">${order.id} · ${escapeHtml(merchant.name)}</span></div>
+      <div class="notice"><strong>Verified GoodKota Order</strong><br><span class="small">${escapeHtml(order.orderNumber || order.id)} · ${escapeHtml(merchant.name)}</span></div>
       <form id="ratingForm" style="margin-top:14px">
         ${ratingField("Overall experience", "overall")}
         ${ratingField("Food / kota quality", "food")}
@@ -654,7 +674,7 @@ function openRating(app, orderId) {
     event.preventDefault();
     const values = Object.fromEntries([...app.dialog.querySelectorAll(".stars")].map(group => [group.dataset.field, Number(group.dataset.value || 0)]));
     if (!values.overall || !values.food || !values.service) return alert("Please rate the overall experience, food and service.");
-    app.store.addRating({ orderId, ...values, comment: app.dialog.querySelector("#ratingComment").value });
+    app.commands.submitRating({ orderId, ...values, comment: app.dialog.querySelector("#ratingComment").value });
     app.closeDialog();
     app.toast("Thanks. Your verified rating was recorded.");
     app.render();

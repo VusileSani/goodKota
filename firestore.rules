@@ -1,0 +1,214 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function owner() { return signedIn() && request.auth.token.goodkotaOwner == true; }
+    function admin() { return signedIn() && (owner() || request.auth.token.goodkotaAdmin == true); }
+    function deliveryOps() { return signedIn() && (admin() || request.auth.token.deliveryOps == true); }
+    function customer(uid) { return signedIn() && request.auth.uid == uid; }
+
+    function merchantMember(merchantId) {
+      return signedIn()
+        && merchantId != null
+        && exists(/databases/$(database)/documents/merchantMemberships/$(request.auth.uid + '_' + merchantId))
+        && get(/databases/$(database)/documents/merchantMemberships/$(request.auth.uid + '_' + merchantId)).data.active == true;
+    }
+
+    function driverOwns(driverId) {
+      return signedIn()
+        && driverId != null
+        && exists(/databases/$(database)/documents/drivers/$(driverId))
+        && get(/databases/$(database)/documents/drivers/$(driverId)).data.authUid == request.auth.uid;
+    }
+
+    function ownsOrder(orderId) {
+      return signedIn()
+        && orderId != null
+        && exists(/databases/$(database)/documents/orders/$(orderId))
+        && get(/databases/$(database)/documents/orders/$(orderId)).data.customerId == request.auth.uid;
+    }
+
+    function canReadOrder(orderId) {
+      let order = get(/databases/$(database)/documents/orders/$(orderId)).data;
+      return signedIn() && (admin() || deliveryOps() || order.customerId == request.auth.uid || merchantMember(order.merchantId));
+    }
+
+    function canReadTask(taskId) {
+      let task = get(/databases/$(database)/documents/deliveryTasks/$(taskId)).data;
+      return signedIn() && (
+        deliveryOps()
+        || driverOwns(task.assignedDriverId)
+        || merchantMember(task.merchantId)
+        || ownsOrder(task.orderId)
+      );
+    }
+
+    function canReadSupportCase(caseId) {
+      let item = get(/databases/$(database)/documents/supportCases/$(caseId)).data;
+      return signedIn() && (
+        admin()
+        || item.createdByUid == request.auth.uid
+        || (item.merchantId != null && merchantMember(item.merchantId))
+      );
+    }
+
+    match /platformConfig/{doc} {
+      allow read: if signedIn();
+      allow write: if false; // Cloud Functions only.
+    }
+    match /platformStaff/{staffId} {
+      allow read: if admin();
+      allow write: if false;
+    }
+    match /platformAudit/{eventId} {
+      allow read: if owner() || (admin() && resource.data.visibility == 'operations');
+      allow create, update, delete: if false;
+    }
+
+    match /merchants/{merchantId} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /merchantMemberships/{membershipId} {
+      allow read: if signedIn() && (admin() || resource.data.uid == request.auth.uid);
+      allow write: if false;
+    }
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /users/{uid} {
+      allow read: if customer(uid) || admin();
+      allow create: if customer(uid) && request.resource.data.role == 'customer';
+      allow update: if customer(uid)
+        && request.resource.data.role == 'customer'
+        && resource.data.role == 'customer'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','phone','email','notificationPreferences','updatedAt']);
+      allow delete: if false;
+    }
+
+    match /orders/{orderId} {
+      allow read: if signedIn() && (admin() || deliveryOps() || resource.data.customerId == request.auth.uid || merchantMember(resource.data.merchantId));
+      allow write: if false;
+    }
+    match /orderEvents/{eventId} {
+      allow read: if signedIn() && canReadOrder(resource.data.orderId);
+      allow write: if false;
+    }
+    match /ratings/{ratingId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /paymentTransactions/{paymentId} {
+      allow read: if signedIn() && (admin() || resource.data.customerId == request.auth.uid || merchantMember(resource.data.merchantId));
+      allow write: if false;
+    }
+    match /paymentEvents/{eventId} {
+      allow read: if signedIn() && (admin() || canReadOrder(resource.data.orderId));
+      allow write: if false;
+    }
+    match /refunds/{refundId} {
+      allow read: if admin() || (signedIn() && ownsOrder(resource.data.orderId));
+      allow write: if false;
+    }
+    match /merchantPayouts/{payoutId} {
+      allow read: if admin() || merchantMember(resource.data.merchantId);
+      allow write: if false;
+    }
+    match /settlementEvents/{eventId} {
+      allow read: if admin() || merchantMember(resource.data.merchantId);
+      allow write: if false;
+    }
+    match /feeAllocations/{allocationId} {
+      allow read: if admin() || merchantMember(resource.data.merchantId);
+      allow write: if false;
+    }
+    match /reconciliationRuns/{runId} {
+      allow read: if owner();
+      allow write: if false;
+    }
+
+    match /drivers/{driverId} {
+      allow read: if deliveryOps() || driverOwns(driverId);
+      allow write: if false;
+    }
+    match /driverVehicles/{vehicleId} {
+      allow read: if deliveryOps() || driverOwns(resource.data.driverId);
+      allow write: if false;
+    }
+    match /driverLocations/{driverId} {
+      allow read: if deliveryOps()
+        || driverOwns(driverId)
+        || (resource.data.activeTaskId != null && canReadTask(resource.data.activeTaskId));
+      allow write: if false;
+    }
+    match /deliveryTasks/{taskId} {
+      allow read: if signedIn() && (
+        deliveryOps()
+        || driverOwns(resource.data.assignedDriverId)
+        || merchantMember(resource.data.merchantId)
+        || ownsOrder(resource.data.orderId)
+      );
+      allow write: if false;
+    }
+    match /deliveryCredentials/{taskId} {
+      allow read: if signedIn() && resource.data.customerId == request.auth.uid;
+      allow write: if false;
+    }
+    match /deliveryAssignments/{assignmentId} {
+      allow read: if deliveryOps() || driverOwns(resource.data.driverId);
+      allow write: if false;
+    }
+    match /deliveryEvents/{eventId} {
+      allow read: if signedIn() && canReadTask(resource.data.taskId);
+      allow write: if false;
+    }
+    match /proofsOfDelivery/{proofId} {
+      allow read: if signedIn() && canReadTask(resource.data.taskId);
+      allow write: if false;
+    }
+
+    match /supportCases/{caseId} {
+      allow read: if signedIn() && (
+        admin()
+        || resource.data.createdByUid == request.auth.uid
+        || (resource.data.merchantId != null && merchantMember(resource.data.merchantId))
+      );
+      allow write: if false; // Created/updated through Cloud Functions.
+    }
+    match /supportCaseEvents/{eventId} {
+      allow read: if signedIn() && canReadSupportCase(resource.data.caseId);
+      allow write: if false;
+    }
+    match /announcements/{announcementId} {
+      allow read: if signedIn() && (
+        resource.data.audience in ['all','customers','merchants','drivers']
+        || (resource.data.audience == 'operations' && deliveryOps())
+        || (resource.data.audience == 'internal' && admin())
+      );
+      allow write: if false;
+    }
+
+    match /operationalAlerts/{alertId} {
+      allow read: if admin();
+      allow write: if false;
+    }
+    match /materialized/{docId} {
+      allow read: if deliveryOps();
+      allow write: if false;
+    }
+    match /merchantQualityAggregates/{merchantId} {
+      allow read: if admin();
+      allow write: if false;
+    }
+    match /idempotencyRecords/{id} { allow read, write: if false; }
+    match /rateLimits/{id} { allow read, write: if false; }
+    match /jobs/{jobId} { allow read, write: if false; }
+    match /analyticsEvents/{eventId} { allow read: if owner(); allow write: if false; }
+    match /telemetryEvents/{eventId} { allow read: if admin(); allow write: if false; }
+
+    match /{document=**} { allow read, write: if false; }
+  }
+}

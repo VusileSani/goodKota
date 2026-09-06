@@ -1,0 +1,76 @@
+# GoodKota Platform Governance
+
+## Authority model
+
+GoodKota separates company ownership from day-to-day platform operations.
+
+```text
+GoodKota Owner
+  -> GoodKota Admin
+      -> Delivery Ops
+      -> Merchant
+      -> Driver
+      -> Customer
+```
+
+### GoodKota Owner
+
+Owner authority governs GoodKota itself. It is not a larger version of Admin.
+
+Owner controls:
+- who can hold Owner or Admin authority
+- maintenance mode
+- customer ordering availability
+- payment availability
+- delivery availability
+- merchant onboarding availability
+- full privileged audit and integrity overview
+
+Invariants:
+- GoodKota must always retain at least one active Owner.
+- Admin cannot grant, revoke or change Owner authority.
+- Owner-level control changes require a reason and are written to the privileged audit.
+- financial history, order history and audit history are append-oriented; operational corrections should be represented as new events rather than silent historical rewrites.
+
+### GoodKota Admin
+
+Admin is an internal GoodKota employee role responsible for continuity of day-to-day platform operations.
+
+Admin can:
+- onboard and maintain merchants
+- manage merchant compliance
+- manage merchant commercial/subscription status
+- perform reason-coded merchant operating interventions
+- manage GoodKota Standard quality interventions
+- receive, assign and resolve support cases
+- publish and close platform announcements
+- see operational activity history for staff handover
+
+Admin cannot:
+- grant or remove Owner authority
+- change protected Owner-level company controls
+- erase privileged audit history
+
+### Delivery Ops
+
+Delivery Ops remains operationally narrow: assignment and monitoring of delivery tasks and drivers. It should not inherit merchant, financial or company-governance authority.
+
+## Production enforcement
+
+The actor selector in this browser build is for product testing only. Production must enforce authority with Firebase Authentication, server-issued custom claims, Firestore/Realtime Database Security Rules and Cloud Functions for privileged transitions.
+
+Recommended claims include:
+- `goodkotaOwner: true`
+- `goodkotaAdmin: true`
+- `deliveryOps: true`
+- merchant-scoped and driver-scoped identifiers/roles
+
+Owner/Admin claims must only be created or changed by a trusted server-side environment. High-risk changes should be server-authoritative and auditable.
+
+## Support continuity
+
+Support cases and operational audit history exist so stakeholder support does not depend on one founder, developer or employee being available. A case remains in the GoodKota queue until resolved and can be handed from one authorized employee to another with the previous context intact.
+
+## Merchant location
+
+Merchant creation accepts any real South African street address. The browser build can resolve the address to latitude/longitude using an address lookup and also permits manual coordinates when lookup is unavailable. Production should replace the public lookup with the selected geocoding provider, persist geohashes, and validate service radius server-side.

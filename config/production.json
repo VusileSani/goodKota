@@ -1,0 +1,34 @@
+{
+  "environment": "production",
+  "firebaseRegion": "africa-south1",
+  "currency": "ZAR",
+  "moneyStorage": "integer_cents",
+  "queryDefaults": {
+    "customerOrders": 20,
+    "merchantOrders": 50,
+    "deliveryQueue": 50,
+    "drivers": 50,
+    "supportCases": 50,
+    "merchants": 50,
+    "audit": 100
+  },
+  "retention": {
+    "driverLocationMinutes": 30,
+    "telemetryDays": 30,
+    "supportDays": 730,
+    "auditDays": 2555
+  },
+  "security": {
+    "ownerMfaRequired": true,
+    "adminMfaRequired": true,
+    "appCheckRequired": true,
+    "clientPrivilegedWrites": false
+  },
+  "slos": {
+    "checkoutAvailability": 99.9,
+    "checkoutP95Ms": 2500,
+    "orderCommandP95Ms": 1500,
+    "dispatchCommandP95Ms": 1500,
+    "trackingReadP95Ms": 1000
+  }
+}

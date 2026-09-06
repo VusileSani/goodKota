@@ -4,14 +4,15 @@ const inMinutes = minutes => Date.now() + minutes * 60_000;
 const merchantDefaults = {
   enabled: true,
   prepMinutes: 20,
-  deliveryFee: 20,
-  minOrder: 30,
+  deliveryFeeCents: 2000,
+  minOrderCents: 3000,
   delivery: { enabled: true, radiusKm: 7, providerPreference: "goodkota_fleet" },
   deliveryCapability: { ownDrivers: false, acceptsGoodKotaFleet: true, thirdPartyAllowed: true },
   gatewayAccount: { id: null, status: "not_configured" },
   settlement: { bankName: "", accountHolder: "", maskedAccount: "", status: "not_configured" },
-  compliance: { status: "pending_review", note: "Awaiting GoodKota Office review" },
-  qualityWorkflow: { status: "healthy", note: "" }
+  compliance: { status: "pending_review", note: "Awaiting GoodKota Admin review" },
+  qualityWorkflow: { status: "healthy", note: "" },
+  commercial: { plan: "Standard", status: "active", note: "" }
 };
 
 const makeMerchant = details => ({
@@ -22,17 +23,18 @@ const makeMerchant = details => ({
   gatewayAccount: { ...merchantDefaults.gatewayAccount, ...(details.gatewayAccount || {}) },
   settlement: { ...merchantDefaults.settlement, ...(details.settlement || {}) },
   compliance: { ...merchantDefaults.compliance, ...(details.compliance || {}) },
-  qualityWorkflow: { ...merchantDefaults.qualityWorkflow, ...(details.qualityWorkflow || {}) }
+  qualityWorkflow: { ...merchantDefaults.qualityWorkflow, ...(details.qualityWorkflow || {}) },
+  commercial: { ...merchantDefaults.commercial, ...(details.commercial || {}) }
 });
 
 export const seed = {
   platform: {
     name: "GoodKota",
     paymentGateway: {
-      provider: "Marketplace Gateway (demo adapter)",
+      provider: "Marketplace Gateway",
       enabled: true,
       settlementModel: "direct_to_merchant",
-      configuredBy: "GoodKota Office"
+      configuredBy: "GoodKota Owner"
     },
     delivery: {
       enabled: true,
@@ -42,13 +44,20 @@ export const seed = {
       proofOfDelivery: "customer_pin",
       driverLocationRetention: "short_lived_operational_data",
       providerAdapters: ["goodkota_fleet", "merchant_fleet", "third_party_future"]
+    },
+    controls: {
+      maintenanceMode: false,
+      orderingEnabled: true,
+      paymentsEnabled: true,
+      deliveryEnabled: true,
+      merchantOnboardingEnabled: true
     }
   },
   users: [
     {
       id: "u_customer_1",
       role: "customer",
-      name: "Demo Customer",
+      name: "Customer",
       phone: "071 000 0000",
       email: "customer@example.com",
       notificationPreferences: { nearbyQualityMerchants: false, orderUpdates: true, deliveryUpdates: true }
@@ -65,11 +74,11 @@ export const seed = {
       latitude: -25.9992,
       longitude: 28.1263,
       prepMinutes: 18,
-      deliveryFee: 24,
-      minOrder: 35,
+      deliveryFeeCents: 2400,
+      minOrderCents: 3500,
       delivery: { enabled: true, radiusKm: 8, providerPreference: "goodkota_fleet" },
       gatewayAccount: { id: "sub_demo_001", status: "verified" },
-      settlement: { bankName: "Demo Bank", accountHolder: "Kasi Bites (Pty) Ltd", maskedAccount: "•••• 4821", status: "verified" },
+      settlement: { bankName: "Merchant Bank", accountHolder: "Kasi Bites (Pty) Ltd", maskedAccount: "•••• 4821", status: "verified" },
       compliance: { status: "compliant", note: "GoodKota merchant requirements verified" }
     }),
     makeMerchant({
@@ -82,12 +91,12 @@ export const seed = {
       latitude: -25.9964,
       longitude: 28.2268,
       prepMinutes: 22,
-      deliveryFee: 20,
-      minOrder: 30,
+      deliveryFeeCents: 2000,
+      minOrderCents: 3000,
       delivery: { enabled: true, radiusKm: 7, providerPreference: "merchant_fleet" },
       deliveryCapability: { ownDrivers: true, acceptsGoodKotaFleet: true, thirdPartyAllowed: true },
       gatewayAccount: { id: "sub_demo_002", status: "verified" },
-      settlement: { bankName: "Demo Bank", accountHolder: "Tembisa Kota Company (Pty) Ltd", maskedAccount: "•••• 1954", status: "verified" },
+      settlement: { bankName: "Merchant Bank", accountHolder: "Tembisa Kota Company (Pty) Ltd", maskedAccount: "•••• 1954", status: "verified" },
       compliance: { status: "compliant", note: "GoodKota merchant requirements verified" }
     }),
     makeMerchant({
@@ -100,8 +109,8 @@ export const seed = {
       latitude: -25.8603,
       longitude: 28.1894,
       prepMinutes: 25,
-      deliveryFee: 28,
-      minOrder: 40,
+      deliveryFeeCents: 2800,
+      minOrderCents: 4000,
       delivery: { enabled: true, radiusKm: 9, providerPreference: "goodkota_fleet" },
       gatewayAccount: { id: "sub_demo_003", status: "pending" },
       settlement: { status: "pending" },
@@ -118,57 +127,63 @@ export const seed = {
       latitude: -25.9869,
       longitude: 28.1974,
       prepMinutes: 20,
-      deliveryFee: 22,
-      minOrder: 35,
+      deliveryFeeCents: 2200,
+      minOrderCents: 3500,
       delivery: { enabled: true, radiusKm: 6, providerPreference: "goodkota_fleet" },
       gatewayAccount: { id: "sub_demo_004", status: "verified" },
-      settlement: { bankName: "Demo Bank", accountHolder: "Kasi Bites (Pty) Ltd", maskedAccount: "•••• 4821", status: "verified" },
+      settlement: { bankName: "Merchant Bank", accountHolder: "Kasi Bites (Pty) Ltd", maskedAccount: "•••• 4821", status: "verified" },
       compliance: { status: "compliant", note: "GoodKota merchant requirements verified" },
       qualityWorkflow: { status: "intervention", note: "Corrective action: improve holding times and chips freshness" }
     })
   ],
   products: [
-    { id: "p1", merchantId: "m1", name: "Classic Kota", price: 48, category: "Kotas", desc: "Chips, polony, cheese, atchar and house sauces.", emoji: "🥪", enabled: true },
-    { id: "p2", merchantId: "m1", name: "Loaded Kota", price: 76, category: "Kotas", desc: "Chips, cheese, russian, egg, bacon and sauces.", emoji: "🍔", enabled: true },
-    { id: "p3", merchantId: "m1", name: "Russian & Chips", price: 58, category: "Meals", desc: "Crispy chips with sliced russian and sauce.", emoji: "🍟", enabled: true },
-    { id: "p4", merchantId: "m2", name: "Tembisa Special", price: 69, category: "Kotas", desc: "Chips, vienna, cheese, egg and signature sauce.", emoji: "🥪", enabled: true },
-    { id: "p5", merchantId: "m2", name: "Double Trouble", price: 84, category: "Kotas", desc: "Double protein, chips, cheese, egg and atchar.", emoji: "🍔", enabled: true },
-    { id: "p6", merchantId: "m3", name: "Centurion Crunch", price: 72, category: "Kotas", desc: "Loaded kota with crunchy chicken strips.", emoji: "🥙", enabled: true },
-    { id: "p7", merchantId: "m1", name: "Soft Drink", price: 20, category: "Drinks", desc: "330ml cold drink.", emoji: "🥤", enabled: true },
-    { id: "p8", merchantId: "m4", name: "Classic Kota", price: 48, category: "Kotas", desc: "Chips, polony, cheese, atchar and house sauces.", emoji: "🥪", enabled: true },
-    { id: "p9", merchantId: "m4", name: "Loaded Kota", price: 76, category: "Kotas", desc: "Chips, cheese, russian, egg, bacon and sauces.", emoji: "🍔", enabled: true },
-    { id: "p10", merchantId: "m4", name: "Russian & Chips", price: 58, category: "Meals", desc: "Crispy chips with sliced russian and sauce.", emoji: "🍟", enabled: true },
-    { id: "p11", merchantId: "m4", name: "Soft Drink", price: 20, category: "Drinks", desc: "330ml cold drink.", emoji: "🥤", enabled: true }
+    { id: "p1", merchantId: "m1", name: "Classic Kota", priceCents: 4800, category: "Kotas", desc: "Chips, polony, cheese, atchar and house sauces.", emoji: "🥪", enabled: true },
+    { id: "p2", merchantId: "m1", name: "Loaded Kota", priceCents: 7600, category: "Kotas", desc: "Chips, cheese, russian, egg, bacon and sauces.", emoji: "🍔", enabled: true },
+    { id: "p3", merchantId: "m1", name: "Russian & Chips", priceCents: 5800, category: "Meals", desc: "Crispy chips with sliced russian and sauce.", emoji: "🍟", enabled: true },
+    { id: "p4", merchantId: "m2", name: "Tembisa Special", priceCents: 6900, category: "Kotas", desc: "Chips, vienna, cheese, egg and signature sauce.", emoji: "🥪", enabled: true },
+    { id: "p5", merchantId: "m2", name: "Double Trouble", priceCents: 8400, category: "Kotas", desc: "Double protein, chips, cheese, egg and atchar.", emoji: "🍔", enabled: true },
+    { id: "p6", merchantId: "m3", name: "Centurion Crunch", priceCents: 7200, category: "Kotas", desc: "Loaded kota with crunchy chicken strips.", emoji: "🥙", enabled: true },
+    { id: "p7", merchantId: "m1", name: "Soft Drink", priceCents: 2000, category: "Drinks", desc: "330ml cold drink.", emoji: "🥤", enabled: true },
+    { id: "p8", merchantId: "m4", name: "Classic Kota", priceCents: 4800, category: "Kotas", desc: "Chips, polony, cheese, atchar and house sauces.", emoji: "🥪", enabled: true },
+    { id: "p9", merchantId: "m4", name: "Loaded Kota", priceCents: 7600, category: "Kotas", desc: "Chips, cheese, russian, egg, bacon and sauces.", emoji: "🍔", enabled: true },
+    { id: "p10", merchantId: "m4", name: "Russian & Chips", priceCents: 5800, category: "Meals", desc: "Crispy chips with sliced russian and sauce.", emoji: "🍟", enabled: true },
+    { id: "p11", merchantId: "m4", name: "Soft Drink", priceCents: 2000, category: "Drinks", desc: "330ml cold drink.", emoji: "🥤", enabled: true }
   ],
   orders: [
     {
-      id: "GK2001", customerId: "u_customer_1", merchantId: "m1", customer: "Demo Customer",
-      phone: "071 000 0000", email: "customer@example.com", mode: "Takeaway", amount: 96,
+      id: "order_seed_2001", orderNumber: "GK2001", customerId: "u_customer_1", merchantId: "m1", customer: "Customer",
+      phone: "071 000 0000", email: "customer@example.com", mode: "Takeaway", amountCents: 9600,
       fulfilment: { type: "pickup" },
       status: "completed", paymentStatus: "paid", createdAt: ago(60 * 24 * 2),
-      items: [{ productId: "p1", name: "Classic Kota", qty: 2, price: 48 }], rated: false
+      items: [{ productId: "p1", name: "Classic Kota", qty: 2, priceCents: 4800 }], rated: false
     },
     {
-      id: "GK2002", customerId: "u_customer_1", merchantId: "m2", customer: "Demo Customer",
-      phone: "071 000 0000", email: "customer@example.com", mode: "Takeaway", amount: 69,
+      id: "order_seed_2002", orderNumber: "GK2002", customerId: "u_customer_1", merchantId: "m2", customer: "Customer",
+      phone: "071 000 0000", email: "customer@example.com", mode: "Takeaway", amountCents: 6900,
       fulfilment: { type: "pickup" },
       status: "accepted", paymentStatus: "paid", createdAt: ago(34),
-      items: [{ productId: "p4", name: "Tembisa Special", qty: 1, price: 69 }], rated: false
+      items: [{ productId: "p4", name: "Tembisa Special", qty: 1, priceCents: 6900 }], rated: false
     },
     {
-      id: "GK2003", customerId: "u_customer_1", merchantId: "m1", customer: "Demo Customer",
-      phone: "071 000 0000", email: "customer@example.com", mode: "Home Delivery", amount: 100,
-      deliveryFee: 24,
+      id: "order_seed_2003", orderNumber: "GK2003", customerId: "u_customer_1", merchantId: "m1", customer: "Customer",
+      phone: "071 000 0000", email: "customer@example.com", mode: "Home Delivery", amountCents: 10000,
+      deliveryFeeCents: 2400,
       fulfilment: {
         type: "delivery",
         provider: "goodkota_fleet",
-        destination: { address: "Demo delivery address, Midrand", latitude: -26.0072, longitude: 28.1205 }
+        destination: { address: "Customer delivery address, Midrand", latitude: -26.0072, longitude: 28.1205 }
       },
       status: "out_for_delivery", paymentStatus: "paid", createdAt: ago(28),
-      items: [{ productId: "p2", name: "Loaded Kota", qty: 1, price: 76 }], rated: false
+      items: [{ productId: "p2", name: "Loaded Kota", qty: 1, priceCents: 7600 }], rated: false
     }
   ],
-  payments: [],
+  paymentTransactions: [],
+  paymentEvents: [],
+  refunds: [],
+  merchantPayouts: [],
+  settlementEvents: [],
+  feeAllocations: [],
+  reconciliationRuns: [],
   drivers: [
     {
       id: "d1", name: "Neo M.", phone: "071 555 0101", operatorType: "goodkota", operatorId: "goodkota",
@@ -187,9 +202,9 @@ export const seed = {
     }
   ],
   driverVehicles: [
-    { id: "v1", driverId: "d1", type: "motorbike", registration: "GK 01 DEMO", enabled: true },
-    { id: "v2", driverId: "d2", type: "motorbike", registration: "GK 02 DEMO", enabled: true },
-    { id: "v3", driverId: "d3", type: "scooter", registration: "TM 03 DEMO", enabled: true }
+    { id: "v1", driverId: "d1", type: "motorbike", registration: "GK 01", enabled: true },
+    { id: "v2", driverId: "d2", type: "motorbike", registration: "GK 02", enabled: true },
+    { id: "v3", driverId: "d3", type: "scooter", registration: "TM 03", enabled: true }
   ],
   driverLocations: [
     { driverId: "d1", latitude: -26.0028, longitude: 28.1232, accuracyMeters: 14, heading: 220, recordedAt: ago(1) },
@@ -198,11 +213,11 @@ export const seed = {
   ],
   deliveryTasks: [
     {
-      id: "dt1", orderId: "GK2003", merchantId: "m1", providerType: "goodkota_fleet",
-      status: "en_route", assignedDriverId: "d1", assignmentId: "da1", deliveryFee: 24,
+      id: "dt1", orderId: "order_seed_2003", merchantId: "m1", providerType: "goodkota_fleet",
+      status: "en_route", assignedDriverId: "d1", assignmentId: "da1", deliveryFeeCents: 2400,
       pickup: { address: "Kasi Bites Midrand, Midrand, Gauteng", latitude: -25.9992, longitude: 28.1263 },
-      dropoff: { address: "Demo delivery address, Midrand", latitude: -26.0072, longitude: 28.1205 },
-      verification: { method: "pin", demoPin: "4827" },
+      dropoff: { address: "Customer delivery address, Midrand", latitude: -26.0072, longitude: 28.1205 },
+      verification: { method: "pin", pin: "4827" },
       createdAt: ago(28), readyAt: ago(18), assignedAt: ago(16), pickedUpAt: ago(7), estimatedArrivalAt: inMinutes(8), deliveredAt: null
     }
   ],
@@ -240,5 +255,18 @@ export const seed = {
     {id:"r20",merchantId:"m4",orderId:"hist20",verified:true,overall:2,food:2,service:4,comment:"",createdAt:ago(900)},
     {id:"r21",merchantId:"m4",orderId:"hist21",verified:true,overall:4,food:4,service:4,comment:"Much better.",createdAt:ago(600)}
   ],
-  promos: [{ id: "promo1", code: "KOTA10", discount: 10, min: 60, status: "active" }]
+  platformStaff: [
+    { id: "staff_owner_1", name: "GoodKota Owner", email: "owner@goodkota.co.za", role: "owner", active: true, createdAt: ago(60 * 24 * 30) },
+    { id: "staff_admin_1", name: "Platform Operations", email: "admin@goodkota.co.za", role: "admin", active: true, createdAt: ago(60 * 24 * 10) }
+  ],
+  supportCases: [
+    { id: "case_1", source: "merchant", sourceId: "m3", sourceName: "Centurion Kota Works", merchantId: "m3", subject: "Settlement verification", message: "Please confirm what is still required for settlement verification.", priority: "normal", status: "open", assignedTo: "staff_admin_1", createdAt: ago(95), updatedAt: ago(95), resolutionNote: "" }
+  ],
+  announcements: [
+    { id: "announcement_1", title: "GoodKota operations online", message: "Merchant, delivery and support operations are available.", audience: "internal", severity: "info", active: true, createdBy: "staff_admin_1", createdAt: ago(180) }
+  ],
+  auditTrail: [
+    { id: "audit_1", actorId: "staff_owner_1", actorRole: "owner", actorName: "GoodKota Owner", action: "platform_governance_enabled", targetType: "platform", targetId: "goodkota", reason: "Establish protected Owner and Admin operating authority", visibility: "owner", createdAt: ago(60 * 24) }
+  ],
+  promos: [{ id: "promo1", code: "KOTA10", discount: 10, minCents: 6000, status: "active" }]
 };

@@ -21,14 +21,14 @@ export function renderDeliveryOpsView(app) {
       <div class="stat"><span class="muted">Available drivers</span><b>${availableDrivers.length}</b></div>
     </div>
 
-    ${!deliveryEnabled ? '<div class="notice"><strong>Delivery operations are paused by the GoodKota Owner.</strong><div class="small" style="margin-top:4px">The queue remains visible for incident handling, but new dispatch assignments are disabled.</div></div>' : ""}
+    ${!deliveryEnabled ? '<div class="notice"><strong>Delivery operations are paused by the Yagoya Owner.</strong><div class="small" style="margin-top:4px">The queue remains visible for incident handling, but new dispatch assignments are disabled.</div></div>' : ""}
     <section class="section">
       <div class="section-head"><div><h3>Delivery queue</h3><p>Assign drivers, monitor the hand-off and see the customer-facing delivery state.</p></div></div>
       <div class="table-wrap">${taskTable(app, tasks)}</div>
     </section>
 
     <section class="section">
-      <div class="section-head"><div><h3>Driver fleet</h3><p>GoodKota-owned and merchant-owned drivers share a common operational contract.</p></div></div>
+      <div class="section-head"><div><h3>Driver fleet</h3><p>Yagoya-owned and merchant-owned drivers share a common operational contract.</p></div></div>
       <div class="table-wrap">${driverTable(app, drivers)}</div>
     </section>
 `;
@@ -36,7 +36,7 @@ export function renderDeliveryOpsView(app) {
   app.root.querySelectorAll("[data-assign-best]").forEach(button => {
     button.disabled = !deliveryEnabled;
     button.addEventListener("click", () => {
-      if (!deliveryEnabled) return alert("GoodKota delivery operations are temporarily paused.");
+      if (!deliveryEnabled) return alert("Yagoya delivery operations are temporarily paused.");
       const task = app.repos.delivery.task(button.dataset.assignBest);
       const recommendations = app.repos.delivery.recommendDrivers(task, { limit: 10 });
       if (!recommendations.length) return alert("No eligible available driver is currently online for this delivery provider.");
@@ -85,7 +85,7 @@ function driverTable(app, drivers) {
     const order = task ? app.repos.orders.get(task.orderId) : null;
     return `<tr>
       <td><strong>${escapeHtml(driver.name)}</strong><div class="muted small">⭐ ${Number(driver.rating || 0).toFixed(1)} · ${driver.completedDeliveries} completed</div></td>
-      <td>${driver.operatorType === "goodkota" ? "GoodKota" : escapeHtml(app.repos.merchants.get(driver.operatorId)?.name || "Merchant")}</td>
+      <td>${driver.operatorType === "goodkota" ? "Yagoya" : escapeHtml(app.repos.merchants.get(driver.operatorId)?.name || "Merchant")}</td>
       <td>${escapeHtml(vehicle?.type || "—")}<div class="muted small">${escapeHtml(vehicle?.registration || "")}</div></td>
       <td><span class="badge ${driver.shiftStatus === "online" ? "ok" : ""}">${escapeHtml(driver.shiftStatus)}</span></td>
       <td>${escapeHtml(driver.availability)}</td>

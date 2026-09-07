@@ -40,7 +40,7 @@ export function assessQuality(summary) {
     return { signal: "watch", reason: "Quality trend requires monitoring" };
   }
 
-  return { signal: "healthy", reason: "Meets the GoodKota Standard" };
+  return { signal: "healthy", reason: "Meets the Yagoya Standard" };
 }
 
 export function qualityBadge(workflowStatus, signal) {
@@ -50,7 +50,7 @@ export function qualityBadge(workflowStatus, signal) {
   if (signal === "alert") return { label: "Quality alert", tone: "danger" };
   if (signal === "watch" || workflowStatus === "watch") return { label: "Quality watch", tone: "warn" };
   if (signal === "building") return { label: "Building rating history", tone: "info" };
-  return { label: "GoodKota Standard", tone: "ok" };
+  return { label: "Yagoya Standard", tone: "ok" };
 }
 
 export function isEligibleForProximityRecommendation(merchant) {

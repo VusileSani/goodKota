@@ -7,10 +7,10 @@ const merchantDefaults = {
   deliveryFeeCents: 2000,
   minOrderCents: 3000,
   delivery: { enabled: true, radiusKm: 7, providerPreference: "goodkota_fleet" },
-  deliveryCapability: { ownDrivers: false, acceptsGoodKotaFleet: true, thirdPartyAllowed: true },
+  deliveryCapability: { ownDrivers: false, acceptsYagoyaFleet: true, thirdPartyAllowed: true },
   gatewayAccount: { id: null, status: "not_configured" },
   settlement: { bankName: "", accountHolder: "", maskedAccount: "", status: "not_configured" },
-  compliance: { status: "pending_review", note: "Awaiting GoodKota Admin review" },
+  compliance: { status: "pending_review", note: "Awaiting Yagoya Admin review" },
   qualityWorkflow: { status: "healthy", note: "" },
   commercial: { plan: "Standard", status: "active", note: "" }
 };
@@ -29,12 +29,12 @@ const makeMerchant = details => ({
 
 export const seed = {
   platform: {
-    name: "GoodKota",
+    name: "Yagoya",
     paymentGateway: {
       provider: "Marketplace Gateway",
       enabled: true,
       settlementModel: "direct_to_merchant",
-      configuredBy: "GoodKota Owner"
+      configuredBy: "Yagoya Owner"
     },
     delivery: {
       enabled: true,
@@ -83,7 +83,7 @@ export const seed = {
       delivery: { enabled: true, radiusKm: 8, providerPreference: "goodkota_fleet" },
       gatewayAccount: { id: "sub_demo_001", status: "verified" },
       settlement: { bankName: "Merchant Bank", accountHolder: "Kasi Bites (Pty) Ltd", maskedAccount: "•••• 4821", status: "verified" },
-      compliance: { status: "compliant", note: "GoodKota merchant requirements verified" }
+      compliance: { status: "compliant", note: "Yagoya merchant requirements verified" }
     }),
     makeMerchant({
       id: "m2",
@@ -98,10 +98,10 @@ export const seed = {
       deliveryFeeCents: 2000,
       minOrderCents: 3000,
       delivery: { enabled: true, radiusKm: 7, providerPreference: "merchant_fleet" },
-      deliveryCapability: { ownDrivers: true, acceptsGoodKotaFleet: true, thirdPartyAllowed: true },
+      deliveryCapability: { ownDrivers: true, acceptsYagoyaFleet: true, thirdPartyAllowed: true },
       gatewayAccount: { id: "sub_demo_002", status: "verified" },
       settlement: { bankName: "Merchant Bank", accountHolder: "Tembisa Kota Company (Pty) Ltd", maskedAccount: "•••• 1954", status: "verified" },
-      compliance: { status: "compliant", note: "GoodKota merchant requirements verified" }
+      compliance: { status: "compliant", note: "Yagoya merchant requirements verified" }
     }),
     makeMerchant({
       id: "m3",
@@ -136,7 +136,7 @@ export const seed = {
       delivery: { enabled: true, radiusKm: 6, providerPreference: "goodkota_fleet" },
       gatewayAccount: { id: "sub_demo_004", status: "verified" },
       settlement: { bankName: "Merchant Bank", accountHolder: "Kasi Bites (Pty) Ltd", maskedAccount: "•••• 4821", status: "verified" },
-      compliance: { status: "compliant", note: "GoodKota merchant requirements verified" },
+      compliance: { status: "compliant", note: "Yagoya merchant requirements verified" },
       qualityWorkflow: { status: "intervention", note: "Corrective action: improve holding times and chips freshness" }
     })
   ],
@@ -260,21 +260,21 @@ export const seed = {
     {id:"r21",merchantId:"m4",orderId:"hist21",verified:true,overall:4,food:4,service:4,comment:"Much better.",createdAt:ago(600)}
   ],
   platformStaff: [
-    { id: "staff_owner_1", name: "GoodKota Owner", email: "owner@goodkota.co.za", role: "owner", active: true, createdAt: ago(60 * 24 * 30) },
+    { id: "staff_owner_1", name: "Yagoya Owner", email: "owner@goodkota.co.za", role: "owner", active: true, createdAt: ago(60 * 24 * 30) },
     { id: "staff_admin_1", name: "Platform Operations", email: "admin@goodkota.co.za", role: "admin", active: true, createdAt: ago(60 * 24 * 10) }
   ],
   supportCases: [
     { id: "case_1", source: "merchant", sourceId: "m3", sourceName: "Centurion Kota Works", merchantId: "m3", subject: "Settlement verification", message: "Please confirm what is still required for settlement verification.", priority: "normal", status: "open", assignedTo: "staff_admin_1", createdAt: ago(95), updatedAt: ago(95), resolutionNote: "" }
   ],
   announcements: [
-    { id: "announcement_1", title: "GoodKota operations online", message: "Merchant, delivery and support operations are available.", audience: "internal", severity: "info", active: true, createdBy: "staff_admin_1", createdAt: ago(180) }
+    { id: "announcement_1", title: "Yagoya operations online", message: "Merchant, delivery and support operations are available.", audience: "internal", severity: "info", active: true, createdBy: "staff_admin_1", createdAt: ago(180) }
   ],
   auditTrail: [
-    { id: "audit_1", actorId: "staff_owner_1", actorRole: "owner", actorName: "GoodKota Owner", action: "platform_governance_enabled", targetType: "platform", targetId: "goodkota", reason: "Establish protected Owner and Admin operating authority", visibility: "owner", createdAt: ago(60 * 24) }
+    { id: "audit_1", actorId: "staff_owner_1", actorRole: "owner", actorName: "Yagoya Owner", action: "platform_governance_enabled", targetType: "platform", targetId: "goodkota", reason: "Establish protected Owner and Admin operating authority", visibility: "owner", createdAt: ago(60 * 24) }
   ],
   promos: [{ id: "promo1", code: "KOTA10", discountPercent: 10, minCents: 6000, status: "active", createdAt: ago(60 * 24 * 7), version: 1 }],
   merchantApplications: [
-    { id: "merchant_application_seed_1", businessName: "Soweto Kota Corner", contactName: "Thabo M.", email: "owner@sowetokotacorner.example", phone: "071 444 1111", address: "Vilakazi Street, Orlando West, Soweto, Gauteng", area: "Soweto", latitude: -26.2383, longitude: 27.9088, status: "new", note: "Interested in GoodKota ordering and delivery.", createdAt: ago(60 * 18), updatedAt: ago(60 * 18), version: 1 }
+    { id: "merchant_application_seed_1", businessName: "Soweto Kota Corner", contactName: "Thabo M.", email: "owner@sowetokotacorner.example", phone: "071 444 1111", address: "Vilakazi Street, Orlando West, Soweto, Gauteng", area: "Soweto", latitude: -26.2383, longitude: 27.9088, status: "new", note: "Interested in Yagoya ordering and delivery.", createdAt: ago(60 * 18), updatedAt: ago(60 * 18), version: 1 }
   ],
   driverApplications: [
     { id: "driver_application_seed_1", name: "Kagiso N.", phone: "071 444 2222", email: "kagiso.driver@example.com", vehicleType: "Motorbike", registration: "GP 21 GK", operatingArea: "Midrand", status: "new", note: "Available evenings and weekends.", createdAt: ago(60 * 8), updatedAt: ago(60 * 8), version: 1 }

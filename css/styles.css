@@ -34,7 +34,7 @@ body {
   z-index: 500;
   display: grid;
   place-items: center;
-  background: #f15a29 url("../assets/goodkota-splash.jpg") center / cover no-repeat;
+  background: #f15a29 url("../assets/yagoya-splash.jpg") center / cover no-repeat;
   transition: opacity .32s ease, visibility .32s ease;
 }
 .brand-splash.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
@@ -1013,7 +1013,7 @@ body.dialog-open {
 }
 
 
-/* GoodKota v5 — platform governance */
+/* Yagoya v5 — platform governance */
 .actor-switcher {
   display: flex;
   align-items: center;
@@ -1047,7 +1047,7 @@ body.dialog-open {
   border-radius: 26px;
   background:
     linear-gradient(110deg, rgba(43,33,30,.98), rgba(79,51,40,.93)),
-    url("../assets/goodkota-splash.jpg") center / cover no-repeat;
+    url("../assets/yagoya-splash.jpg") center / cover no-repeat;
   color: #fff;
   box-shadow: var(--shadow);
 }
@@ -1065,7 +1065,7 @@ body.dialog-open {
 .governance-hero h2 { margin: 7px 0 9px; font-size: clamp(2rem, 5vw, 3.25rem); letter-spacing: -.035em; }
 .governance-hero p { max-width: 680px; margin: 0; color: #e7dfdc; }
 .governance-hero.compact { min-height: 150px; }
-.owner-hero { background: linear-gradient(112deg, rgba(29,23,21,.99), rgba(64,39,31,.94)), url("../assets/goodkota-splash.jpg") center / cover no-repeat; }
+.owner-hero { background: linear-gradient(112deg, rgba(29,23,21,.99), rgba(64,39,31,.94)), url("../assets/yagoya-splash.jpg") center / cover no-repeat; }
 .status-pulse {
   flex: 0 0 auto;
   display: inline-flex;
@@ -1215,7 +1215,7 @@ body.dialog-open {
 }
 @media (max-width: 700px) {
   .app-header { gap:8px; padding:10px 12px; }
-  /* Keep the GoodKota mark visible at every viewport width. Only the wordmark collapses. */
+  /* Keep the Yagoya mark visible at every viewport width. Only the wordmark collapses. */
   .brand-wordmark { display:none; }
   .brand-logo-shell { display:grid; flex:0 0 auto; }
   .brand-links { margin-left:0; }
@@ -1235,7 +1235,7 @@ body.dialog-open {
 }
 
 /* =========================================================
-   v6.1.1 — visible GoodKota UI roll-up
+   v6.1.1 — visible Yagoya UI roll-up
    Stronger brand presence without turning every surface orange.
    ========================================================= */
 body {
@@ -1262,7 +1262,7 @@ body {
   border-radius: 0 22px 22px 0;
   background:
     linear-gradient(135deg, rgba(241,90,41,.98), rgba(255,117,70,.97)),
-    url("../assets/goodkota-splash.jpg") center / cover no-repeat;
+    url("../assets/yagoya-splash.jpg") center / cover no-repeat;
   box-shadow: inset -1px 0 rgba(36,28,25,.08);
 }
 .brand {
@@ -1348,7 +1348,7 @@ body {
 
 .app-shell { max-width: 1220px; padding-top: 22px; }
 
-/* Customer: unmistakably GoodKota while keeping ordering calm. */
+/* Customer: unmistakably Yagoya while keeping ordering calm. */
 .customer-location-strip {
   border-color: #f3bda9;
   background: rgba(255,250,247,.985);
@@ -1368,7 +1368,7 @@ body {
   border-radius: 26px;
   background:
     linear-gradient(120deg, rgba(241,90,41,.98), rgba(255,123,73,.91)),
-    url("../assets/goodkota-splash.jpg") center / cover no-repeat;
+    url("../assets/yagoya-splash.jpg") center / cover no-repeat;
   color: #211512;
   box-shadow: 0 16px 38px rgba(134,58,30,.18);
 }
@@ -1464,7 +1464,7 @@ body {
 .merchant-hero {
   background:
     linear-gradient(112deg, rgba(43,33,30,.98), rgba(91,51,36,.91)),
-    url("../assets/goodkota-splash.jpg") center / cover no-repeat;
+    url("../assets/yagoya-splash.jpg") center / cover no-repeat;
   border-left: 7px solid var(--brand);
 }
 .driver-hero {
@@ -1496,7 +1496,7 @@ body {
 .governance-hero.admin-hero {
   background:
     linear-gradient(112deg, rgba(241,90,41,.98), rgba(209,69,26,.93)),
-    url("../assets/goodkota-splash.jpg") center / cover no-repeat;
+    url("../assets/yagoya-splash.jpg") center / cover no-repeat;
   color: #1f1714;
   border-top: 0;
 }
@@ -1511,7 +1511,7 @@ body {
   border-top: 5px solid var(--brand);
   background:
     linear-gradient(112deg, rgba(29,23,21,.99), rgba(64,39,31,.95)),
-    url("../assets/goodkota-splash.jpg") center / cover no-repeat;
+    url("../assets/yagoya-splash.jpg") center / cover no-repeat;
 }
 .governance-metrics .stat,
 .metric-strip .stat {

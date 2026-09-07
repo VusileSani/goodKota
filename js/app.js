@@ -1,7 +1,7 @@
 import { AppStore } from "./core/store.js";
 import { RepositoryHub } from "./repositories/repository-hub.js";
 import { TelemetryService } from "./services/telemetry-service.js";
-import { GoodKotaCommandService } from "./services/command-service.js";
+import { YagoyaCommandService } from "./services/command-service.js";
 import { defaultLocation, getCurrentPosition, resolveArea } from "./services/location-service.js";
 import { geocodeSouthAfricanAddress } from "./services/geocoding-service.js";
 import { LocalMarketplacePaymentAdapter } from "./services/payment-service.js";
@@ -16,7 +16,7 @@ import { renderDeliveryOpsView } from "./views/delivery-ops-view.js";
 import { renderAdminView } from "./views/admin-view.js";
 import { renderOwnerView } from "./views/owner-view.js";
 
-class GoodKotaApp {
+class YagoyaApp {
   constructor() {
     this.root = document.querySelector("#app");
     this.dialog = document.querySelector("#appDialog");
@@ -34,7 +34,7 @@ class GoodKotaApp {
     this.customerMenuQuery = "";
     this.customerCategory = "All";
     this.paymentService = new LocalMarketplacePaymentAdapter(this.repos.platform.paymentGateway());
-    this.commands = new GoodKotaCommandService({ store: this.store, paymentService: this.paymentService, telemetry: this.telemetry });
+    this.commands = new YagoyaCommandService({ store: this.store, paymentService: this.paymentService, telemetry: this.telemetry });
     this.retention = new RetentionService(this.store);
     this.jobs = new JobService(this.store, this.telemetry);
     this.adminSection = "overview";
@@ -85,7 +85,7 @@ class GoodKotaApp {
     const brand = this.repos.platform.brand();
     const social = brand.social || {};
     const links = [["Instagram", social.instagram], ["Facebook", social.facebook], ["TikTok", social.tiktok]].filter(([, url]) => /^https?:\/\//i.test(String(url || "")));
-    host.innerHTML = `<a class="brand-link explore-link" href="${brand.publicWebsite || "./website.html"}">Explore GoodKota</a>${links.map(([label, url]) => `<a class="brand-link social-link" href="${url}" target="_blank" rel="noopener noreferrer" aria-label="GoodKota on ${label}">${label}</a>`).join("")}`;
+    host.innerHTML = `<a class="brand-link explore-link" href="${brand.publicWebsite || "./website.html"}">Explore Yagoya</a>${links.map(([label, url]) => `<a class="brand-link social-link" href="${url}" target="_blank" rel="noopener noreferrer" aria-label="Yagoya on ${label}">${label}</a>`).join("")}`;
   }
 
   renderActorContext() {
@@ -96,8 +96,8 @@ class GoodKotaApp {
       merchant: ["Merchant", "Orders, menu, storefront QR and support"],
       driver: ["Driver", "Current delivery, handover and support"],
       delivery: ["Delivery Ops", "Dispatch and live delivery control"],
-      admin: ["GoodKota Admin", "Platform operations and stakeholder support"],
-      owner: ["GoodKota Owner", "Company authority and protected controls"]
+      admin: ["Yagoya Admin", "Platform operations and stakeholder support"],
+      owner: ["Yagoya Owner", "Company authority and protected controls"]
     };
     const [label, hint] = contexts[this.route] || contexts.customer;
     host.dataset.actor = this.route;
@@ -134,7 +134,7 @@ class GoodKotaApp {
     if (controls.maintenanceMode && !["owner", "admin"].includes(this.route)) {
       this.root.innerHTML = `
         <section class="governance-hero compact">
-          <div><span class="eyebrow">GoodKota</span><h2>Platform maintenance</h2><p>GoodKota is temporarily paused while the platform team completes an operational intervention.</p></div>
+          <div><span class="eyebrow">Yagoya</span><h2>Platform maintenance</h2><p>Yagoya is temporarily paused while the platform team completes an operational intervention.</p></div>
           <span class="status-pulse danger">Maintenance</span>
         </section>
         <section class="section"><div class="card"><strong>No action is required from you.</strong><p class="muted">Your existing records remain preserved. Normal service will return when the Owner releases maintenance mode.</p></div></section>`;
@@ -290,7 +290,7 @@ class GoodKotaApp {
   async enableNearbyNotifications() {
     if (this.store.customer.notificationPreferences.nearbyQualityMerchants) {
       this.commands.setNearbyNotifications(false);
-      this.toast("Nearby GoodKota alerts disabled.");
+      this.toast("Nearby Yagoya alerts disabled.");
       this.render();
       return;
     }
@@ -298,8 +298,8 @@ class GoodKotaApp {
     try {
       await requestNotificationPermission();
       this.commands.setNearbyNotifications(true);
-      await showLocalNotification("GoodKota alerts are ready", {
-        body: "Future proximity recommendations will be limited to merchants meeting the GoodKota Standard."
+      await showLocalNotification("Yagoya alerts are ready", {
+        body: "Future proximity recommendations will be limited to merchants meeting the Yagoya Standard."
       });
       this.render();
     } catch (error) {
@@ -308,5 +308,5 @@ class GoodKotaApp {
   }
 }
 
-const app = new GoodKotaApp();
+const app = new YagoyaApp();
 app.start();

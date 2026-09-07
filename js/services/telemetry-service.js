@@ -12,8 +12,8 @@ export class TelemetryService {
       createdAt: Date.now()
     };
     this.store.appendTelemetry(record);
-    if (level === "error") console.error("[GoodKota]", event, metadata);
-    else console.info("[GoodKota]", event, metadata);
+    if (level === "error") console.error("[Yagoya]", event, metadata);
+    else console.info("[Yagoya]", event, metadata);
     return record;
   }
 

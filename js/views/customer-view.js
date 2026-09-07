@@ -154,7 +154,7 @@ function recentOrders(app) {
     return `
       <article class="customer-order-card">
         <div class="customer-order-topline">
-          <div><strong>${escapeHtml(merchant?.name || "GoodKota merchant")}</strong><div class="muted small">${escapeHtml(order.orderNumber || order.id)} · ${formatDateTime(order.createdAt)}</div></div>
+          <div><strong>${escapeHtml(merchant?.name || "Yagoya merchant")}</strong><div class="muted small">${escapeHtml(order.orderNumber || order.id)} · ${formatDateTime(order.createdAt)}</div></div>
           <strong>${money(order.amountCents)}</strong>
         </div>
         <div class="customer-order-status">
@@ -178,10 +178,10 @@ function renderHome(app, ranked) {
       <div class="customer-greeting">
         <div class="customer-greeting-copy">
           <span class="eyebrow">Hi ${escapeHtml(customer.name.split(" ")[0] || "there")}</span>
-          <h1>Find a good kota nearby.</h1>
-          <p>Closest first. Verified quality visible before you order.</p>
+          <h1>Find good food nearby.</h1>
+          <p>Closest first. Trusted local food with quality visible before you order.</p>
         </div>
-        <img class="customer-greeting-mark" src="./assets/goodkota-logo.png" alt="" aria-hidden="true" />
+        <img class="customer-greeting-mark" src="./assets/yagoya-logo.png" alt="" aria-hidden="true" />
       </div>
 
       <label class="customer-search" aria-label="Search nearby merchants">
@@ -191,11 +191,11 @@ function renderHome(app, ranked) {
 
       <div class="customer-home-meta">
         <strong>${ranked.length} nearby</strong>
-        <span class="muted small">${eligible} meeting the GoodKota Standard</span>
+        <span class="muted small">${eligible} meeting the Yagoya Standard</span>
       </div>
 
       <div class="customer-merchant-list" id="merchantList">
-        ${ranked.map((merchant, index) => merchantCard(merchant, index)).join("") || '<div class="empty">No GoodKota merchants are available near this location yet.</div>'}
+        ${ranked.map((merchant, index) => merchantCard(merchant, index)).join("") || '<div class="empty">No Yagoya merchants are available near this location yet.</div>'}
       </div>
     </section>`;
 }
@@ -207,7 +207,7 @@ function renderBrowse(app, selectedMerchant, products) {
       <section class="customer-screen">
         <div class="empty customer-empty-state">
           <strong>Choose a merchant first.</strong>
-          <span>GoodKota will show the closest available merchants on Home.</span>
+          <span>Yagoya will show the closest available merchants on Home.</span>
           <button class="btn primary" data-customer-section="home">Find a merchant</button>
         </div>
       </section>`;
@@ -280,7 +280,7 @@ function renderCart(app, selectedMerchant) {
       ` : `
         <div class="empty customer-empty-state">
           <strong>No merchant selected.</strong>
-          <span>Start with a nearby GoodKota merchant.</span>
+          <span>Start with a nearby Yagoya merchant.</span>
           <button class="btn primary" data-customer-section="home">Find a merchant</button>
         </div>`}
     </section>`;
@@ -291,7 +291,7 @@ function renderAccount(app) {
   return `
     ${locationStrip(app)}
     <section class="customer-screen">
-      <div class="customer-screen-title"><h1>Account</h1><p>Your GoodKota account essentials.</p></div>
+      <div class="customer-screen-title"><h1>Account</h1><p>Your Yagoya account essentials.</p></div>
       <div class="card customer-account-card">
         <div class="customer-account-row"><span>Name</span><strong>${escapeHtml(customer.name)}</strong></div>
         <div class="customer-account-row"><span>Phone</span><strong>${escapeHtml(customer.phone)}</strong></div>
@@ -300,12 +300,12 @@ function renderAccount(app) {
       <div class="card customer-account-card">
         <div>
           <strong>Nearby quality alerts</strong>
-          <p class="muted small">Optional alerts for nearby merchants meeting the GoodKota Standard.</p>
+          <p class="muted small">Optional alerts for nearby merchants meeting the Yagoya Standard.</p>
         </div>
         <button class="btn ${customer.notificationPreferences.nearbyQualityMerchants ? "dark" : "primary"}" id="notificationButton">${customer.notificationPreferences.nearbyQualityMerchants ? "Turn off" : "Enable alerts"}</button>
       </div>
       <div class="card customer-account-card action-card">
-        <div><strong>Help & support</strong><p class="muted small">Send an issue to the GoodKota support team.</p></div>
+        <div><strong>Help & support</strong><p class="muted small">Send an issue to the Yagoya support team.</p></div>
         <button class="btn ghost" id="customerSupportButton">Get help</button>
       </div>
     </section>`;
@@ -481,18 +481,18 @@ function openCustomerSupport(app) {
   const customer = app.repos.users.customer();
   app.openDialog(`
     <div class="dialog-inner customer-dialog-inner">
-      <div class="dialog-head"><div><span class="eyebrow">GoodKota support</span><h2>How can we help?</h2></div><button class="icon-btn" data-close-dialog>✕</button></div>
+      <div class="dialog-head"><div><span class="eyebrow">Yagoya support</span><h2>How can we help?</h2></div><button class="icon-btn" data-close-dialog>✕</button></div>
       <form id="customerSupportForm" class="form-grid">
         <label class="field full">Subject<input id="customerSupportSubject" required /></label>
         <label class="field full">Message<textarea id="customerSupportMessage" rows="5" required></textarea></label>
-        <button class="btn primary field full">Send to GoodKota</button>
+        <button class="btn primary field full">Send to Yagoya</button>
       </form>
     </div>`);
   app.dialog.querySelector("#customerSupportForm").addEventListener("submit", event => {
     event.preventDefault();
     app.commands.createSupportCase({ source: "customer", sourceId: customer.id, sourceName: customer.name, subject: app.dialog.querySelector("#customerSupportSubject").value, message: app.dialog.querySelector("#customerSupportMessage").value, priority: "normal" });
     app.closeDialog();
-    app.toast("Support request sent to GoodKota.");
+    app.toast("Support request sent to Yagoya.");
     app.render();
   });
 }
@@ -520,8 +520,8 @@ function openProduct(app, productId) {
 
 function openCheckout(app) {
   const controls = app.repos.platform.controls();
-  if (!controls.orderingEnabled) return alert("GoodKota ordering is temporarily paused.");
-  if (!controls.paymentsEnabled) return alert("GoodKota payments are temporarily unavailable.");
+  if (!controls.orderingEnabled) return alert("Yagoya ordering is temporarily paused.");
+  if (!controls.paymentsEnabled) return alert("Yagoya payments are temporarily unavailable.");
   const merchant = app.repos.merchants.get(app.selectedMerchantId);
   if (!merchant || !app.cart.length) return;
   const customer = app.repos.users.customer();
@@ -567,7 +567,7 @@ function openCheckout(app) {
         <div class="summary-line"><span>Delivery</span><strong>${money(price.deliveryFeeCents)}</strong></div>
         ${price.tipCents ? `<div class="summary-line"><span>Tip</span><strong>${money(price.tipCents)}</strong></div>` : ""}
         <div class="summary-line total"><span>To pay</span><strong>${money(price.totalCents)}</strong></div>`;
-      pricingMessage.textContent = price.promoCode ? `Promotion ${price.promoCode} applied.` : "Final pricing is verified by GoodKota before payment.";
+      pricingMessage.textContent = price.promoCode ? `Promotion ${price.promoCode} applied.` : "Final pricing is verified by Yagoya before payment.";
       return price;
     } catch (error) {
       summary.innerHTML = `<div class="notice">${escapeHtml(error.message)}</div>`;
@@ -598,7 +598,7 @@ function openCheckout(app) {
       const deliveryAddress = app.dialog.querySelector("#checkoutAddress")?.value.trim() || "";
       if (!customerDetails.name || !customerDetails.phone || !customerDetails.email) throw new Error("Name, phone and email are required.");
       if (pricing.subtotalCents < merchant.minOrderCents) throw new Error(`Minimum order is ${money(merchant.minOrderCents)}.`);
-      if (app.deliveryMode === "Home Delivery" && !app.repos.platform.controls().deliveryEnabled) throw new Error("GoodKota delivery is temporarily unavailable.");
+      if (app.deliveryMode === "Home Delivery" && !app.repos.platform.controls().deliveryEnabled) throw new Error("Yagoya delivery is temporarily unavailable.");
       if (app.deliveryMode === "Home Delivery" && !deliveryAddress) throw new Error("Delivery address is required.");
       const scheduled = app.dialog.querySelector("#checkoutTiming").value === "scheduled" ? app.dialog.querySelector("#checkoutSchedule").value : null;
       if (app.dialog.querySelector("#checkoutTiming").value === "scheduled" && !scheduled) throw new Error("Choose a scheduled order time.");
@@ -686,12 +686,12 @@ function openRating(app, orderId) {
   app.openDialog(`
     <div class="dialog-inner customer-dialog-inner">
       <div class="dialog-head"><h2>Rate your kota</h2><button class="icon-btn" data-close-dialog>✕</button></div>
-      <div class="notice"><strong>Verified GoodKota Order</strong><br><span class="small">${escapeHtml(order.orderNumber || order.id)} · ${escapeHtml(merchant.name)}</span></div>
+      <div class="notice"><strong>Verified Yagoya Order</strong><br><span class="small">${escapeHtml(order.orderNumber || order.id)} · ${escapeHtml(merchant.name)}</span></div>
       <form id="ratingForm" style="margin-top:14px">
         ${ratingField("Overall experience", "overall")}
         ${ratingField("Food / kota quality", "food")}
         ${ratingField("Service experience", "service")}
-        <label class="field" style="margin-top:14px">Optional comment<textarea id="ratingComment" rows="3" placeholder="Tell GoodKota what stood out..."></textarea></label>
+        <label class="field" style="margin-top:14px">Optional comment<textarea id="ratingComment" rows="3" placeholder="Tell Yagoya what stood out..."></textarea></label>
         <button class="btn primary customer-primary-action">Submit verified rating</button>
       </form>
     </div>`);

@@ -177,7 +177,7 @@ export class AppStore {
 
   ensureCollections() {
     ARRAY_COLLECTIONS.forEach(key => { if (!Array.isArray(this.state[key])) this.state[key] = []; });
-    if (!this.state.platform) this.state.platform = clone(seed.platform || { name: "GoodKota" });
+    if (!this.state.platform) this.state.platform = clone(seed.platform || { name: "Yagoya" });
     if (!this.state.materialized) this.state.materialized = {};
   }
 
@@ -194,7 +194,7 @@ export class AppStore {
       merchant.contact ||= {};
       merchant.compliance ||= { status: merchant.settlement?.status === "verified" ? "compliant" : "pending_review", note: "" };
       merchant.delivery ||= { enabled: true, radiusKm: 7, providerPreference: "goodkota_fleet" };
-      merchant.deliveryCapability ||= { ownDrivers: false, acceptsGoodKotaFleet: true, thirdPartyAllowed: true };
+      merchant.deliveryCapability ||= { ownDrivers: false, acceptsYagoyaFleet: true, thirdPartyAllowed: true };
       merchant.qualityWorkflow ||= { status: "healthy", note: "" };
       merchant.commercial ||= { plan: "Standard", status: "active", note: "" };
       merchant.prepMinutes ??= 20;
@@ -234,7 +234,7 @@ export class AppStore {
     this.state.platform.brand.social ||= { instagram: "", facebook: "", tiktok: "" };
 
     if (!this.state.platformStaff.some(person => person.role === "owner" && person.active !== false)) {
-      this.state.platformStaff.unshift({ id: uid("staff"), authUid: null, name: "GoodKota Owner", email: "owner@goodkota.co.za", role: "owner", active: true, createdAt: Date.now() });
+      this.state.platformStaff.unshift({ id: uid("staff"), authUid: null, name: "Yagoya Owner", email: "owner@goodkota.co.za", role: "owner", active: true, createdAt: Date.now() });
     }
     if (!this.state.platformStaff.some(person => person.role === "admin" && person.active !== false)) {
       this.state.platformStaff.push({ id: uid("staff"), authUid: null, name: "Platform Operations", email: "admin@goodkota.co.za", role: "admin", active: true, createdAt: Date.now() });
@@ -582,7 +582,7 @@ export class AppStore {
 
   addRating({ orderId, overall, food, service, comment }) {
     const order = this.order(orderId);
-    if (!order || order.status !== "completed" || order.rated) throw new Error("Only completed, unrated GoodKota orders can be rated.");
+    if (!order || order.status !== "completed" || order.rated) throw new Error("Only completed, unrated Yagoya orders can be rated.");
     const values = [overall, food, service].map(Number);
     if (values.some(value => !Number.isInteger(value) || value < 1 || value > 5)) throw new Error("Ratings must be whole numbers from 1 to 5.");
     const rating = { id: uid("rating"), merchantId: order.merchantId, orderId, customerId: order.customerId, verified: true, overall: values[0], food: values[1], service: values[2], comment: String(comment || "").trim(), createdAt: Date.now() };
@@ -635,9 +635,9 @@ export class AppStore {
     const item = {
       enabled: true, contact: {}, prepMinutes: 20, deliveryFeeCents: 2000, minOrderCents: 3000,
       delivery: { enabled: true, radiusKm: 7, providerPreference: "goodkota_fleet" },
-      deliveryCapability: { ownDrivers: false, acceptsGoodKotaFleet: true, thirdPartyAllowed: true },
+      deliveryCapability: { ownDrivers: false, acceptsYagoyaFleet: true, thirdPartyAllowed: true },
       gatewayAccount: { id: null, status: "not_configured" }, settlement: { bankName: "", accountHolder: "", maskedAccount: "", status: "not_configured" },
-      compliance: { status: "pending_review", note: "Awaiting GoodKota Admin review" }, qualityWorkflow: { status: "healthy", note: "" }, commercial: { plan: "Standard", status: "active", note: "" },
+      compliance: { status: "pending_review", note: "Awaiting Yagoya Admin review" }, qualityWorkflow: { status: "healthy", note: "" }, commercial: { plan: "Standard", status: "active", note: "" },
       createdAt: Date.now(), version: 1, ...merchant
     };
     if (Number.isFinite(Number(item.latitude)) && Number.isFinite(Number(item.longitude))) item.geohash = encodeGeohash(item.latitude, item.longitude);
@@ -784,7 +784,7 @@ export class AppStore {
   }
 
   addPlatformStaff({ name, email, role = "admin", authUid = null }, actor, reason = "") {
-    if (actor?.role !== "owner") throw new Error("Only a GoodKota Owner can grant platform authority.");
+    if (actor?.role !== "owner") throw new Error("Only a Yagoya Owner can grant platform authority.");
     if (!["owner", "admin"].includes(role)) throw new Error("Invalid platform role.");
     const member = { id: uid("staff"), authUid, name: String(name || "").trim(), email: String(email || "").trim(), role, active: true, createdAt: Date.now(), version: 1 };
     if (!member.name || !member.email) throw new Error("Name and email are required.");
@@ -794,12 +794,12 @@ export class AppStore {
   }
 
   updatePlatformStaff(staffId, changes, actor, reason = "") {
-    if (actor?.role !== "owner") throw new Error("Only a GoodKota Owner can change platform authority.");
+    if (actor?.role !== "owner") throw new Error("Only a Yagoya Owner can change platform authority.");
     const member = this.state.platformStaff.find(person => person.id === staffId); if (!member) throw new Error("Platform staff member not found.");
     const nextRole = changes.role ?? member.role; const nextActive = changes.active ?? member.active;
     if (!["owner", "admin"].includes(nextRole)) throw new Error("Invalid platform role.");
     const activeOwnersAfter = this.state.platformStaff.filter(person => person.id === staffId ? nextRole === "owner" && nextActive !== false : person.role === "owner" && person.active !== false).length;
-    if (activeOwnersAfter < 1) throw new Error("GoodKota must always retain at least one active Owner.");
+    if (activeOwnersAfter < 1) throw new Error("Yagoya must always retain at least one active Owner.");
     const before = { role: member.role, active: member.active !== false, authUid: member.authUid || null };
     member.role = nextRole; member.active = Boolean(nextActive); if (changes.name !== undefined) member.name = String(changes.name || "").trim(); if (changes.email !== undefined) member.email = String(changes.email || "").trim(); if (changes.authUid !== undefined) member.authUid = changes.authUid || null; member.version += 1;
     this.logAudit({ actor, action: "platform_staff_authority_changed", targetType: "platform_staff", targetId: staffId, reason, visibility: "owner", metadata: { before, after: { role: member.role, active: member.active, authUid: member.authUid } } });
@@ -807,13 +807,13 @@ export class AppStore {
   }
 
   publishAnnouncement({ title, message, audience = "all", severity = "info" }, actor) {
-    if (!actor || !["owner", "admin"].includes(actor.role)) throw new Error("GoodKota platform authority is required.");
+    if (!actor || !["owner", "admin"].includes(actor.role)) throw new Error("Yagoya platform authority is required.");
     const item = { id: uid("announcement"), title: String(title || "").trim(), message: String(message || "").trim(), audience, severity, active: true, createdBy: actor.id, createdAt: Date.now() };
     if (!item.title || !item.message) throw new Error("Title and message are required.");
     this.state.announcements.unshift(item); this.logAudit({ actor, action: "announcement_published", targetType: "announcement", targetId: item.id, reason: item.title, visibility: "operations", metadata: { audience, severity } }); return item;
   }
 
-  setAnnouncementActive(announcementId, active, actor) { if (!actor || !["owner", "admin"].includes(actor.role)) throw new Error("GoodKota platform authority is required."); const item = this.state.announcements.find(entry => entry.id === announcementId); if (!item) throw new Error("Announcement not found."); item.active = Boolean(active); this.logAudit({ actor, action: active ? "announcement_reactivated" : "announcement_closed", targetType: "announcement", targetId: announcementId, reason: item.title, visibility: "operations" }); return item; }
+  setAnnouncementActive(announcementId, active, actor) { if (!actor || !["owner", "admin"].includes(actor.role)) throw new Error("Yagoya platform authority is required."); const item = this.state.announcements.find(entry => entry.id === announcementId); if (!item) throw new Error("Announcement not found."); item.active = Boolean(active); this.logAudit({ actor, action: active ? "announcement_reactivated" : "announcement_closed", targetType: "announcement", targetId: announcementId, reason: item.title, visibility: "operations" }); return item; }
 
   addSupportCase({ source = "merchant", sourceId = null, sourceName = "", merchantId = null, subject, message, priority = "normal" }, actor = null) {
     const item = { id: uid("case"), source, sourceId, sourceName: String(sourceName || "").trim(), merchantId, subject: String(subject || "").trim(), message: String(message || "").trim(), priority, status: "open", assignedTo: null, createdAt: Date.now(), updatedAt: Date.now(), resolutionNote: "", version: 1 };
@@ -826,7 +826,7 @@ export class AppStore {
   }
 
   updateSupportCase(caseId, { status, assignedTo, resolutionNote }, actor) {
-    if (!actor || !["owner", "admin"].includes(actor.role)) throw new Error("GoodKota platform authority is required.");
+    if (!actor || !["owner", "admin"].includes(actor.role)) throw new Error("Yagoya platform authority is required.");
     const item = this.state.supportCases.find(entry => entry.id === caseId); if (!item) throw new Error("Support case not found.");
     const itemBefore = clone(item);
     const before = { status: item.status, assignedTo: item.assignedTo, resolutionNote: item.resolutionNote };
@@ -837,7 +837,7 @@ export class AppStore {
   }
 
   setMerchantCommercial(merchantId, { plan, status, note }, actor, reason = "") {
-    if (!actor || !["owner", "admin"].includes(actor.role)) throw new Error("GoodKota platform authority is required.");
+    if (!actor || !["owner", "admin"].includes(actor.role)) throw new Error("Yagoya platform authority is required.");
     const merchant = this.merchant(merchantId); if (!merchant) throw new Error("Merchant not found.");
     const merchantBefore = clone(merchant);
     const before = clone(merchant.commercial || {}); merchant.commercial = { plan: plan || before.plan || "Standard", status: status || before.status || "active", note: String(note ?? before.note ?? "").trim(), updatedAt: Date.now() }; merchant.version += 1;

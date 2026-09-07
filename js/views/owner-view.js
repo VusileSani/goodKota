@@ -1,17 +1,17 @@
 import { escapeHtml, formatDateTime } from "../core/utils.js";
 
 const CONTROL_LABELS = {
-  maintenanceMode: ["Maintenance mode", "Pause normal actor access while GoodKota resolves a platform incident."],
+  maintenanceMode: ["Maintenance mode", "Pause normal actor access while Yagoya resolves a platform incident."],
   orderingEnabled: ["Customer ordering", "Allow customers to place new orders."],
   paymentsEnabled: ["Payments", "Allow payment initiation and confirmation."],
   deliveryEnabled: ["Delivery operations", "Allow Home Delivery and delivery task operations."],
-  merchantOnboardingEnabled: ["Merchant onboarding", "Allow GoodKota Admin to create new merchants."]
+  merchantOnboardingEnabled: ["Merchant onboarding", "Allow Yagoya Admin to create new merchants."]
 };
 
 export function renderOwnerView(app) {
   const actor = app.platformActor("owner");
   if (!actor) {
-    app.root.innerHTML = '<section class="section"><div class="notice danger"><strong>Owner authority is unavailable.</strong><div class="small" style="margin-top:4px">GoodKota requires at least one active Owner.</div></div></section>';
+    app.root.innerHTML = '<section class="section"><div class="notice danger"><strong>Owner authority is unavailable.</strong><div class="small" style="margin-top:4px">Yagoya requires at least one active Owner.</div></div></section>';
     return;
   }
   const section = app.ownerSection || "control";
@@ -29,9 +29,9 @@ export function renderOwnerView(app) {
   app.root.innerHTML = `
     <section class="governance-hero owner-hero">
       <div>
-        <span class="eyebrow">GoodKota Owner</span>
+        <span class="eyebrow">Yagoya Owner</span>
         <h2>Company Control</h2>
-        <p>Govern platform authority, protected company controls and the integrity of GoodKota as an operating business.</p>
+        <p>Govern platform authority, protected company controls and the integrity of Yagoya as an operating business.</p>
       </div>
       <span class="status-pulse ${controls.maintenanceMode ? "danger" : "ok"}">${controls.maintenanceMode ? "Maintenance" : "Operational"}</span>
     </section>
@@ -43,7 +43,7 @@ export function renderOwnerView(app) {
       <div class="stat"><span class="muted">Active deliveries</span><b>${activeDeliveries.length}</b></div>
     </div>
 
-    <nav class="section-tabs" aria-label="GoodKota Owner sections">
+    <nav class="section-tabs" aria-label="Yagoya Owner sections">
       ${ownerTab("control", "Control", section)}
       ${ownerTab("authority", "Authority", section)}
       ${ownerTab("brand", "Brand", section)}
@@ -94,22 +94,22 @@ function controlSection(platform, controls) {
         <div class="summary-line"><span>Settlement model</span><strong>${escapeHtml(platform.paymentGateway?.settlementModel || "—")}</strong></div>
         <div class="summary-line"><span>Delivery model</span><strong>${escapeHtml(platform.delivery?.operatingModel || "—")}</strong></div>
         <div class="summary-line"><span>Proof of delivery</span><strong>${escapeHtml(platform.delivery?.proofOfDelivery || "—")}</strong></div>
-        <div class="notice info" style="margin-top:12px"><strong>Owner principle</strong><div class="small" style="margin-top:4px">Owner authority changes who may control GoodKota. It is deliberately separate from routine merchant and delivery operations.</div></div>
+        <div class="notice info" style="margin-top:12px"><strong>Owner principle</strong><div class="small" style="margin-top:4px">Owner authority changes who may control Yagoya. It is deliberately separate from routine merchant and delivery operations.</div></div>
       </div>
     </section>`;
 }
 
 function authoritySection(staff) {
   return `
-    <section class="section-head"><div><h2>Platform Authority</h2><p>Only Owners can create, remove or change GoodKota platform authority.</p></div><button class="btn primary" id="addPlatformStaff">Add platform staff</button></section>
+    <section class="section-head"><div><h2>Platform Authority</h2><p>Only Owners can create, remove or change Yagoya platform authority.</p></div><button class="btn primary" id="addPlatformStaff">Add platform staff</button></section>
     <section class="section"><div class="table-wrap">${staffTable(staff)}</div></section>
-    <div class="notice"><strong>Integrity rule:</strong> GoodKota can never be left without at least one active Owner.</div>`;
+    <div class="notice"><strong>Integrity rule:</strong> Yagoya can never be left without at least one active Owner.</div>`;
 }
 
 function brandSection(brand) {
   const social = brand.social || {};
   return `
-    <section class="section-head"><div><h2>GoodKota Brand</h2><p>Company-owned public destinations used by the app and public website.</p></div></section>
+    <section class="section-head"><div><h2>Yagoya Brand</h2><p>Company-owned public destinations used by the app and public website.</p></div></section>
     <section class="section card">
       <form id="brandSettingsForm" class="form-grid">
         <label class="field full">Public website<input id="brandWebsite" value="${escapeHtml(brand.publicWebsite || "./website.html")}" required /></label>
@@ -119,7 +119,7 @@ function brandSection(brand) {
         <label class="field full">Reason<textarea id="brandReason" rows="3" placeholder="Why are these public destinations changing?" required></textarea></label>
         <button class="btn primary field full">Save brand settings</button>
       </form>
-      <div class="notice info" style="margin-top:14px"><strong>App stays lean.</strong><div class="small" style="margin-top:4px">Only configured social links appear in the app header. Brand content remains on the public GoodKota website.</div></div>
+      <div class="notice info" style="margin-top:14px"><strong>App stays lean.</strong><div class="small" style="margin-top:4px">Only configured social links appear in the app header. Brand content remains on the public Yagoya website.</div></div>
     </section>`;
 }
 
@@ -129,7 +129,7 @@ function integritySection(data) {
     <section class="section-head"><div><h2>Platform Integrity</h2><p>Signals that can affect trust, money movement or operational continuity.</p></div></section>
     <div class="grid grid-2">
       ${integrityCard("Settlement verification", data.settlementAttention.length, data.settlementAttention.map(m => m.name), "Merchant money configuration")}
-      ${integrityCard("Quality intervention", data.qualityAttention.length, data.qualityAttention.map(m => m.name), "GoodKota Standard")}
+      ${integrityCard("Quality intervention", data.qualityAttention.length, data.qualityAttention.map(m => m.name), "Yagoya Standard")}
       ${integrityCard("Commercial exceptions", data.commercialAttention.length, data.commercialAttention.map(m => m.name), "Subscription / commercial status")}
       ${integrityCard("Open support cases", data.openCases.length, data.openCases.map(c => c.subject), "Unresolved stakeholder requests")}
     </div>
@@ -191,13 +191,13 @@ function bindOwnerActions(app, actor) {
 }
 
 function openAddStaff(app, actor) {
-  app.openDialog(`<div class="dialog-inner"><div class="dialog-head"><div><span class="eyebrow">Owner authority</span><h2>Add platform staff</h2></div><button class="icon-btn" data-close-dialog>✕</button></div><form id="platformStaffForm" class="form-grid"><label class="field full">Name<input id="staffName" required /></label><label class="field full">Email<input id="staffEmail" type="email" required /></label><label class="field">Authority<select id="staffRole"><option value="admin">GoodKota Admin</option><option value="owner">GoodKota Owner</option></select></label><label class="field full">Reason<textarea id="staffReason" rows="3" placeholder="Why is this authority required?" required></textarea></label><button class="btn primary field full">Grant authority</button></form></div>`);
+  app.openDialog(`<div class="dialog-inner"><div class="dialog-head"><div><span class="eyebrow">Owner authority</span><h2>Add platform staff</h2></div><button class="icon-btn" data-close-dialog>✕</button></div><form id="platformStaffForm" class="form-grid"><label class="field full">Name<input id="staffName" required /></label><label class="field full">Email<input id="staffEmail" type="email" required /></label><label class="field">Authority<select id="staffRole"><option value="admin">Yagoya Admin</option><option value="owner">Yagoya Owner</option></select></label><label class="field full">Reason<textarea id="staffReason" rows="3" placeholder="Why is this authority required?" required></textarea></label><button class="btn primary field full">Grant authority</button></form></div>`);
   app.dialog.querySelector("#platformStaffForm").addEventListener("submit", event => { event.preventDefault(); const reason = app.dialog.querySelector("#staffReason").value.trim(); if (!reason) return alert("A reason is required."); try { app.commands.addPlatformStaff({ name: app.dialog.querySelector("#staffName").value, email: app.dialog.querySelector("#staffEmail").value, role: app.dialog.querySelector("#staffRole").value }, actor, reason); app.closeDialog(); app.toast("Platform authority granted."); app.render(); } catch (error) { alert(error.message); } });
 }
 
 function openEditStaff(app, staffId, actor) {
   const person = app.repos.governance.staff({ limit: 50 }).items.find(item => item.id === staffId); if (!person) return;
-  app.openDialog(`<div class="dialog-inner"><div class="dialog-head"><div><span class="eyebrow">Owner authority</span><h2>${escapeHtml(person.name)}</h2></div><button class="icon-btn" data-close-dialog>✕</button></div><div class="form-grid"><label class="field">Authority<select id="editStaffRole"><option value="admin" ${person.role === "admin" ? "selected" : ""}>GoodKota Admin</option><option value="owner" ${person.role === "owner" ? "selected" : ""}>GoodKota Owner</option></select></label><label class="field">Status<select id="editStaffActive"><option value="true" ${person.active !== false ? "selected" : ""}>Active</option><option value="false" ${person.active === false ? "selected" : ""}>Inactive</option></select></label><label class="field full">Reason<textarea id="editStaffReason" rows="3" placeholder="Why is this authority changing?" required></textarea></label><button class="btn primary field full" id="saveStaffAuthority">Save authority</button></div></div>`);
+  app.openDialog(`<div class="dialog-inner"><div class="dialog-head"><div><span class="eyebrow">Owner authority</span><h2>${escapeHtml(person.name)}</h2></div><button class="icon-btn" data-close-dialog>✕</button></div><div class="form-grid"><label class="field">Authority<select id="editStaffRole"><option value="admin" ${person.role === "admin" ? "selected" : ""}>Yagoya Admin</option><option value="owner" ${person.role === "owner" ? "selected" : ""}>Yagoya Owner</option></select></label><label class="field">Status<select id="editStaffActive"><option value="true" ${person.active !== false ? "selected" : ""}>Active</option><option value="false" ${person.active === false ? "selected" : ""}>Inactive</option></select></label><label class="field full">Reason<textarea id="editStaffReason" rows="3" placeholder="Why is this authority changing?" required></textarea></label><button class="btn primary field full" id="saveStaffAuthority">Save authority</button></div></div>`);
   app.dialog.querySelector("#saveStaffAuthority").addEventListener("click", () => { const reason = app.dialog.querySelector("#editStaffReason").value.trim(); if (!reason) return alert("A reason is required."); try { app.commands.updatePlatformStaff(staffId, { role: app.dialog.querySelector("#editStaffRole").value, active: app.dialog.querySelector("#editStaffActive").value === "true" }, actor, reason); app.closeDialog(); app.toast("Platform authority updated."); app.render(); } catch (error) { alert(error.message); } });
 }
 

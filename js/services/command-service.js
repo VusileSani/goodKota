@@ -2,7 +2,7 @@ import { requireRole } from "./authorization-service.js";
 import { uid } from "../core/utils.js";
 import { calculateOrderPricing } from "./pricing-service.js";
 
-export class GoodKotaCommandService {
+export class YagoyaCommandService {
   constructor({ store, paymentService, telemetry }) {
     this.store = store;
     this.paymentService = paymentService;
@@ -30,9 +30,9 @@ export class GoodKotaCommandService {
   async checkout({ merchantId, customerId, customerDetails, mode, address, notes, fulfilment, items, promoCode = "", tipCents = 0, scheduledFor = null, idempotencyKey }) {
     this.assertRateLimit(`checkout:${customerId}`, 10, 60_000);
     const controls = this.store.state.platform.controls || {};
-    if (!controls.orderingEnabled) throw new Error("GoodKota ordering is temporarily paused.");
-    if (!controls.paymentsEnabled) throw new Error("GoodKota payments are temporarily unavailable.");
-    if (fulfilment?.type === "delivery" && !controls.deliveryEnabled) throw new Error("GoodKota delivery is temporarily unavailable.");
+    if (!controls.orderingEnabled) throw new Error("Yagoya ordering is temporarily paused.");
+    if (!controls.paymentsEnabled) throw new Error("Yagoya payments are temporarily unavailable.");
+    if (fulfilment?.type === "delivery" && !controls.deliveryEnabled) throw new Error("Yagoya delivery is temporarily unavailable.");
 
     const prior = this.store.findIdempotency(idempotencyKey);
     if (prior) return prior.result;
@@ -119,7 +119,7 @@ export class GoodKotaCommandService {
   saveSettlement(merchantId, settlement, gatewayAccount, actor, reason) { return this.store.transaction(() => this.store.saveMerchantSettlement(merchantId, settlement, gatewayAccount, actor, reason)); }
   createSupportCase(data, actor = null) { this.assertRateLimit(`support:${data.source}:${data.sourceId || data.merchantId || "anon"}`, 8, 60_000); return this.store.transaction(() => this.store.addSupportCase(data, actor)); }
 
-  adminAddMerchant(merchant, actor) { requireRole(actor, ["admin", "owner"]); if (!this.store.state.platform.controls.merchantOnboardingEnabled) throw new Error("Merchant onboarding is paused by the GoodKota Owner."); return this.store.transaction(() => { const item = this.store.addMerchant(merchant); this.store.logAudit({ actor, action: "merchant_added", targetType: "merchant", targetId: item.id, reason: "Merchant onboarding", visibility: "operations" }); return item; }); }
+  adminAddMerchant(merchant, actor) { requireRole(actor, ["admin", "owner"]); if (!this.store.state.platform.controls.merchantOnboardingEnabled) throw new Error("Merchant onboarding is paused by the Yagoya Owner."); return this.store.transaction(() => { const item = this.store.addMerchant(merchant); this.store.logAudit({ actor, action: "merchant_added", targetType: "merchant", targetId: item.id, reason: "Merchant onboarding", visibility: "operations" }); return item; }); }
   adminUpdateMerchant(merchantId, changes, actor, reason = "Merchant profile maintenance") { requireRole(actor, ["admin", "owner"]); return this.store.transaction(() => { const item = this.store.updateMerchant(merchantId, changes); this.store.logAudit({ actor, action: "merchant_details_updated", targetType: "merchant", targetId: merchantId, reason, visibility: "operations" }); return item; }); }
   adminSetMerchantEnabled(merchantId, enabled, actor, reason = "Merchant availability changed") { requireRole(actor, ["admin", "owner"]); return this.store.transaction(() => { const item = this.store.setMerchantEnabled(merchantId, enabled); this.store.logAudit({ actor, action: "merchant_enabled_changed", targetType: "merchant", targetId: merchantId, reason, visibility: "operations", metadata: { enabled } }); return item; }); }
   adminSetCompliance(merchantId, status, note, actor, reason = "Compliance review") { requireRole(actor, ["admin", "owner"]); return this.store.transaction(() => { const item = this.store.setMerchantCompliance(merchantId, status, note, actor, reason); this.store.logAudit({ actor, action: "merchant_compliance_changed", targetType: "merchant", targetId: merchantId, reason, visibility: "operations", metadata: { status } }); return item; }); }

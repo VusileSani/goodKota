@@ -13,7 +13,7 @@ const COMMERCIAL_STATUSES = ["active", "review", "overdue", "suspended"];
 export function renderAdminView(app) {
   const actor = app.platformActor("admin");
   if (!actor) {
-    app.root.innerHTML = '<section class="section"><div class="notice danger"><strong>No active GoodKota Admin account.</strong><div class="small" style="margin-top:4px">An Owner must grant Admin authority before this workspace can operate.</div></div></section>';
+    app.root.innerHTML = '<section class="section"><div class="notice danger"><strong>No active Yagoya Admin account.</strong><div class="small" style="margin-top:4px">An Owner must grant Admin authority before this workspace can operate.</div></div></section>';
     return;
   }
   const snapshot = app.repos.governance.adminOverview();
@@ -30,7 +30,7 @@ export function renderAdminView(app) {
   app.root.innerHTML = `
     <section class="governance-hero admin-hero">
       <div>
-        <span class="eyebrow">GoodKota Admin</span>
+        <span class="eyebrow">Yagoya Admin</span>
         <h2>Platform Operations</h2>
         <p>Keep merchants supported, compliant and operating. Company ownership and high-risk platform authority remain protected.</p>
       </div>
@@ -45,7 +45,7 @@ export function renderAdminView(app) {
       <div class="stat"><span class="muted">New applications</span><b>${merchantApplications.length + driverApplications.length}</b></div>
     </div>
 
-    <nav class="section-tabs" aria-label="GoodKota Admin sections">
+    <nav class="section-tabs" aria-label="Yagoya Admin sections">
       ${adminTab("overview", "Overview", section)}
       ${adminTab("merchants", "Merchants", section)}
       ${adminTab("applications", "Applications", section, merchantApplications.length + driverApplications.length)}
@@ -105,7 +105,7 @@ function overviewSection(app, data) {
       </div>
       <div class="card">
         <span class="eyebrow">Authority boundary</span>
-        <h3>Operate GoodKota. Do not own it.</h3>
+        <h3>Operate Yagoya. Do not own it.</h3>
         <p class="muted">Admins can support merchants, manage commercial and compliance status, publish notices and resolve operating issues. Admins cannot grant Owner authority or change protected company-wide controls.</p>
         <div class="integrity-strip"><span>Owner-controlled</span><strong>Authority · Maintenance · Ordering · Payments · Delivery</strong></div>
       </div>
@@ -128,7 +128,7 @@ function merchantsSection(app, qualityAlerts, commercialAttention) {
       <div><h2>Merchants</h2><p>Onboarding, compliance, commercial status and quality intervention.</p></div>
       <button class="btn primary" id="addMerchantButton" ${enabled ? "" : "disabled"}>+ Add merchant</button>
     </section>
-    ${!enabled ? '<div class="notice">Merchant onboarding is paused by the GoodKota Owner.</div>' : ""}
+    ${!enabled ? '<div class="notice">Merchant onboarding is paused by the Yagoya Owner.</div>' : ""}
     <div class="toolbar compact-toolbar"><input id="adminMerchantSearch" type="search" placeholder="Search merchant, area or address" value="${escapeHtml(app.adminMerchantQuery || "")}" /></div>
     <section class="section"><div class="table-wrap">${merchantTable(app.repos.merchants.list({ query: app.adminMerchantQuery || "", limit: 25, sortBy: "createdAt", direction: "desc" }).items)}</div><div class="muted small" style="margin-top:8px">Showing up to 25 matching merchants. Search narrows the operational view.</div></section>
     ${qualityAlerts.length || commercialAttention.length ? `
@@ -159,7 +159,7 @@ function communicationsSection(app) {
 function activitySection(app) {
   const events = app.repos.governance.audit({ visibility: "operations", limit: 80 }).items;
   return `
-    <section class="section-head"><div><h2>Activity</h2><p>Operational history for continuity between GoodKota employees.</p></div></section>
+    <section class="section-head"><div><h2>Activity</h2><p>Operational history for continuity between Yagoya employees.</p></div></section>
     <section class="section"><div class="table-wrap">${auditTable(events)}</div></section>`;
 }
 
@@ -315,7 +315,7 @@ function locationFields(prefix, merchant = null) {
 function openAddMerchant(app, actor) {
   app.openDialog(`
     <div class="dialog-inner dialog-wide-inner">
-      <div class="dialog-head"><div><span class="eyebrow">GoodKota Admin</span><h2>Add merchant</h2></div><button class="icon-btn" data-close-dialog>✕</button></div>
+      <div class="dialog-head"><div><span class="eyebrow">Yagoya Admin</span><h2>Add merchant</h2></div><button class="icon-btn" data-close-dialog>✕</button></div>
       <form id="merchantForm" class="form-grid">
         <div class="form-section"><h3 class="form-section-title">Business</h3></div>
         <label class="field">Trading name<input id="merchantName" required /></label>
@@ -368,7 +368,7 @@ function openMerchantDetail(app, merchantId, actor) {
       <details class="details-disclosure"><summary>Settlement & business details</summary><div style="margin-top:10px"><div class="summary-line"><span>Legal name</span><strong>${escapeHtml(merchant.legalName || "—")}</strong></div><div class="summary-line"><span>Email</span><strong>${escapeHtml(merchant.contact?.email || "—")}</strong></div><div class="summary-line"><span>Settlement</span><strong>${escapeHtml(merchant.settlement?.status || "not configured")}</strong></div><div class="summary-line"><span>Gateway</span><strong>${escapeHtml(merchant.gatewayAccount?.status || "not configured")}</strong></div></div></details>
     </div>`);
   app.dialog.querySelector("#editMerchantButton").addEventListener("click", () => openEditMerchant(app, merchantId, actor));
-  app.dialog.querySelector("#toggleMerchantButton").addEventListener("click", () => requestReason(app, { title: merchant.enabled ? "Disable merchant" : "Enable merchant", description: "Record why GoodKota is changing this merchant's operating access.", confirmLabel: merchant.enabled ? "Disable" : "Enable", danger: merchant.enabled, onConfirm: reason => { const next = !merchant.enabled; app.commands.adminSetMerchantEnabled(merchantId, next, actor, reason); app.closeDialog(); app.toast(next ? "Merchant enabled." : "Merchant disabled."); app.render(); } }));
+  app.dialog.querySelector("#toggleMerchantButton").addEventListener("click", () => requestReason(app, { title: merchant.enabled ? "Disable merchant" : "Enable merchant", description: "Record why Yagoya is changing this merchant's operating access.", confirmLabel: merchant.enabled ? "Disable" : "Enable", danger: merchant.enabled, onConfirm: reason => { const next = !merchant.enabled; app.commands.adminSetMerchantEnabled(merchantId, next, actor, reason); app.closeDialog(); app.toast(next ? "Merchant enabled." : "Merchant disabled."); app.render(); } }));
   app.dialog.querySelector("#saveComplianceButton").addEventListener("click", () => { const status = app.dialog.querySelector("#complianceStatus").value; const note = app.dialog.querySelector("#complianceNote").value; app.commands.adminSetCompliance(merchantId, status, note, actor, note || status); app.toast("Compliance updated."); openMerchantDetail(app, merchantId, actor); app.render(); });
   app.dialog.querySelector("#saveCommercialButton").addEventListener("click", () => { const status = app.dialog.querySelector("#commercialStatus").value; const plan = app.dialog.querySelector("#commercialPlan").value.trim(); const note = app.dialog.querySelector("#commercialNote").value; app.commands.adminSetCommercial(merchantId, { plan, status, note }, actor, note || `Commercial status ${status}`); app.toast("Commercial status updated."); openMerchantDetail(app, merchantId, actor); app.render(); });
 }
@@ -376,7 +376,7 @@ function openMerchantDetail(app, merchantId, actor) {
 function openEditMerchant(app, merchantId, actor) {
   const merchant = app.repos.merchants.get(merchantId); if (!merchant) return;
   app.openDialog(`
-    <div class="dialog-inner dialog-wide-inner"><div class="dialog-head"><div><span class="eyebrow">GoodKota Admin</span><h2>Edit merchant</h2></div><button class="icon-btn" data-close-dialog>✕</button></div>
+    <div class="dialog-inner dialog-wide-inner"><div class="dialog-head"><div><span class="eyebrow">Yagoya Admin</span><h2>Edit merchant</h2></div><button class="icon-btn" data-close-dialog>✕</button></div>
       <form id="editMerchantForm" class="form-grid">
         <label class="field">Trading name<input id="editMerchantName" value="${escapeHtml(merchant.name)}" required /></label><label class="field">Legal name<input id="editMerchantLegalName" value="${escapeHtml(merchant.legalName || "")}" required /></label><label class="field full">Contact email<input id="editMerchantEmail" type="email" value="${escapeHtml(merchant.contact?.email || "")}" /></label>
         ${locationFields("editMerchant", merchant)}
@@ -395,7 +395,7 @@ function openSupportCase(app, caseId, actor) {
 }
 
 function openAnnouncementDialog(app, actor) {
-  app.openDialog(`<div class="dialog-inner"><div class="dialog-head"><div><span class="eyebrow">GoodKota communication</span><h2>New announcement</h2></div><button class="icon-btn" data-close-dialog>✕</button></div><form id="announcementForm" class="form-grid"><label class="field full">Title<input id="announcementTitle" required /></label><label class="field full">Message<textarea id="announcementMessage" rows="4" required></textarea></label><label class="field">Audience<select id="announcementAudience"><option value="all">Everyone</option><option value="customers">Customers</option><option value="merchants">Merchants</option><option value="drivers">Drivers</option><option value="operations">Delivery Ops</option><option value="internal">GoodKota staff</option></select></label><label class="field">Importance<select id="announcementSeverity"><option value="info">Information</option><option value="warn">Important</option><option value="danger">Critical</option></select></label><button class="btn primary field full">Publish</button></form></div>`);
+  app.openDialog(`<div class="dialog-inner"><div class="dialog-head"><div><span class="eyebrow">Yagoya communication</span><h2>New announcement</h2></div><button class="icon-btn" data-close-dialog>✕</button></div><form id="announcementForm" class="form-grid"><label class="field full">Title<input id="announcementTitle" required /></label><label class="field full">Message<textarea id="announcementMessage" rows="4" required></textarea></label><label class="field">Audience<select id="announcementAudience"><option value="all">Everyone</option><option value="customers">Customers</option><option value="merchants">Merchants</option><option value="drivers">Drivers</option><option value="operations">Delivery Ops</option><option value="internal">Yagoya staff</option></select></label><label class="field">Importance<select id="announcementSeverity"><option value="info">Information</option><option value="warn">Important</option><option value="danger">Critical</option></select></label><button class="btn primary field full">Publish</button></form></div>`);
   app.dialog.querySelector("#announcementForm").addEventListener("submit", event => { event.preventDefault(); app.commands.publishAnnouncement({ title: app.dialog.querySelector("#announcementTitle").value, message: app.dialog.querySelector("#announcementMessage").value, audience: app.dialog.querySelector("#announcementAudience").value, severity: app.dialog.querySelector("#announcementSeverity").value }, actor); app.closeDialog(); app.toast("Announcement published."); app.render(); });
 }
 
@@ -403,12 +403,12 @@ function applicationsSection(app, merchantApplications, driverApplications) {
   const allMerchants = app.repos.applications.merchants({ limit: 25 }).items;
   const allDrivers = app.repos.applications.drivers({ limit: 25 }).items;
   return `
-    <section class="section-head"><div><h2>Applications</h2><p>Public merchant and driver applications enter a durable GoodKota operating queue.</p></div></section>
+    <section class="section-head"><div><h2>Applications</h2><p>Public merchant and driver applications enter a durable Yagoya operating queue.</p></div></section>
     <section class="section grid grid-2">
       <div class="card"><div class="section-head"><div><h3>Merchant applications</h3><p>${merchantApplications.length} new</p></div></div>${applicationMerchantTable(allMerchants)}</div>
       <div class="card"><div class="section-head"><div><h3>Driver applications</h3><p>${driverApplications.length} new</p></div></div>${applicationDriverTable(allDrivers)}</div>
     </section>
-    <section class="section card"><h3>Customer waitlist</h3><p class="muted small">Latest public interest captured from the GoodKota website.</p>${waitlistTable(app.repos.applications.waitlist({ limit: 25 }).items)}</section>`;
+    <section class="section card"><h3>Customer waitlist</h3><p class="muted small">Latest public interest captured from the Yagoya website.</p>${waitlistTable(app.repos.applications.waitlist({ limit: 25 }).items)}</section>`;
 }
 
 function applicationMerchantTable(items) {
@@ -434,14 +434,14 @@ function driversSection(app) {
     return `${driver.name} ${driver.phone} ${vehicle?.registration || ""} ${driver.operatorType}`.toLowerCase().includes(query);
   }) : page.items;
   return `
-    <section class="section-head"><div><h2>Drivers</h2><p>GoodKota and merchant-fleet driver administration stays separate from live dispatch.</p></div><button class="btn primary" id="addDriverButton">+ Add driver</button></section>
+    <section class="section-head"><div><h2>Drivers</h2><p>Yagoya and merchant-fleet driver administration stays separate from live dispatch.</p></div><button class="btn primary" id="addDriverButton">+ Add driver</button></section>
     <div class="toolbar compact-toolbar"><input id="adminDriverSearch" type="search" placeholder="Search driver or registration" value="${escapeHtml(app.adminDriverQuery || "")}" /></div>
     <section class="section"><div class="table-wrap">${driverAdminTable(app, drivers)}</div><div class="muted small" style="margin-top:8px">Driver Ops remains separate: Delivery Ops assigns live jobs; Admin maintains people, vehicles and access.</div></section>`;
 }
 
 function driverAdminTable(app, drivers) {
   if (!drivers.length) return '<div class="empty">No matching drivers.</div>';
-  return `<table><thead><tr><th>Driver</th><th>Vehicle</th><th>Operator</th><th>Shift</th><th>Status</th><th></th></tr></thead><tbody>${drivers.map(driver => { const vehicle = app.repos.delivery.vehicle(driver.vehicleId); return `<tr><td><strong>${escapeHtml(driver.name)}</strong><div class="muted small">${escapeHtml(driver.phone || "")}</div></td><td>${escapeHtml(vehicle?.type || "—")}<div class="muted small">${escapeHtml(vehicle?.registration || "")}</div></td><td>${escapeHtml(driver.operatorType)}</td><td>${escapeHtml(driver.shiftStatus)}</td><td><span class="badge ${driver.enabled !== false ? "ok" : "danger"}">${driver.enabled !== false ? "Active" : "Disabled"}</span></td><td><button class="btn ghost small" data-manage-driver="${driver.id}">Manage</button></td></tr>`; }).join("")}</tbody></table>`;
+  return `<table><thead><tr><th>Driver</th><th>Vehicle</th><th>Operator</th><th>Shift</th><th>Status</th><th></th></tr></thead><tbody>${drivers.map(driver => { const vehicle = app.repos.delivery.vehicle(driver.vehicleId); return `<tr><td><strong>${escapeHtml(driver.name)}</strong><div class="muted small">${escapeHtml(driver.phone || "")}</div></td><td>${escapeHtml(vehicle?.type || "—")}<div class="muted small">${escapeHtml(vehicle?.registration || "")}</div></td><td>${driver.operatorType === "goodkota" ? "Yagoya" : "Merchant"}</td><td>${escapeHtml(driver.shiftStatus)}</td><td><span class="badge ${driver.enabled !== false ? "ok" : "danger"}">${driver.enabled !== false ? "Active" : "Disabled"}</span></td><td><button class="btn ghost small" data-manage-driver="${driver.id}">Manage</button></td></tr>`; }).join("")}</tbody></table>`;
 }
 
 function ordersSection(app) {
@@ -460,7 +460,7 @@ function adminOrdersTable(app, orders) {
 function promotionsSection(app) {
   const promos = app.repos.promotions.list({ limit: 50 }).items;
   return `
-    <section class="section-head"><div><h2>Promotions</h2><p>GoodKota-wide promotion codes with controlled status and minimum-spend rules.</p></div><button class="btn primary" id="addPromotionButton">+ New promotion</button></section>
+    <section class="section-head"><div><h2>Promotions</h2><p>Yagoya-wide promotion codes with controlled status and minimum-spend rules.</p></div><button class="btn primary" id="addPromotionButton">+ New promotion</button></section>
     <section class="section"><div class="table-wrap">${promotionTable(promos)}</div></section>`;
 }
 
@@ -470,7 +470,7 @@ function promotionTable(items) {
 }
 
 function openAddDriver(app, actor, source = null) {
-  app.openDialog(`<div class="dialog-inner"><div class="dialog-head"><div><span class="eyebrow">GoodKota Admin</span><h2>Add driver</h2></div><button class="icon-btn" data-close-dialog>✕</button></div><form id="addDriverForm" class="form-grid"><label class="field">Name<input id="driverName" value="${escapeHtml(source?.name || "")}" required /></label><label class="field">Phone<input id="driverPhone" value="${escapeHtml(source?.phone || "")}" required /></label><label class="field">Email<input id="driverEmail" type="email" value="${escapeHtml(source?.email || "")}" /></label><label class="field">Vehicle type<input id="driverVehicle" value="${escapeHtml(source?.vehicleType || "Motorbike")}" required /></label><label class="field">Registration<input id="driverRegistration" value="${escapeHtml(source?.registration || "")}" /></label><label class="field">Operator<select id="driverOperator"><option value="goodkota">GoodKota fleet</option><option value="merchant">Merchant fleet</option></select></label><button class="btn primary field full">Add driver</button></form></div>`);
+  app.openDialog(`<div class="dialog-inner"><div class="dialog-head"><div><span class="eyebrow">Yagoya Admin</span><h2>Add driver</h2></div><button class="icon-btn" data-close-dialog>✕</button></div><form id="addDriverForm" class="form-grid"><label class="field">Name<input id="driverName" value="${escapeHtml(source?.name || "")}" required /></label><label class="field">Phone<input id="driverPhone" value="${escapeHtml(source?.phone || "")}" required /></label><label class="field">Email<input id="driverEmail" type="email" value="${escapeHtml(source?.email || "")}" /></label><label class="field">Vehicle type<input id="driverVehicle" value="${escapeHtml(source?.vehicleType || "Motorbike")}" required /></label><label class="field">Registration<input id="driverRegistration" value="${escapeHtml(source?.registration || "")}" /></label><label class="field">Operator<select id="driverOperator"><option value="goodkota">Yagoya fleet</option><option value="merchant">Merchant fleet</option></select></label><button class="btn primary field full">Add driver</button></form></div>`);
   app.dialog.querySelector("#addDriverForm").addEventListener("submit", event => { event.preventDefault(); try { const driver = app.commands.adminAddDriver({ name: app.dialog.querySelector("#driverName").value, phone: app.dialog.querySelector("#driverPhone").value, email: app.dialog.querySelector("#driverEmail").value, vehicleType: app.dialog.querySelector("#driverVehicle").value, registration: app.dialog.querySelector("#driverRegistration").value, operatorType: app.dialog.querySelector("#driverOperator").value, operatorId: app.dialog.querySelector("#driverOperator").value === "goodkota" ? "goodkota" : null }, actor); if (source?.id) app.commands.adminUpdateApplication("driver", source.id, { status: "approved", note: `Onboarded as ${driver.name}` }, actor); app.closeDialog(); app.toast("Driver added."); app.adminSection = "drivers"; app.render(); } catch (error) { alert(error.message); } });
 }
 
@@ -513,4 +513,4 @@ function complianceBadge(status) {
   const map = { pending_review: { label: "Pending review", tone: "warn" }, compliant: { label: "Compliant", tone: "ok" }, needs_action: { label: "Needs action", tone: "danger" }, suspended: { label: "Suspended", tone: "danger" } };
   return map[status] || map.pending_review;
 }
-function providerOptions(selected = "goodkota_fleet") { return [["goodkota_fleet", "GoodKota fleet"], ["merchant_fleet", "Merchant fleet"], ["hybrid", "Hybrid"]].map(([value, label]) => `<option value="${value}" ${value === selected ? "selected" : ""}>${label}</option>`).join(""); }
+function providerOptions(selected = "goodkota_fleet") { return [["goodkota_fleet", "Yagoya fleet"], ["merchant_fleet", "Merchant fleet"], ["hybrid", "Hybrid"]].map(([value, label]) => `<option value="${value}" ${value === selected ? "selected" : ""}>${label}</option>`).join(""); }

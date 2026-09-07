@@ -56,13 +56,13 @@ export function renderMerchantView(app) {
         <button class="btn ghost small" id="bankingButton">${merchant.settlement?.status === "verified" ? "Update" : "Set up"}</button>
       </div>
       <div class="card">
-        <strong>GoodKota Standard</strong>
+        <strong>Yagoya Standard</strong>
         <div class="summary-line"><span>Verified ratings</span><strong>${merchant.qualitySummary.count}</strong></div>
         <div class="summary-line"><span>Overall</span><strong>${merchant.qualitySummary.overall.toFixed(1)}</strong></div>
         <div class="summary-line"><span>Status</span><span class="badge ${quality.tone}">${quality.label}</span></div>
       </div>
       <div class="card action-card">
-        <div><strong>GoodKota support</strong><div class="muted small">${escapeHtml(merchant.commercial?.plan || "Standard")} · ${escapeHtml(merchant.commercial?.status || "active")}</div></div>
+        <div><strong>Yagoya support</strong><div class="muted small">${escapeHtml(merchant.commercial?.plan || "Standard")} · ${escapeHtml(merchant.commercial?.status || "active")}</div></div>
         <button class="btn ghost small" id="merchantSupportButton">Get help</button>
       </div>
     </section>`;
@@ -189,18 +189,18 @@ function catalogueTable(products) {
 function openMerchantSupport(app, merchant) {
   app.openDialog(`
     <div class="dialog-inner">
-      <div class="dialog-head"><div><span class="eyebrow">GoodKota support</span><h2>How can we help?</h2></div><button class="icon-btn" data-close-dialog>✕</button></div>
+      <div class="dialog-head"><div><span class="eyebrow">Yagoya support</span><h2>How can we help?</h2></div><button class="icon-btn" data-close-dialog>✕</button></div>
       <form id="merchantSupportForm" class="form-grid">
         <label class="field full">Subject<input id="supportSubject" required placeholder="Short description" /></label>
         <label class="field">Priority<select id="supportPriority"><option value="normal">Normal</option><option value="high">High</option><option value="low">Low</option></select></label>
         <label class="field full">What do you need?<textarea id="supportMessage" rows="5" required></textarea></label>
-        <button class="btn primary field full">Send to GoodKota</button>
+        <button class="btn primary field full">Send to Yagoya</button>
       </form>
     </div>`);
   app.dialog.querySelector("#merchantSupportForm").addEventListener("submit", event => {
     event.preventDefault();
     app.commands.createSupportCase({ source: "merchant", merchantId: merchant.id, sourceId: merchant.id, sourceName: merchant.name, subject: app.dialog.querySelector("#supportSubject").value, message: app.dialog.querySelector("#supportMessage").value, priority: app.dialog.querySelector("#supportPriority").value });
-    app.closeDialog(); app.toast("Support request sent to GoodKota."); app.render();
+    app.closeDialog(); app.toast("Support request sent to Yagoya."); app.render();
   });
 }
 
@@ -260,7 +260,7 @@ function openMerchantQr(app, merchant) {
       <div class="dialog-head"><div><span class="eyebrow">Storefront QR</span><h2>${escapeHtml(merchant.name)}</h2></div><button class="icon-btn" data-close-dialog>✕</button></div>
       <div class="qr-panel">
         <img class="merchant-qr-image" src="${image}" alt="QR code for ${escapeHtml(merchant.name)}" />
-        <div><strong>Scan to order from this merchant</strong><p class="muted small">The code opens ${escapeHtml(merchant.name)} directly inside GoodKota.</p><code class="qr-url">${escapeHtml(url)}</code></div>
+        <div><strong>Scan to order from this merchant</strong><p class="muted small">The code opens ${escapeHtml(merchant.name)} directly inside Yagoya.</p><code class="qr-url">${escapeHtml(url)}</code></div>
       </div>
       <div class="inline-actions" style="margin-top:16px"><button class="btn primary" id="printQrButton">Print QR</button><button class="btn ghost" id="copyQrLink">Copy link</button></div>
     </div>`);

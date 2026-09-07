@@ -6,7 +6,7 @@ export class LocalMarketplacePaymentAdapter {
   }
 
   async createPaymentIntent({ amountCents, orderId, merchant, customer, breakdown = {}, fulfilment = { type: "pickup" }, idempotencyKey }) {
-    if (!this.config.enabled) throw new Error("The GoodKota payment gateway is currently disabled.");
+    if (!this.config.enabled) throw new Error("The Yagoya payment gateway is currently disabled.");
     if (merchant.gatewayAccount?.status !== "verified") throw new Error("This merchant has not completed payment settlement onboarding.");
     await new Promise(resolve => setTimeout(resolve, 350));
 

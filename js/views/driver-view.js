@@ -25,7 +25,7 @@ export function renderDriverView(app) {
     <section class="actor-hero driver-hero">
       <div><span class="eyebrow">Driver workspace</span><h2>${escapeHtml(driver.name)}</h2><p>Current job, handover and support.</p></div>
       <select id="driverSwitcher" class="btn hero-switcher">
-        ${drivers.map(item => `<option value="${item.id}" ${item.id === driver.id ? "selected" : ""}>${escapeHtml(item.name)} · ${escapeHtml(item.operatorType)}</option>`).join("")}
+        ${drivers.map(item => `<option value="${item.id}" ${item.id === driver.id ? "selected" : ""}>${escapeHtml(item.name)} · ${item.operatorType === "goodkota" ? "Yagoya" : "Merchant"}</option>`).join("")}
       </select>
     </section>
 
@@ -40,7 +40,7 @@ export function renderDriverView(app) {
       <div class="card">
         <span class="eyebrow">Driver & vehicle</span>
         <h3 style="margin:8px 0">${escapeHtml(driver.name)}</h3>
-        <div class="summary-line"><span>Operator</span><strong>${driver.operatorType === "goodkota" ? "GoodKota fleet" : "Merchant fleet"}</strong></div>
+        <div class="summary-line"><span>Operator</span><strong>${driver.operatorType === "goodkota" ? "Yagoya fleet" : "Merchant fleet"}</strong></div>
         <div class="summary-line"><span>Vehicle</span><strong>${escapeHtml(vehicle?.type || "—")}</strong></div>
         <div class="summary-line"><span>Registration</span><strong>${escapeHtml(vehicle?.registration || "—")}</strong></div>
         <div class="summary-line"><span>Last location</span><strong>${location ? formatDateTime(location.recordedAt) : "No snapshot"}</strong></div>
@@ -49,7 +49,7 @@ export function renderDriverView(app) {
       </div>
     </section>
 
-    ${!deliveryEnabled ? '<section class="section"><div class="notice"><strong>Delivery operations are paused by GoodKota.</strong><div class="small" style="margin-top:4px">Existing delivery records remain visible, but driver progression is temporarily disabled.</div></div></section>' : ""}
+    ${!deliveryEnabled ? '<section class="section"><div class="notice"><strong>Delivery operations are paused by Yagoya.</strong><div class="small" style="margin-top:4px">Existing delivery records remain visible, but driver progression is temporarily disabled.</div></div></section>' : ""}
     ${task ? activeTaskMarkup(task, order, merchant, driver, events, deliveryEnabled) : `
       <section class="section">
         <div class="empty"><strong>No active delivery.</strong><br>Dispatch can assign an eligible job when this driver is online and available.</div>
@@ -67,7 +67,7 @@ export function renderDriverView(app) {
   });
 
   app.root.querySelector("#advanceDelivery")?.addEventListener("click", () => {
-    if (!deliveryEnabled) return alert("GoodKota delivery operations are temporarily paused.");
+    if (!deliveryEnabled) return alert("Yagoya delivery operations are temporarily paused.");
     try {
       app.commands.advanceDriver({ driverId: driver.id });
       nudgeDriverLocation(app, driver.id);
@@ -76,7 +76,7 @@ export function renderDriverView(app) {
     } catch (error) { alert(error.message); }
   });
 
-  app.root.querySelector("#completeDelivery")?.addEventListener("click", () => deliveryEnabled ? openPinDialog(app, driver) : alert("GoodKota delivery operations are temporarily paused."));
+  app.root.querySelector("#completeDelivery")?.addEventListener("click", () => deliveryEnabled ? openPinDialog(app, driver) : alert("Yagoya delivery operations are temporarily paused."));
   app.root.querySelector("#driverSupportButton")?.addEventListener("click", () => openDriverSupport(app, driver));
   app.root.querySelector("#nudgeLocation")?.addEventListener("click", () => {
     nudgeDriverLocation(app, driver.id);
@@ -136,14 +136,14 @@ function openDriverSupport(app, driver) {
       <form id="driverSupportForm" class="form-grid">
         <label class="field full">Subject<input id="driverSupportSubject" required /></label>
         <label class="field full">Message<textarea id="driverSupportMessage" rows="5" required></textarea></label>
-        <button class="btn primary field full">Send to GoodKota</button>
+        <button class="btn primary field full">Send to Yagoya</button>
       </form>
     </div>`);
   app.dialog.querySelector("#driverSupportForm").addEventListener("submit", event => {
     event.preventDefault();
     app.commands.createSupportCase({ source: "driver", sourceId: driver.id, sourceName: driver.name, subject: app.dialog.querySelector("#driverSupportSubject").value, message: app.dialog.querySelector("#driverSupportMessage").value, priority: "normal" });
     app.closeDialog();
-    app.toast("Support request sent to GoodKota.");
+    app.toast("Support request sent to Yagoya.");
     app.render();
   });
 }

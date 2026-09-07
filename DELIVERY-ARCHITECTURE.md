@@ -1,4 +1,4 @@
-# GoodKota delivery architecture — v4.2
+# Yagoya delivery architecture — v4.2
 
 ## Core principle
 
@@ -41,10 +41,10 @@ A future external courier adapter should conceptually implement:
 createJob(deliveryTask)
 cancelJob(deliveryTask)
 getJob(externalJobId)
-translateWebhook(providerEvent) -> GoodKota delivery event/status
+translateWebhook(providerEvent) -> Yagoya delivery event/status
 ```
 
-GoodKota should expose stable internal delivery statuses even if providers use different terminology.
+Yagoya should expose stable internal delivery statuses even if providers use different terminology.
 
 ## Dispatch evolution
 

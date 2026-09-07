@@ -15,7 +15,7 @@ Merchant access is tenant membership data (`merchantMemberships/{uid}_{merchantI
 
 - Owner and Admin accounts require MFA.
 - Only trusted server code changes platform custom claims.
-- GoodKota must always retain at least one active Owner.
+- Yagoya must always retain at least one active Owner.
 - Owner control/authority changes require a reason and append an immutable audit event.
 - App Check is enforced on callable privileged functions.
 - Client writes to payments, orders, delivery transitions, platform authority and audit are denied by Security Rules.

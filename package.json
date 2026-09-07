@@ -1,8 +1,8 @@
 {
-  "name": "goodkota-v6-1-2-logo-restoration",
+  "name": "yagoya-v6-2-brand-transition",
   "private": true,
   "type": "module",
-  "version": "6.1.2",
+  "version": "6.2.0",
   "scripts": {
     "test": "node tests/scale-foundation.test.mjs && node tests/static-validation.mjs && node tests/ui-rollup.test.mjs && node tests/runtime-render-smoke.test.mjs",
     "test:scale": "node tests/scale-foundation.test.mjs",

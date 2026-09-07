@@ -1,4 +1,4 @@
-const CACHE = "goodkota-v6-1-2-logo-restoration-shell";
+const CACHE = "yagoya-v6-2-brand-transition-shell";
 const SHELL = [
   "./",
   "./index.html",
@@ -6,8 +6,8 @@ const SHELL = [
   "./css/website.css",
   "./website.html",
   "./manifest.webmanifest",
-  "./assets/goodkota-logo.png",
-  "./assets/goodkota-splash.jpg",
+  "./assets/yagoya-logo.png",
+  "./assets/yagoya-splash.jpg",
   "./js/app.js",
   "./js/core/store.js",
   "./js/core/utils.js",

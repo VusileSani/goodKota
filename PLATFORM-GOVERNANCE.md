@@ -1,21 +1,21 @@
-# GoodKota Platform Governance
+# Yagoya Platform Governance
 
 ## Authority model
 
-GoodKota separates company ownership from day-to-day platform operations.
+Yagoya separates company ownership from day-to-day platform operations.
 
 ```text
-GoodKota Owner
-  -> GoodKota Admin
+Yagoya Owner
+  -> Yagoya Admin
       -> Delivery Ops
       -> Merchant
       -> Driver
       -> Customer
 ```
 
-### GoodKota Owner
+### Yagoya Owner
 
-Owner authority governs GoodKota itself. It is not a larger version of Admin.
+Owner authority governs Yagoya itself. It is not a larger version of Admin.
 
 Owner controls:
 - who can hold Owner or Admin authority
@@ -27,21 +27,21 @@ Owner controls:
 - full privileged audit and integrity overview
 
 Invariants:
-- GoodKota must always retain at least one active Owner.
+- Yagoya must always retain at least one active Owner.
 - Admin cannot grant, revoke or change Owner authority.
 - Owner-level control changes require a reason and are written to the privileged audit.
 - financial history, order history and audit history are append-oriented; operational corrections should be represented as new events rather than silent historical rewrites.
 
-### GoodKota Admin
+### Yagoya Admin
 
-Admin is an internal GoodKota employee role responsible for continuity of day-to-day platform operations.
+Admin is an internal Yagoya employee role responsible for continuity of day-to-day platform operations.
 
 Admin can:
 - onboard and maintain merchants
 - manage merchant compliance
 - manage merchant commercial/subscription status
 - perform reason-coded merchant operating interventions
-- manage GoodKota Standard quality interventions
+- manage Yagoya Standard quality interventions
 - receive, assign and resolve support cases
 - publish and close platform announcements
 - see operational activity history for staff handover
@@ -69,7 +69,7 @@ Owner/Admin claims must only be created or changed by a trusted server-side envi
 
 ## Support continuity
 
-Support cases and operational audit history exist so stakeholder support does not depend on one founder, developer or employee being available. A case remains in the GoodKota queue until resolved and can be handed from one authorized employee to another with the previous context intact.
+Support cases and operational audit history exist so stakeholder support does not depend on one founder, developer or employee being available. A case remains in the Yagoya queue until resolved and can be handed from one authorized employee to another with the previous context intact.
 
 ## Merchant location
 
@@ -77,8 +77,8 @@ Merchant creation accepts any real South African street address. The browser bui
 
 ## v6.1 operating extensions
 
-GoodKota Admin now also owns the day-to-day queues for merchant applications, driver applications, driver administration, promotions and bounded cross-merchant order oversight. These remain operational powers and do not confer ownership authority.
+Yagoya Admin now also owns the day-to-day queues for merchant applications, driver applications, driver administration, promotions and bounded cross-merchant order oversight. These remain operational powers and do not confer ownership authority.
 
-GoodKota Owner additionally governs the official public brand configuration (public website and official social channels). Admin cannot change this Owner-only company identity control.
+Yagoya Owner additionally governs the official public brand configuration (public website and official social channels). Admin cannot change this Owner-only company identity control.
 
 Public merchant/driver/waitlist submissions are intake records, not authority grants. Approval never automatically creates platform staff authority. Merchant and driver onboarding remain explicit Admin operations with their own audit events.

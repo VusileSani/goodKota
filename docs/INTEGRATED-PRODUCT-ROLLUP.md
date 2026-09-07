@@ -1,6 +1,6 @@
 # Integrated Product Rollup — v6.1
 
-v6.1 closes the gap between GoodKota's approved product direction and the v6 Scale Foundation.
+v6.1 closes the gap between Yagoya's approved product direction and the v6 Scale Foundation.
 
 ## Domain boundaries
 

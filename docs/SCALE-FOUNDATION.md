@@ -1,4 +1,4 @@
-# GoodKota Scale Foundation — v6.0
+# Yagoya Scale Foundation — v6.0
 
 ## Purpose
 

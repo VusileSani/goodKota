@@ -63,8 +63,8 @@ for (const [name, render, prepare] of [
   ["Merchant", renderMerchantView, app => {}],
   ["Driver", renderDriverView, app => {}],
   ["Delivery Ops", renderDeliveryOpsView, app => {}],
-  ["GoodKota Admin", renderAdminView, app => { app.adminSection="overview"; }],
-  ["GoodKota Owner", renderOwnerView, app => { app.ownerSection="control"; }]
+  ["Yagoya Admin", renderAdminView, app => { app.adminSection="overview"; }],
+  ["Yagoya Owner", renderOwnerView, app => { app.ownerSection="control"; }]
 ]) {
   test(`${name} primary view renders without a runtime exception`, () => {
     const app = buildApp();
@@ -84,7 +84,7 @@ test("Customer secondary sections render without runtime exceptions", () => {
   }
 });
 
-test("GoodKota Admin sections render without runtime exceptions", () => {
+test("Yagoya Admin sections render without runtime exceptions", () => {
   for (const section of ["overview", "merchants", "applications", "drivers", "orders", "promotions", "support", "communications", "activity"]) {
     const app = buildApp();
     app.adminSection = section;
@@ -93,7 +93,7 @@ test("GoodKota Admin sections render without runtime exceptions", () => {
   }
 });
 
-test("GoodKota Owner sections render without runtime exceptions", () => {
+test("Yagoya Owner sections render without runtime exceptions", () => {
   for (const section of ["control", "authority", "brand", "integrity", "audit"]) {
     const app = buildApp();
     app.ownerSection = section;

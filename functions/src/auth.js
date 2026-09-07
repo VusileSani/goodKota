@@ -14,6 +14,6 @@ export function requireRole(request, allowed) {
     admin: claims.goodkotaOwner === true || claims.goodkotaAdmin === true,
     delivery: claims.goodkotaOwner === true || claims.goodkotaAdmin === true || claims.deliveryOps === true
   };
-  if (!list.some(role => roleMap[role])) throw new HttpsError("permission-denied", "Insufficient GoodKota authority.");
+  if (!list.some(role => roleMap[role])) throw new HttpsError("permission-denied", "Insufficient Yagoya authority.");
   return auth;
 }

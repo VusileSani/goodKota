@@ -1,4 +1,4 @@
-# GoodKota Firebase data contract — v6.0
+# Yagoya Firebase data contract — v6.0
 
 Target stack: Firebase Authentication + Cloud Firestore + Cloud Functions + Firebase Cloud Messaging.
 
@@ -132,7 +132,7 @@ A merchant is the real operating store/location. Location and operating fields l
   },
   "deliveryCapability": {
     "ownDrivers": false,
-    "acceptsGoodKotaFleet": true,
+    "acceptsYagoyaFleet": true,
     "thirdPartyAllowed": true
   },
   "gatewayAccount": {
@@ -143,7 +143,7 @@ A merchant is the real operating store/location. Location and operating fields l
   "settlementStatus": "verified",
   "compliance": {
     "status": "compliant",
-    "note": "GoodKota requirements verified"
+    "note": "Yagoya requirements verified"
   },
   "qualityWorkflow": {
     "status": "healthy",
@@ -159,7 +159,7 @@ A merchant is the real operating store/location. Location and operating fields l
 
 Recommended compliance values: `pending_review`, `compliant`, `needs_action`, `suspended`.
 
-If a future business has several GoodKota stores under one brand, model the group separately (for example `brands/{brandId}`) and let each physical merchant optionally reference `brandId`.
+If a future business has several Yagoya stores under one brand, model the group separately (for example `brands/{brandId}`) and let each physical merchant optionally reference `brandId`.
 
 ## Product
 
@@ -374,7 +374,7 @@ Delivery quality should later be a separate dimension so logistics problems do n
 ## Production invariants
 
 - browser-side payment success never marks an order paid without a verified server event
-- disabled or quality-suspended merchants cannot accept new GoodKota orders
+- disabled or quality-suspended merchants cannot accept new Yagoya orders
 - only the relevant merchant/authorized merchant user can change its order preparation state
 - a delivery cannot be assigned until the merchant marks the order ready
 - driver location reads are restricted to authorized operations, the driver, and the assigned customer context

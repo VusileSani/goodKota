@@ -1,10 +1,14 @@
-# GoodKota v6.1.2 — Logo Restoration
+# Yagoya v6.2 — Brand Transition
 
-This release restores the persistent GoodKota header logo at all responsive widths while preserving the v6.1.1 visible UI rollup and v6 scale foundation.
+**Yagoya:** We tell you where the good food is.
 
-# GoodKota v6.1.1 — Visible UI Rollup
+# Yagoya v6.1.2 — Logo Restoration
 
-GoodKota v6.1.1 keeps the v6 Scale Foundation and the full v6.1 product rollup intact, while correcting the visible GoodKota interface layer so the agreed branding, actor separation and operating workspaces are clearly present.
+This release restores the persistent Yagoya header logo at all responsive widths while preserving the v6.1.1 visible UI rollup and v6 scale foundation.
+
+# Yagoya v6.1.1 — Visible UI Rollup
+
+Yagoya v6.1.1 keeps the v6 Scale Foundation and the full v6.1 product rollup intact, while correcting the visible Yagoya interface layer so the agreed branding, actor separation and operating workspaces are clearly present.
 
 ## Actors
 
@@ -12,14 +16,14 @@ GoodKota v6.1.1 keeps the v6 Scale Foundation and the full v6.1 product rollup i
 - **Merchant** — operate orders, maintain its own catalogue, manage settlement, monitor quality, print a direct-storefront QR and request support.
 - **Driver** — manage assigned deliveries and proof of delivery.
 - **Delivery Ops** — dispatch and monitor live delivery work.
-- **GoodKota Admin** — run merchant/driver onboarding, applications, compliance, commercial status, promotions, cross-merchant orders, support, announcements and routine platform operations.
-- **GoodKota Owner** — govern GoodKota authority, company-wide controls, official brand/social configuration and the full privileged audit.
+- **Yagoya Admin** — run merchant/driver onboarding, applications, compliance, commercial status, promotions, cross-merchant orders, support, announcements and routine platform operations.
+- **Yagoya Owner** — govern Yagoya authority, company-wide controls, official brand/social configuration and the full privileged audit.
 
 The actor switcher exists for product testing. Production authority is enforced with Firebase Authentication/custom claims, App Check, Firestore Security Rules and Cloud Functions.
 
 ## v6.1.1 visible UI correction
 
-- stronger orange GoodKota header and customer hero
+- stronger orange Yagoya header and customer hero
 - visible actor-context strip tied to the View as switcher
 - distinct Merchant, Driver, Delivery Ops, Admin and Owner workspace heroes
 - orange Admin operations identity and darker Owner governance identity
@@ -31,18 +35,18 @@ The actor switcher exists for product testing. Production authority is enforced 
 - any real merchant street address can be captured and resolved to coordinates
 - merchant catalogue add/edit/hide plus optional product-image URLs
 - merchant-specific storefront deep links and printable QR codes
-- public GoodKota website for Kota Culture, promotions, merchant applications, driver applications and customer waitlist
+- public Yagoya website for Kota Culture, promotions, merchant applications, driver applications and customer waitlist
 - Owner-configured official website/social links with light app navigation
 - Admin application queues, driver administration, promotions and bounded all-order oversight
 - promo-code checkout, tips and scheduled orders
-- customer/merchant/driver support continuity through the GoodKota Admin queue
-- stronger but restrained GoodKota orange brand presence
+- customer/merchant/driver support continuity through the Yagoya Admin queue
+- stronger but restrained Yagoya orange brand presence
 - v6.0 browser-state migration to v6.1 without wiping operational data
 
 ## Scale foundation retained
 
 - bounded repository/query contracts and cursor-shaped pagination
-- scattered internal IDs separate from human GoodKota order numbers
+- scattered internal IDs separate from human Yagoya order numbers
 - integer-cents financial storage
 - bounded geospatial discovery and dispatch candidate queries
 - idempotent commands and concurrency-protected delivery assignment

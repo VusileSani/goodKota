@@ -1,13 +1,13 @@
 import { AppStore } from "./core/store.js";
 import { RepositoryHub } from "./repositories/repository-hub.js";
-import { GoodKotaCommandService } from "./services/command-service.js";
+import { YagoyaCommandService } from "./services/command-service.js";
 import { LocalMarketplacePaymentAdapter } from "./services/payment-service.js";
 import { geocodeSouthAfricanAddress } from "./services/geocoding-service.js";
 import { escapeHtml, money } from "./core/utils.js";
 
 const store = new AppStore();
 const repos = new RepositoryHub(store);
-const commands = new GoodKotaCommandService({
+const commands = new YagoyaCommandService({
   store,
   paymentService: new LocalMarketplacePaymentAdapter(repos.platform.paymentGateway()),
   telemetry: { emit() {}, alert() {} }
@@ -24,7 +24,7 @@ function renderPromotions() {
   const host = document.querySelector("#publicPromotions");
   const promos = repos.promotions.list({ status: "active", limit: 12 }).items;
   host.innerHTML = promos.length ? promos.map(item => `
-    <article class="promotion-card"><span class="kicker">GoodKota offer</span><h3>${escapeHtml(item.code)}</h3><p>Save ${Number(item.discountPercent || 0)}%${Number(item.minCents || 0) ? ` when you spend ${money(item.minCents)} or more` : ""}.</p><a class="button secondary" href="./index.html">Order on GoodKota</a></article>`).join("") : '<article class="promotion-card"><h3>More coming soon.</h3><p>Current GoodKota promotions will appear here.</p></article>';
+    <article class="promotion-card"><span class="kicker">Yagoya offer</span><h3>${escapeHtml(item.code)}</h3><p>Save ${Number(item.discountPercent || 0)}%${Number(item.minCents || 0) ? ` when you spend ${money(item.minCents)} or more` : ""}.</p><a class="button secondary" href="./index.html">Order on Yagoya</a></article>`).join("") : '<article class="promotion-card"><h3>More coming soon.</h3><p>Current Yagoya promotions will appear here.</p></article>';
 }
 
 function renderSocial() {
@@ -68,7 +68,7 @@ document.querySelector("#merchantApplicationForm")?.addEventListener("submit", e
     });
     event.currentTarget.reset(); resolvedMerchantLocation = null;
     document.querySelector("#merchantLocationStatus").textContent = "Use the actual operating address.";
-    toast("Merchant application sent to GoodKota.");
+    toast("Merchant application sent to Yagoya.");
   } catch (error) { alert(error.message); }
 });
 
@@ -84,7 +84,7 @@ document.querySelector("#driverApplicationForm")?.addEventListener("submit", eve
       registration: document.querySelector("#driverRegistration").value,
       note: document.querySelector("#driverNote").value
     });
-    event.currentTarget.reset(); toast("Driver application sent to GoodKota.");
+    event.currentTarget.reset(); toast("Driver application sent to Yagoya.");
   } catch (error) { alert(error.message); }
 });
 
@@ -92,7 +92,7 @@ document.querySelector("#waitlistForm")?.addEventListener("submit", event => {
   event.preventDefault();
   try {
     commands.joinWaitlist({ name: document.querySelector("#waitlistName").value, email: document.querySelector("#waitlistEmail").value, area: document.querySelector("#waitlistArea").value });
-    event.currentTarget.reset(); toast("You're on the GoodKota list.");
+    event.currentTarget.reset(); toast("You're on the Yagoya list.");
   } catch (error) { alert(error.message); }
 });
 

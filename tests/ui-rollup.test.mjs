@@ -8,20 +8,20 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
 const read = file => fs.readFileSync(path.join(root, file), "utf8");
 
-test("shell visibly exposes GoodKota brand navigation and actor context", () => {
+test("shell visibly exposes Yagoya brand navigation and actor context", () => {
   const html = read("index.html");
   assert.match(html, /class="header-brand-zone"/);
   assert.match(html, /id="brandLinks"/);
-  assert.match(html, /Explore GoodKota/);
+  assert.match(html, /Explore Yagoya/);
   assert.match(html, /id="actorContext"/);
   for (const role of ["customer","merchant","driver","delivery","admin","owner"]) assert.match(html, new RegExp(`value="${role}"`));
 });
 
-test("customer home has an orange GoodKota hero and branded navigation states", () => {
+test("customer home has an orange Yagoya hero and branded navigation states", () => {
   const view = read("js/views/customer-view.js");
   const css = read("css/styles.css");
   assert.match(view, /customer-greeting-mark/);
-  assert.match(view, /assets\/goodkota-logo\.png/);
+  assert.match(view, /assets\/yagoya-logo\.png/);
   assert.match(css, /customer-home-screen \.customer-greeting/);
   assert.match(css, /linear-gradient\(120deg, rgba\(241,90,41/);
   assert.match(css, /customer-nav-item\.active/);
@@ -37,7 +37,7 @@ test("merchant workspace visibly exposes order detail, menu maintenance and stor
   assert.match(view, /data-open-order/);
 });
 
-test("GoodKota Admin and Owner are visibly separate workspaces", () => {
+test("Yagoya Admin and Owner are visibly separate workspaces", () => {
   const admin = read("js/views/admin-view.js");
   const owner = read("js/views/owner-view.js");
   const css = read("css/styles.css");
@@ -55,7 +55,7 @@ test("GoodKota Admin and Owner are visibly separate workspaces", () => {
   assert.match(css, /governance-hero\.owner-hero/);
 });
 
-test("public GoodKota website carries brand, culture and stakeholder intake", () => {
+test("public Yagoya website carries brand, culture and stakeholder intake", () => {
   const website = read("website.html");
   for (const id of ["culture","promotions","merchants","drivers","waitlist"]) assert.match(website, new RegExp(`id="${id}"`));
   assert.match(website, /Kota Culture/);
@@ -80,11 +80,11 @@ test("Admin overview materialized summary is passed explicitly and not read from
 });
 
 
-test("GoodKota header logo remains visible on narrow screens", () => {
+test("Yagoya header logo remains visible on narrow screens", () => {
   const html = read("index.html");
   const css = read("css/styles.css");
   assert.match(html, /class="brand-logo-shell"/);
-  assert.match(html, /class="brand-logo" src="\.\/assets\/goodkota-logo\.png"/);
+  assert.match(html, /class="brand-logo" src="\.\/assets\/yagoya-logo\.png"/);
   assert.equal(/\.brand\s+span\s*\{\s*display\s*:\s*none/i.test(css), false);
   assert.match(css, /\.brand-wordmark\s*\{\s*display\s*:\s*none/);
   assert.match(css, /\.brand-logo-shell\s*\{\s*display\s*:\s*grid/);

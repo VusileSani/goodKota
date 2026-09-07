@@ -1,14 +1,14 @@
 {
-  "name": "GoodKota",
-  "short_name": "GoodKota",
+  "name": "Yagoya",
+  "short_name": "Yagoya",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#faf9f7",
   "theme_color": "#F15A29",
-  "description": "Find a good kota nearby, order with confidence and track delivery.",
+  "description": "We tell you where the good food is — trusted local discovery, ordering and delivery.",
   "icons": [
     {
-      "src": "./assets/goodkota-logo.png",
+      "src": "./assets/yagoya-logo.png",
       "sizes": "300x300",
       "type": "image/png",
       "purpose": "any"

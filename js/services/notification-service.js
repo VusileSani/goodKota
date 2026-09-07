@@ -25,8 +25,8 @@ export async function showLocalNotification(title, options = {}) {
   const registration = await navigator.serviceWorker?.ready;
   if (registration?.showNotification) {
     return registration.showNotification(title, {
-      icon: "./assets/goodkota-logo.png",
-      badge: "./assets/goodkota-logo.png",
+      icon: "./assets/yagoya-logo.png",
+      badge: "./assets/yagoya-logo.png",
       ...options
     });
   }

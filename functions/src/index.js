@@ -203,7 +203,7 @@ export const updatePlatformAuthority = onCall({ region: REGION, enforceAppCheck:
       const existingData = existing.data() || {};
       const wouldRemoveActiveOwner = existingData.role === "owner" && existingData.active === true && (role !== "owner" || active === false);
       if (wouldRemoveActiveOwner && activeOwners.size <= 1) {
-        throw new HttpsError("failed-precondition", "GoodKota must retain at least one active Owner.");
+        throw new HttpsError("failed-precondition", "Yagoya must retain at least one active Owner.");
       }
       tx.set(staffRef, { authUid: uid, role, active: active !== false, updatedAt: serverTime() }, { merge: true });
       tx.create(db.collection("platformAudit").doc(), auditEvent({
@@ -239,8 +239,8 @@ export const createMerchant = onCall({ region: REGION, enforceAppCheck: true }, 
     prepMinutes: Math.max(1, Math.min(240, Number(data.prepMinutes || 20))),
     deliveryFeeCents: cents(data.deliveryFeeCents || 0), minOrderCents: cents(data.minOrderCents || 0),
     delivery: { enabled: data.delivery?.enabled !== false, radiusKm: Math.max(0, Number(data.delivery?.radiusKm || 7)), providerPreference: text(data.delivery?.providerPreference || "goodkota_fleet") },
-    deliveryCapability: { ownDrivers: Boolean(data.deliveryCapability?.ownDrivers), acceptsGoodKotaFleet: data.deliveryCapability?.acceptsGoodKotaFleet !== false, thirdPartyAllowed: data.deliveryCapability?.thirdPartyAllowed !== false },
-    compliance: { status: "pending_review", note: "Awaiting GoodKota Admin review" },
+    deliveryCapability: { ownDrivers: Boolean(data.deliveryCapability?.ownDrivers), acceptsYagoyaFleet: data.deliveryCapability?.acceptsYagoyaFleet !== false, thirdPartyAllowed: data.deliveryCapability?.thirdPartyAllowed !== false },
+    compliance: { status: "pending_review", note: "Awaiting Yagoya Admin review" },
     qualityWorkflow: { status: "healthy", note: "" }, commercial: { plan: text(data.commercial?.plan || "Standard"), status: "active", note: "" },
     settlement: { status: "not_configured" }, gatewayAccount: { status: "not_configured" }, createdAt: serverTime(), version: 1
   };

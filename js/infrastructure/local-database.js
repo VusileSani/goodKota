@@ -1,6 +1,6 @@
-const PREFIX = "goodkota_integrated_v6_1";
+const PREFIX = "yagoya_integrated_v6_2";
 const LEGACY_SINGLE_KEYS = ["goodkota_foundation_v4", "goodkota_foundation_v5"];
-const LEGACY_COLLECTION_PREFIXES = ["goodkota_scale_v6"];
+const LEGACY_COLLECTION_PREFIXES = ["goodkota_integrated_v6_1", "goodkota_scale_v6"];
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -62,7 +62,7 @@ export class LocalCollectionDatabase {
       localStorage.setItem(this.key(name), serialized);
       this.cache.set(name, serialized);
     }
-    localStorage.setItem(this.key("manifest"), JSON.stringify({ schemaVersion: "6.1", collections }));
+    localStorage.setItem(this.key("manifest"), JSON.stringify({ schemaVersion: "6.2", collections }));
   }
 
   clear() {

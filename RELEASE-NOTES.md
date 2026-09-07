@@ -1,3 +1,11 @@
+# GoodKota v6.1.2 — Logo Restoration
+
+- Fixed a responsive regression that hid the GoodKota logo below 700px by hiding every span inside the brand control.
+- The official GoodKota logo now remains visible in the persistent header across Customer, Merchant, Driver, Delivery Ops, GoodKota Admin and GoodKota Owner views.
+- The wordmark may collapse on narrow screens, but the logo itself never does.
+- The logo remains the primary home/navigation anchor.
+- Added a regression test to prevent blanket `.brand span` hiding from returning.
+
 # GoodKota v6.1.1 — Visible UI Rollup
 
 v6.1.1 is the corrected release of the v6.1 Integrated Product Rollup. The v6.1 functional additions were present in code, but the visible shell did not reflect the agreed GoodKota interface treatment strongly enough. This release fixes that gap without changing the v6.1 data schema.

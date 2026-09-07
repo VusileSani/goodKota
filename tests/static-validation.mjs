@@ -39,10 +39,10 @@ test("views do not read global store collections directly", () => {
   }
 });
 
-test("package/config/index files identify v6.1.1 and parse cleanly", () => {
+test("package/config/index files identify v6.1.2 and parse cleanly", () => {
   const pkg = JSON.parse(read("package.json"));
-  assert.equal(pkg.version, "6.1.1");
-  assert.equal(pkg.name, "goodkota-v6-1-1-visible-ui-rollup");
+  assert.equal(pkg.version, "6.1.2");
+  assert.equal(pkg.name, "goodkota-v6-1-2-logo-restoration");
   JSON.parse(read("firestore.indexes.json"));
   JSON.parse(read("firebase.json"));
   JSON.parse(read("config/production.json"));

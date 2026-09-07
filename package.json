@@ -1,8 +1,8 @@
 {
-  "name": "goodkota-v6-1-1-visible-ui-rollup",
+  "name": "goodkota-v6-1-2-logo-restoration",
   "private": true,
   "type": "module",
-  "version": "6.1.1",
+  "version": "6.1.2",
   "scripts": {
     "test": "node tests/scale-foundation.test.mjs && node tests/static-validation.mjs && node tests/ui-rollup.test.mjs && node tests/runtime-render-smoke.test.mjs",
     "test:scale": "node tests/scale-foundation.test.mjs",

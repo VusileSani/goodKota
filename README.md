@@ -1,3 +1,7 @@
+# GoodKota v6.1.2 — Logo Restoration
+
+This release restores the persistent GoodKota header logo at all responsive widths while preserving the v6.1.1 visible UI rollup and v6 scale foundation.
+
 # GoodKota v6.1.1 — Visible UI Rollup
 
 GoodKota v6.1.1 keeps the v6 Scale Foundation and the full v6.1 product rollup intact, while correcting the visible GoodKota interface layer so the agreed branding, actor separation and operating workspaces are clearly present.

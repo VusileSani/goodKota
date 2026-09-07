@@ -78,3 +78,14 @@ test("Admin overview materialized summary is passed explicitly and not read from
   assert.match(admin, /data\.summary\?\.merchantCount/);
   assert.equal(/overviewSection[\s\S]*snapshot\.summary\.merchantCount/.test(admin), false);
 });
+
+
+test("GoodKota header logo remains visible on narrow screens", () => {
+  const html = read("index.html");
+  const css = read("css/styles.css");
+  assert.match(html, /class="brand-logo-shell"/);
+  assert.match(html, /class="brand-logo" src="\.\/assets\/goodkota-logo\.png"/);
+  assert.equal(/\.brand\s+span\s*\{\s*display\s*:\s*none/i.test(css), false);
+  assert.match(css, /\.brand-wordmark\s*\{\s*display\s*:\s*none/);
+  assert.match(css, /\.brand-logo-shell\s*\{\s*display\s*:\s*grid/);
+});

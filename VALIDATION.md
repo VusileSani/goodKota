@@ -1,3 +1,7 @@
+# GoodKota v6.1.2 Logo Restoration — Validation
+
+This point release fixes the responsive header regression that could hide the official GoodKota logo on narrow viewports. The logo is now explicitly preserved at every breakpoint while the wordmark alone may collapse for space. A regression test rejects any blanket `.brand span { display:none }` rule.
+
 # GoodKota v6.1.1 Visible UI Rollup — Validation
 
 ## Result

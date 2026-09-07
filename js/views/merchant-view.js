@@ -23,9 +23,9 @@ export function renderMerchantView(app) {
   const quality = qualityBadge(merchant.qualityWorkflow.status, merchant.qualitySummary.signal);
 
   app.root.innerHTML = `
-    <section class="section-head">
-      <div><span class="eyebrow">Merchant</span><h2>${escapeHtml(merchant.name)}</h2><p>${escapeHtml(merchant.address || "")} · Orders and menu.</p></div>
-      <select id="merchantSwitcher" class="btn ghost merchant-switcher">
+    <section class="actor-hero merchant-hero">
+      <div><span class="eyebrow">Merchant workspace</span><h2>${escapeHtml(merchant.name)}</h2><p>${escapeHtml(merchant.address || "")} · Orders, menu and storefront tools.</p></div>
+      <select id="merchantSwitcher" class="btn hero-switcher merchant-switcher">
         ${merchants.map(item => `<option value="${item.id}" ${item.id === merchant.id ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}
       </select>
     </section>

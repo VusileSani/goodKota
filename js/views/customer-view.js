@@ -176,9 +176,12 @@ function renderHome(app, ranked) {
     ${locationStrip(app)}
     <section class="customer-screen customer-home-screen">
       <div class="customer-greeting">
-        <span class="eyebrow">Hi ${escapeHtml(customer.name.split(" ")[0] || "there")}</span>
-        <h1>Find a good kota nearby.</h1>
-        <p>Closest first. Verified quality visible before you order.</p>
+        <div class="customer-greeting-copy">
+          <span class="eyebrow">Hi ${escapeHtml(customer.name.split(" ")[0] || "there")}</span>
+          <h1>Find a good kota nearby.</h1>
+          <p>Closest first. Verified quality visible before you order.</p>
+        </div>
+        <img class="customer-greeting-mark" src="./assets/goodkota-logo.png" alt="" aria-hidden="true" />
       </div>
 
       <label class="customer-search" aria-label="Search nearby merchants">

@@ -88,6 +88,22 @@ class GoodKotaApp {
     host.innerHTML = `<a class="brand-link explore-link" href="${brand.publicWebsite || "./website.html"}">Explore GoodKota</a>${links.map(([label, url]) => `<a class="brand-link social-link" href="${url}" target="_blank" rel="noopener noreferrer" aria-label="GoodKota on ${label}">${label}</a>`).join("")}`;
   }
 
+  renderActorContext() {
+    const host = document.querySelector("#actorContext");
+    if (!host) return;
+    const contexts = {
+      customer: ["Customer", "Nearby discovery, ordering and delivery"],
+      merchant: ["Merchant", "Orders, menu, storefront QR and support"],
+      driver: ["Driver", "Current delivery, handover and support"],
+      delivery: ["Delivery Ops", "Dispatch and live delivery control"],
+      admin: ["GoodKota Admin", "Platform operations and stakeholder support"],
+      owner: ["GoodKota Owner", "Company authority and protected controls"]
+    };
+    const [label, hint] = contexts[this.route] || contexts.customer;
+    host.dataset.actor = this.route;
+    host.innerHTML = `<div class="actor-context-inner"><span class="actor-context-label">${label}</span><span class="actor-context-hint">${hint}</span></div>`;
+  }
+
   bindShell() {
     document.querySelector("#brandHome").addEventListener("click", () => this.navigate("customer"));
     document.querySelector("#roleSelect")?.addEventListener("change", event => this.navigate(event.currentTarget.value));
@@ -112,6 +128,8 @@ class GoodKotaApp {
 
   render() {
     document.body.classList.toggle("customer-route", this.route === "customer");
+    document.body.dataset.route = this.route;
+    this.renderActorContext();
     const controls = this.repos.platform.controls();
     if (controls.maintenanceMode && !["owner", "admin"].includes(this.route)) {
       this.root.innerHTML = `

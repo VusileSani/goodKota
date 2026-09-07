@@ -1,10 +1,10 @@
 {
-  "name": "goodkota-v6-1-integrated-product-rollup",
+  "name": "goodkota-v6-1-1-visible-ui-rollup",
   "private": true,
   "type": "module",
-  "version": "6.1.0",
+  "version": "6.1.1",
   "scripts": {
-    "test": "node tests/scale-foundation.test.mjs && node tests/static-validation.mjs",
+    "test": "node tests/scale-foundation.test.mjs && node tests/static-validation.mjs && node tests/ui-rollup.test.mjs && node tests/runtime-render-smoke.test.mjs",
     "test:scale": "node tests/scale-foundation.test.mjs",
     "test:static": "node tests/static-validation.mjs"
   }

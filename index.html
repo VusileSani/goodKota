@@ -16,27 +16,32 @@
   </div>
 
   <header class="app-header">
-    <button class="brand" id="brandHome" aria-label="GoodKota home">
-      <img class="brand-logo" src="./assets/goodkota-logo.png" alt="" />
-      <span>GoodKota</span>
-    </button>
+    <div class="header-brand-zone">
+      <button class="brand" id="brandHome" aria-label="GoodKota home">
+        <span class="brand-logo-shell"><img class="brand-logo" src="./assets/goodkota-logo.png" alt="" /></span>
+        <span class="brand-wordmark"><strong>GoodKota</strong><small>Kota culture. Nearby.</small></span>
+      </button>
+    </div>
 
-    <nav class="brand-links" id="brandLinks" aria-label="GoodKota brand links">
-      <a class="brand-link explore-link" href="./website.html">Explore GoodKota</a>
-    </nav>
+    <div class="header-actions">
+      <nav class="brand-links" id="brandLinks" aria-label="GoodKota brand links">
+        <a class="brand-link explore-link" href="./website.html">Explore GoodKota</a>
+      </nav>
 
-    <label class="actor-switcher">
-      <span>View as</span>
-      <select id="roleSelect" aria-label="Switch GoodKota actor">
-        <option value="customer">Customer</option>
-        <option value="merchant">Merchant</option>
-        <option value="driver">Driver</option>
-        <option value="delivery">Delivery Ops</option>
-        <option value="admin">GoodKota Admin</option>
-        <option value="owner">GoodKota Owner</option>
-      </select>
-    </label>
+      <label class="actor-switcher">
+        <span>View as</span>
+        <select id="roleSelect" aria-label="Switch GoodKota actor">
+          <option value="customer">Customer</option>
+          <option value="merchant">Merchant</option>
+          <option value="driver">Driver</option>
+          <option value="delivery">Delivery Ops</option>
+          <option value="admin">GoodKota Admin</option>
+          <option value="owner">GoodKota Owner</option>
+        </select>
+      </label>
+    </div>
   </header>
+  <div id="actorContext" class="actor-context" aria-live="polite"></div>
 
   <main id="app" class="app-shell" aria-live="polite"></main>
 

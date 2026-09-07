@@ -28,7 +28,7 @@ export function renderAdminView(app) {
   const section = app.adminSection || "overview";
 
   app.root.innerHTML = `
-    <section class="governance-hero">
+    <section class="governance-hero admin-hero">
       <div>
         <span class="eyebrow">GoodKota Admin</span>
         <h2>Platform Operations</h2>
@@ -65,7 +65,7 @@ export function renderAdminView(app) {
     ${section === "support" ? supportSection(app, openCases) : ""}
     ${section === "communications" ? communicationsSection(app) : ""}
     ${section === "activity" ? activitySection(app) : ""}
-    ${section === "overview" ? overviewSection(app, { openCases, qualityAlerts, settlementAttention, commercialAttention, dispatchAttention }) : ""}
+    ${section === "overview" ? overviewSection(app, { openCases, qualityAlerts, settlementAttention, commercialAttention, dispatchAttention, summary: snapshot.summary }) : ""}
   `;
 
   bindSectionTabs(app);
@@ -114,8 +114,8 @@ function overviewSection(app, data) {
     <section class="section">
       <div class="section-head"><div><h3>Merchant network</h3><p>Current operating footprint.</p></div><button class="btn ghost small" data-jump-admin="merchants">Manage merchants</button></div>
       <div class="metric-strip">
-        <div class="stat"><span class="muted">Merchants</span><b>${snapshot.summary.merchantCount || 0}</b></div>
-        <div class="stat"><span class="muted">Active</span><b>${snapshot.summary.activeMerchants || 0}</b></div>
+        <div class="stat"><span class="muted">Merchants</span><b>${data.summary?.merchantCount || 0}</b></div>
+        <div class="stat"><span class="muted">Active</span><b>${data.summary?.activeMerchants || 0}</b></div>
         <div class="stat"><span class="muted">Commercial attention</span><b>${data.commercialAttention.length}</b></div>
       </div>
     </section>`;

@@ -1,4 +1,4 @@
-const CACHE = "goodkota-v6-1-integrated-product-rollup-shell";
+const CACHE = "goodkota-v6-1-1-visible-ui-rollup-shell";
 const SHELL = [
   "./",
   "./index.html",

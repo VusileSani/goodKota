@@ -1231,3 +1231,343 @@ body.dialog-open {
   body.qr-print-mode dialog .inline-actions { display:none!important; }
   body.qr-print-mode .qr-print-card { box-shadow:none!important; border:0!important; }
 }
+
+/* =========================================================
+   v6.1.1 — visible GoodKota UI roll-up
+   Stronger brand presence without turning every surface orange.
+   ========================================================= */
+body {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(241,90,41,.055), transparent 28rem),
+    var(--bg);
+}
+
+.app-header {
+  min-height: 68px;
+  padding: 10px 16px;
+  gap: 14px;
+  background: rgba(255,255,255,.985);
+  border-top: 0;
+  border-bottom: 1px solid #f0d4c9;
+  box-shadow: 0 8px 26px rgba(36,28,25,.08);
+}
+.header-brand-zone {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  margin: -10px 0 -10px -16px;
+  padding: 10px 22px 10px 18px;
+  border-radius: 0 22px 22px 0;
+  background:
+    linear-gradient(135deg, rgba(241,90,41,.98), rgba(255,117,70,.97)),
+    url("../assets/goodkota-splash.jpg") center / cover no-repeat;
+  box-shadow: inset -1px 0 rgba(36,28,25,.08);
+}
+.brand {
+  color: #1f1714;
+  gap: 11px;
+}
+.brand-logo-shell {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 15px;
+  background: rgba(255,255,255,.93);
+  box-shadow: 0 8px 22px rgba(36,28,25,.16);
+}
+.brand-logo { width: 43px; height: 43px; }
+.brand-wordmark { display: grid; gap: 1px; text-align: left; }
+.brand-wordmark strong { font-size: 1.15rem; line-height: 1; letter-spacing: -.02em; }
+.brand-wordmark small { font-size: .68rem; font-weight: 800; opacity: .72; }
+.header-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand-links { margin-left: 0; }
+.brand-link {
+  border-radius: 12px;
+  transition: background .15s ease, border-color .15s ease;
+}
+.brand-link.explore-link {
+  background: #fff4ef;
+  border: 1px solid #ffc4ae;
+  color: #973a1b;
+}
+.brand-link.explore-link:hover { background: #ffe7dd; border-color: #f5a488; }
+.actor-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 10px;
+  border: 1px solid #f0c4b4;
+  border-radius: 14px;
+  background: #fffaf7;
+  color: #6c3d2c;
+  font-size: .76rem;
+  font-weight: 850;
+}
+.actor-switcher select {
+  min-width: 164px;
+  border: 0;
+  outline: 0;
+  border-radius: 9px;
+  background: #fff;
+  color: var(--ink);
+  padding: 7px 28px 7px 9px;
+  font-weight: 900;
+}
+.actor-context {
+  border-bottom: 1px solid #f4d5ca;
+  background: #fff5f0;
+}
+.actor-context-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 7px 24px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 34px;
+}
+.actor-context-label {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--brand);
+  color: #1f1714;
+  font-size: .72rem;
+  font-weight: 950;
+}
+.actor-context-hint { color: #72594f; font-size: .78rem; font-weight: 720; }
+.actor-context[data-actor="owner"] { background: #2b211e; border-bottom-color: #2b211e; }
+.actor-context[data-actor="owner"] .actor-context-label { background: var(--brand); }
+.actor-context[data-actor="owner"] .actor-context-hint { color: #f4ded5; }
+.actor-context[data-actor="admin"] { background: #fff0e9; }
+.actor-context[data-actor="delivery"] { background: #f7f2ef; }
+
+.app-shell { max-width: 1220px; padding-top: 22px; }
+
+/* Customer: unmistakably GoodKota while keeping ordering calm. */
+.customer-location-strip {
+  border-color: #f3bda9;
+  background: rgba(255,250,247,.985);
+  box-shadow: 0 6px 20px rgba(241,90,41,.08);
+}
+.customer-location-label { color: #a54726; }
+.customer-home-screen .customer-greeting {
+  position: relative;
+  overflow: hidden;
+  min-height: 190px;
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 26px 28px;
+  border: 1px solid rgba(145,55,24,.16);
+  border-radius: 26px;
+  background:
+    linear-gradient(120deg, rgba(241,90,41,.98), rgba(255,123,73,.91)),
+    url("../assets/goodkota-splash.jpg") center / cover no-repeat;
+  color: #211512;
+  box-shadow: 0 16px 38px rgba(134,58,30,.18);
+}
+.customer-home-screen .customer-greeting::after {
+  content: "";
+  position: absolute;
+  inset: auto -52px -78px auto;
+  width: 190px;
+  height: 190px;
+  border: 24px solid rgba(255,255,255,.16);
+  border-radius: 50%;
+}
+.customer-greeting-copy { position: relative; z-index: 1; min-width: 0; }
+.customer-home-screen .customer-greeting .eyebrow { color: #5b2a18; }
+.customer-home-screen .customer-greeting h1 {
+  max-width: 500px;
+  margin-top: 8px;
+  font-size: clamp(2.35rem, 8vw, 3.65rem);
+}
+.customer-home-screen .customer-greeting p { color: rgba(36,28,25,.77); font-weight: 720; }
+.customer-greeting-mark {
+  position: relative;
+  z-index: 1;
+  width: clamp(92px, 16vw, 142px);
+  aspect-ratio: 1;
+  object-fit: contain;
+  border-radius: 28%;
+  filter: drop-shadow(0 14px 24px rgba(36,28,25,.18));
+}
+.customer-search { border-color: #eed2c8; }
+.customer-home-meta strong { color: #8f3619; }
+.customer-merchant-card {
+  position: relative;
+  overflow: hidden;
+  border-color: #eaded9;
+}
+.customer-merchant-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: #f8d0c2;
+}
+.customer-merchant-card.closest {
+  border-color: #f2a78b;
+  background: linear-gradient(90deg, #fff6f1, #fff 34%);
+  box-shadow: 0 10px 26px rgba(241,90,41,.10);
+}
+.customer-merchant-card.closest::before { background: var(--brand); }
+.customer-category-chip.active,
+.customer-nav-item.active {
+  background: var(--brand);
+  color: #211512;
+}
+.customer-bottom-nav {
+  border-color: #f0cabc;
+  box-shadow: 0 -8px 28px rgba(36,28,25,.08);
+}
+.customer-cart-bar {
+  background: #2b211e;
+  color: #fff;
+  border-color: #2b211e;
+}
+.customer-cart-action { color: #ffb59c; }
+
+/* Actor workspaces */
+.actor-hero {
+  position: relative;
+  overflow: hidden;
+  min-height: 164px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  padding: 26px 28px;
+  border-radius: 26px;
+  color: #fff;
+  box-shadow: var(--shadow);
+}
+.actor-hero::after {
+  content: "";
+  position: absolute;
+  width: 210px;
+  height: 210px;
+  right: -62px;
+  bottom: -86px;
+  border: 28px solid rgba(255,255,255,.10);
+  border-radius: 50%;
+}
+.actor-hero > * { position: relative; z-index: 1; }
+.actor-hero h2 { margin: 6px 0 7px; font-size: clamp(2rem,5vw,3rem); letter-spacing: -.035em; }
+.actor-hero p { margin: 0; color: rgba(255,255,255,.82); }
+.merchant-hero {
+  background:
+    linear-gradient(112deg, rgba(43,33,30,.98), rgba(91,51,36,.91)),
+    url("../assets/goodkota-splash.jpg") center / cover no-repeat;
+  border-left: 7px solid var(--brand);
+}
+.driver-hero {
+  background: linear-gradient(120deg, #3a2b26, #674535);
+  border-left: 7px solid var(--brand);
+}
+.delivery-hero {
+  background: linear-gradient(120deg, #2b211e, #513a31);
+  border-left: 7px solid var(--brand);
+}
+.hero-switcher {
+  min-width: 210px;
+  background: rgba(255,255,255,.94);
+  color: var(--ink);
+  border: 1px solid rgba(255,255,255,.45);
+}
+.hero-status-chip {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.28);
+  background: rgba(255,255,255,.12);
+  color: #fff;
+  font-size: .78rem;
+  font-weight: 900;
+}
+
+/* Company governance: Admin is operating control; Owner remains visually distinct. */
+.governance-hero.admin-hero {
+  background:
+    linear-gradient(112deg, rgba(241,90,41,.98), rgba(209,69,26,.93)),
+    url("../assets/goodkota-splash.jpg") center / cover no-repeat;
+  color: #1f1714;
+  border-top: 0;
+}
+.governance-hero.admin-hero .eyebrow { color: #552616; }
+.governance-hero.admin-hero p { color: rgba(36,28,25,.78); }
+.governance-hero.admin-hero .status-pulse {
+  border-color: rgba(36,28,25,.2);
+  background: rgba(255,255,255,.30);
+  color: #2b211e;
+}
+.governance-hero.owner-hero {
+  border-top: 5px solid var(--brand);
+  background:
+    linear-gradient(112deg, rgba(29,23,21,.99), rgba(64,39,31,.95)),
+    url("../assets/goodkota-splash.jpg") center / cover no-repeat;
+}
+.governance-metrics .stat,
+.metric-strip .stat {
+  border-top: 3px solid #f5b49d;
+}
+.section-tabs {
+  padding: 5px;
+  border-color: #ecd3ca;
+  background: #fffaf7;
+}
+.section-tab.active {
+  background: var(--brand);
+  color: #211512;
+  box-shadow: 0 5px 14px rgba(241,90,41,.16);
+}
+.section-tab.active span { background: #2b211e; color: #fff; }
+.action-card { border-top: 3px solid #f5b49d; }
+.merchant-tools-grid .action-card:first-child {
+  background: var(--brand-soft);
+  border-color: #f4b7a1;
+}
+.table-wrap table thead { background: #fff5f0; }
+.table-wrap th { color: #7c3d28; }
+.order-link { color: #a53c19; }
+.dialog {
+  border-top: 5px solid var(--brand);
+}
+.dialog::backdrop { background: rgba(36,28,25,.48); }
+
+@media (max-width: 900px) {
+  .header-brand-zone { padding-right: 16px; }
+  .brand-wordmark small { display: none; }
+  .actor-context-inner { padding-left: 18px; padding-right: 18px; }
+  .actor-hero { min-height: 0; align-items: flex-start; flex-direction: column; }
+  .hero-switcher { width: 100%; min-width: 0; }
+}
+
+@media (max-width: 700px) {
+  .app-header { min-height: 62px; padding: 8px 10px; gap: 8px; }
+  .header-brand-zone { margin: -8px 0 -8px -10px; padding: 8px 12px; border-radius: 0 16px 16px 0; }
+  .brand-logo-shell { width: 42px; height: 42px; border-radius: 13px; }
+  .brand-logo { width: 38px; height: 38px; }
+  .brand-wordmark { display: none; }
+  .header-actions { gap: 6px; }
+  .brand-link.explore-link { max-width: 94px; }
+  .actor-switcher { padding: 5px; }
+  .actor-switcher select { min-width: 128px; padding-left: 7px; font-size: .78rem; }
+  .actor-context-inner { padding: 6px 12px; }
+  .actor-context-hint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .customer-home-screen .customer-greeting { min-height: 164px; padding: 22px 20px; grid-template-columns: 1fr auto; }
+  .customer-greeting-mark { width: 86px; }
+  .actor-hero { padding: 22px; border-radius: 22px; }
+}
+
+@media (max-width: 480px) {
+  .brand-link.explore-link { max-width: 74px; padding: 7px 6px; }
+  .actor-switcher select { min-width: 112px; max-width: 134px; }
+  .actor-context-hint { display: none; }
+  .customer-home-screen .customer-greeting { grid-template-columns: 1fr; }
+  .customer-greeting-mark { position: absolute; right: 12px; top: 12px; width: 72px; opacity: .23; }
+}

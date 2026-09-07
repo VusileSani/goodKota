@@ -22,9 +22,9 @@ export function renderDriverView(app) {
   const events = task ? app.repos.delivery.events(task.id, { limit: 5, direction: "desc" }).items : [];
 
   app.root.innerHTML = `
-    <section class="section-head">
-      <div><span class="eyebrow">Driver</span><h2>${escapeHtml(driver.name)}</h2><p>Current job and handover.</p></div>
-      <select id="driverSwitcher" class="btn ghost">
+    <section class="actor-hero driver-hero">
+      <div><span class="eyebrow">Driver workspace</span><h2>${escapeHtml(driver.name)}</h2><p>Current job, handover and support.</p></div>
+      <select id="driverSwitcher" class="btn hero-switcher">
         ${drivers.map(item => `<option value="${item.id}" ${item.id === driver.id ? "selected" : ""}>${escapeHtml(item.name)} · ${escapeHtml(item.operatorType)}</option>`).join("")}
       </select>
     </section>

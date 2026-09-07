@@ -10,8 +10,9 @@ export function renderDeliveryOpsView(app) {
   const availableDrivers = app.repos.delivery.listDrivers({ limit: 50, enabled: true, shiftStatus: "online", availability: "available" }).items;
 
   app.root.innerHTML = `
-    <section class="section-head">
-      <div><span class="eyebrow">Delivery Ops</span><h2>Dispatch</h2><p>Assign and monitor delivery jobs.</p></div>
+    <section class="actor-hero delivery-hero">
+      <div><span class="eyebrow">Delivery Ops</span><h2>Dispatch</h2><p>Assign drivers, monitor hand-offs and keep deliveries moving.</p></div>
+      <span class="hero-status-chip">${deliveryEnabled ? "Delivery live" : "Delivery paused"}</span>
     </section>
 
     <div class="metric-strip">
@@ -81,6 +82,7 @@ function driverTable(app, drivers) {
     const vehicle = app.repos.delivery.vehicle(driver.vehicleId);
     const location = app.repos.delivery.currentLocation(driver.id);
     const task = driver.activeTaskId ? app.repos.delivery.task(driver.activeTaskId) : null;
+    const order = task ? app.repos.orders.get(task.orderId) : null;
     return `<tr>
       <td><strong>${escapeHtml(driver.name)}</strong><div class="muted small">⭐ ${Number(driver.rating || 0).toFixed(1)} · ${driver.completedDeliveries} completed</div></td>
       <td>${driver.operatorType === "goodkota" ? "GoodKota" : escapeHtml(app.repos.merchants.get(driver.operatorId)?.name || "Merchant")}</td>

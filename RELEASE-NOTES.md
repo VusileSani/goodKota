@@ -1,4 +1,27 @@
-# GoodKota v6.1 — Integrated Product Rollup
+# GoodKota v6.1.1 — Visible UI Rollup
+
+v6.1.1 is the corrected release of the v6.1 Integrated Product Rollup. The v6.1 functional additions were present in code, but the visible shell did not reflect the agreed GoodKota interface treatment strongly enough. This release fixes that gap without changing the v6.1 data schema.
+
+## Visible interface correction
+
+- Stronger GoodKota orange identity in the main header, customer home hero, active navigation, selected merchant states and operational cards.
+- Clear actor-context strip for Customer, Merchant, Driver, Delivery Ops, GoodKota Admin and GoodKota Owner.
+- Merchant, Driver and Delivery Ops now open with actor-specific workspace heroes rather than generic section headings.
+- GoodKota Admin uses an orange platform-operations hero; GoodKota Owner remains a deliberately darker company-governance environment.
+- Merchant storefront QR, menu maintenance and full order-detail access remain surfaced in the merchant workspace.
+- App header keeps the ordering experience lean while exposing Explore GoodKota; configured social links remain optional.
+- Public GoodKota website remains the brand/content hub for Kota Culture, promotions, merchant applications, driver applications and waitlist.
+- Overlay behaviour remains viewport-stable; opening and closing dialogs does not scale or zoom the app.
+
+## Runtime correction
+
+- Fixed the GoodKota Admin overview materialized-summary reference so the Admin overview does not rely on an out-of-scope variable.
+
+## Compatibility
+
+The browser storage namespace and schema remain `goodkota_integrated_v6_1` / schema `6.1`, so a v6.1.1 UI correction does not wipe v6.0/v6.1 operational browser data.
+
+## Integrated product capabilities retained
 
 This release consolidates the agreed GoodKota product updates on top of v6.0 rather than replacing the Scale Foundation.
 

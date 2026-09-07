@@ -1,6 +1,6 @@
-# GoodKota v6.1 — Integrated Product Rollup
+# GoodKota v6.1.1 — Visible UI Rollup
 
-GoodKota v6.1 keeps the v6 Scale Foundation intact and rolls the agreed product capabilities back into one coherent, scale-ready application.
+GoodKota v6.1.1 keeps the v6 Scale Foundation and the full v6.1 product rollup intact, while correcting the visible GoodKota interface layer so the agreed branding, actor separation and operating workspaces are clearly present.
 
 ## Actors
 
@@ -12,6 +12,15 @@ GoodKota v6.1 keeps the v6 Scale Foundation intact and rolls the agreed product 
 - **GoodKota Owner** — govern GoodKota authority, company-wide controls, official brand/social configuration and the full privileged audit.
 
 The actor switcher exists for product testing. Production authority is enforced with Firebase Authentication/custom claims, App Check, Firestore Security Rules and Cloud Functions.
+
+## v6.1.1 visible UI correction
+
+- stronger orange GoodKota header and customer hero
+- visible actor-context strip tied to the View as switcher
+- distinct Merchant, Driver, Delivery Ops, Admin and Owner workspace heroes
+- orange Admin operations identity and darker Owner governance identity
+- stable overlays without page zoom/scale changes
+- runtime fix for the Admin overview materialized summary
 
 ## v6.1 product rollup
 

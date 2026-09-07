@@ -22,6 +22,7 @@ export class RepositoryHub {
       get: () => this.store.state.platform,
       controls: () => ({ ...(this.store.state.platform?.controls || {}) }),
       paymentGateway: () => ({ ...(this.store.state.platform?.paymentGateway || {}) }),
+      brand: () => ({ ...(this.store.state.platform?.brand || {}), social: { ...(this.store.state.platform?.brand?.social || {}) } }),
       summary: () => ({ ...(this.store.state.materialized?.platformSummary || {}) })
     };
 
@@ -54,6 +55,19 @@ export class RepositoryHub {
       listForMerchant: (merchantId, options = {}) => pageResult(
         this.store.state.orders.filter(order => order.merchantId === merchantId && (!options.status || [].concat(options.status).includes(order.status))),
         { limit: options.limit || 50, cursor: options.cursor, sortBy: "createdAt", direction: "desc" }
+      ),
+      listAll: (options = {}) => pageResult(
+        this.store.state.orders.filter(order => {
+          if (options.status && ![].concat(options.status).includes(order.status)) return false;
+          if (options.merchantId && order.merchantId !== options.merchantId) return false;
+          if (options.query) {
+            const merchant = byId(this.store.state.merchants, order.merchantId);
+            const hay = `${order.orderNumber || order.id} ${order.customer || ""} ${merchant?.name || ""}`.toLowerCase();
+            if (!hay.includes(String(options.query).toLowerCase())) return false;
+          }
+          return true;
+        }),
+        { limit: options.limit || 50, cursor: options.cursor, sortBy: "createdAt", direction: "desc" }
       )
     };
 
@@ -83,6 +97,29 @@ export class RepositoryHub {
         { limit: options.limit || 50, cursor: options.cursor, sortBy: "createdAt", direction: options.direction || "asc" }
       ),
       recommendDrivers: (task, options = {}) => this.recommendDrivers(task, options)
+    };
+
+    this.promotions = {
+      get: id => byId(this.store.state.promos, id),
+      byCode: code => this.store.state.promos.find(item => item.code === String(code || "").trim().toUpperCase()) || null,
+      list: (options = {}) => pageResult(
+        this.store.state.promos.filter(item => options.status ? item.status === options.status : true),
+        { limit: options.limit || 50, cursor: options.cursor, sortBy: "createdAt", direction: "desc" }
+      )
+    };
+
+    this.applications = {
+      merchants: (options = {}) => pageResult(
+        this.store.state.merchantApplications.filter(item => !options.status || item.status === options.status),
+        { limit: options.limit || 50, cursor: options.cursor, sortBy: "createdAt", direction: "desc" }
+      ),
+      drivers: (options = {}) => pageResult(
+        this.store.state.driverApplications.filter(item => !options.status || item.status === options.status),
+        { limit: options.limit || 50, cursor: options.cursor, sortBy: "createdAt", direction: "desc" }
+      ),
+      merchant: id => byId(this.store.state.merchantApplications, id),
+      driver: id => byId(this.store.state.driverApplications, id),
+      waitlist: (options = {}) => pageResult(this.store.state.waitlistEntries, { limit: options.limit || 50, cursor: options.cursor, sortBy: "createdAt", direction: "desc" })
     };
 
     this.governance = {

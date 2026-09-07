@@ -1,8 +1,10 @@
-const CACHE = "goodkota-v6-scale-foundation-shell";
+const CACHE = "goodkota-v6-1-integrated-product-rollup-shell";
 const SHELL = [
   "./",
   "./index.html",
   "./css/styles.css",
+  "./css/website.css",
+  "./website.html",
   "./manifest.webmanifest",
   "./assets/goodkota-logo.png",
   "./assets/goodkota-splash.jpg",
@@ -23,10 +25,13 @@ const SHELL = [
   "./js/services/location-service.js",
   "./js/services/notification-service.js",
   "./js/services/payment-service.js",
+  "./js/services/pricing-service.js",
   "./js/services/quality-service.js",
   "./js/services/retention-service.js",
   "./js/services/search-service.js",
+  "./js/services/storefront-service.js",
   "./js/services/telemetry-service.js",
+  "./js/public-portal.js",
   "./js/views/customer-view.js",
   "./js/views/merchant-view.js",
   "./js/views/driver-view.js",

@@ -56,6 +56,10 @@ service cloud.firestore {
       allow read: if signedIn();
       allow write: if false; // Cloud Functions only.
     }
+    match /publicBrand/{doc} {
+      allow read: if true;
+      allow write: if false; // Owner Cloud Function only.
+    }
     match /platformStaff/{staffId} {
       allow read: if admin();
       allow write: if false;
@@ -75,6 +79,27 @@ service cloud.firestore {
     }
     match /products/{productId} {
       allow read: if true;
+      allow write: if false; // Tenant-scoped catalogue Cloud Function only.
+    }
+    match /promos/{promoId} {
+      allow read: if admin() || resource.data.status == 'active';
+      allow write: if false;
+    }
+    match /promotionEvents/{eventId} {
+      allow read: if admin();
+      allow write: if false;
+    }
+
+    match /merchantApplications/{applicationId} {
+      allow read: if admin();
+      allow write: if false; // Public intake through App Check protected Cloud Function.
+    }
+    match /driverApplications/{applicationId} {
+      allow read: if admin();
+      allow write: if false;
+    }
+    match /waitlistEntries/{entryId} {
+      allow read: if admin();
       allow write: if false;
     }
 
@@ -132,6 +157,10 @@ service cloud.firestore {
 
     match /drivers/{driverId} {
       allow read: if deliveryOps() || driverOwns(driverId);
+      allow write: if false;
+    }
+    match /driverAdministrationEvents/{eventId} {
+      allow read: if admin();
       allow write: if false;
     }
     match /driverVehicles/{vehicleId} {

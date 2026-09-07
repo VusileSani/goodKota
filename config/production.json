@@ -10,7 +10,12 @@
     "drivers": 50,
     "supportCases": 50,
     "merchants": 50,
-    "audit": 100
+    "audit": 100,
+    "adminOrders": 50,
+    "merchantApplications": 50,
+    "driverApplications": 50,
+    "promotions": 50,
+    "waitlist": 50
   },
   "retention": {
     "driverLocationMinutes": 30,
@@ -30,5 +35,11 @@
     "orderCommandP95Ms": 1500,
     "dispatchCommandP95Ms": 1500,
     "trackingReadP95Ms": 1000
+  },
+  "publicPortal": {
+    "merchantApplications": "cloud_function_only",
+    "driverApplications": "cloud_function_only",
+    "waitlist": "cloud_function_only",
+    "brandProjection": "publicBrand/current"
   }
 }

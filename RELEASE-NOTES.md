@@ -1,52 +1,34 @@
-# GoodKota v6.0 — Scale Foundation
+# GoodKota v6.1 — Integrated Product Rollup
 
-This release applies the v5.0 scale-readiness audit without changing GoodKota's approved product direction.
+This release consolidates the agreed GoodKota product updates on top of v6.0 rather than replacing the Scale Foundation.
 
-## Scale architecture
+## Operations and governance
 
-- introduced repository/query boundaries between views and data
-- removed direct collection access from application views
-- bounded list contracts to a maximum of 100 records with cursor-shaped pagination
-- introduced collection-separated local persistence as a production-shaped test adapter
-- added Firestore index definitions for high-volume access patterns
-- added geohash-based merchant/driver candidate-query contracts
+- Owner and GoodKota Admin remain separate authority layers.
+- Admin gains bounded cross-merchant order oversight, driver administration, merchant/driver application queues and promotion management.
+- Owner retains exclusive control of platform authority, protected company controls and official GoodKota brand/social configuration.
+- GoodKota still enforces at least one active Owner.
+- Admin and Owner interventions remain auditable; ordinary product actors stay scoped to their own work.
 
-## Concurrency and integrity
+## Merchant and customer experience
 
-- internal IDs now use scattered UUID-style identifiers
-- human order numbers are separate display identifiers
-- order/payment/background work supports idempotency keys
-- production order, dispatch, delivery, Owner/Admin and merchant-control transitions are behind Cloud Functions/transactions
-- driver assignment validates both task and driver inside one transaction
-- cumulative refund protection prevents refunds exceeding captured payment value
-- Owner authority updates preserve unrelated custom claims and compensate if authority persistence fails
+- Merchant menu maintenance now supports add/edit/hide, price/category/description changes and optional item images.
+- Each merchant can generate a printable QR that opens its direct GoodKota storefront.
+- Checkout supports promotion codes, tips and future scheduled fulfilment.
+- Pricing is re-derived from the current catalogue in the command layer; browser-supplied item prices are not trusted.
+- Merchant onboarding remains unrestricted to arbitrary real addresses with coordinates stored on the Merchant.
 
-## Financial model
+## Public GoodKota layer
 
-- operational money is stored in integer cents
-- payment transactions, payment events, refunds, fee allocations, merchant payouts, settlement events and reconciliation runs are separate domains
-- payment webhook handling fails closed until a real provider verification adapter is configured
-- production payment webhook creates the paid order and delivery task atomically after verified payment
+- Added `website.html` as the GoodKota brand/community hub.
+- Added Kota Culture, promotions, customer waitlist, merchant application and driver application surfaces.
+- Public applications feed GoodKota Admin operating queues.
+- Owner may configure official Instagram/Facebook/TikTok links; empty channels remain hidden.
 
-## Delivery and location
+## Production enforcement additions
 
-- current driver location is one expiring snapshot per driver
-- delivery credentials are separated from driver-readable task state
-- production delivery task stores only a hash of the customer PIN
-- customer-only delivery credential documents expire automatically
-- customer tracking access is scoped through the customer's order/task relationship
+Added Cloud Function contracts for public merchant/driver/waitlist intake, tenant-scoped merchant catalogue maintenance, Admin driver operations, Admin promotions, application review and Owner brand settings. Firestore remains deny-by-default for these writes.
 
-## Governance and support
+## Migration
 
-- Owner/Admin server-side authority boundaries retained
-- at least one active Owner is enforced
-- platform control changes require a reason and immutable audit event
-- merchant onboarding/profile/status, compliance, commercial and quality intervention server commands are included
-- support case and announcement server command boundaries are included
-
-## Operations
-
-- App Check and privileged MFA expectations documented
-- Firestore TTL policies defined for ephemeral operational data
-- observability, retention, analytics export, load testing and disaster recovery runbooks included
-- automated validation suite added under `tests/`
+v6.1 reads and migrates v6.0 collection-separated browser data into the new `goodkota_integrated_v6_1` namespace. Existing v5 migration support is retained.

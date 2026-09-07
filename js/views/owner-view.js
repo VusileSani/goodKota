@@ -46,11 +46,13 @@ export function renderOwnerView(app) {
     <nav class="section-tabs" aria-label="GoodKota Owner sections">
       ${ownerTab("control", "Control", section)}
       ${ownerTab("authority", "Authority", section)}
+      ${ownerTab("brand", "Brand", section)}
       ${ownerTab("integrity", "Integrity", section)}
       ${ownerTab("audit", "Audit", section)}
     </nav>
 
     ${section === "authority" ? authoritySection(app.repos.governance.staff({ limit: 50 }).items) : ""}
+    ${section === "brand" ? brandSection(app.repos.platform.brand()) : ""}
     ${section === "integrity" ? integritySection(snapshot) : ""}
     ${section === "audit" ? auditSection(app) : ""}
     ${section === "control" ? controlSection(platform, controls) : ""}
@@ -102,6 +104,23 @@ function authoritySection(staff) {
     <section class="section-head"><div><h2>Platform Authority</h2><p>Only Owners can create, remove or change GoodKota platform authority.</p></div><button class="btn primary" id="addPlatformStaff">Add platform staff</button></section>
     <section class="section"><div class="table-wrap">${staffTable(staff)}</div></section>
     <div class="notice"><strong>Integrity rule:</strong> GoodKota can never be left without at least one active Owner.</div>`;
+}
+
+function brandSection(brand) {
+  const social = brand.social || {};
+  return `
+    <section class="section-head"><div><h2>GoodKota Brand</h2><p>Company-owned public destinations used by the app and public website.</p></div></section>
+    <section class="section card">
+      <form id="brandSettingsForm" class="form-grid">
+        <label class="field full">Public website<input id="brandWebsite" value="${escapeHtml(brand.publicWebsite || "./website.html")}" required /></label>
+        <label class="field">Instagram URL<input id="brandInstagram" type="url" value="${escapeHtml(social.instagram || "")}" placeholder="https://instagram.com/…" /></label>
+        <label class="field">Facebook URL<input id="brandFacebook" type="url" value="${escapeHtml(social.facebook || "")}" placeholder="https://facebook.com/…" /></label>
+        <label class="field">TikTok URL<input id="brandTikTok" type="url" value="${escapeHtml(social.tiktok || "")}" placeholder="https://tiktok.com/@…" /></label>
+        <label class="field full">Reason<textarea id="brandReason" rows="3" placeholder="Why are these public destinations changing?" required></textarea></label>
+        <button class="btn primary field full">Save brand settings</button>
+      </form>
+      <div class="notice info" style="margin-top:14px"><strong>App stays lean.</strong><div class="small" style="margin-top:4px">Only configured social links appear in the app header. Brand content remains on the public GoodKota website.</div></div>
+    </section>`;
 }
 
 function integritySection(data) {
@@ -156,6 +175,16 @@ function bindOwnerActions(app, actor) {
       }
     });
   }));
+
+  app.root.querySelector("#brandSettingsForm")?.addEventListener("submit", event => {
+    event.preventDefault();
+    const reason = app.root.querySelector("#brandReason").value.trim();
+    if (!reason) return alert("A reason is required for an Owner change.");
+    app.commands.updateBrandSettings({ publicWebsite: app.root.querySelector("#brandWebsite").value.trim(), social: { instagram: app.root.querySelector("#brandInstagram").value.trim(), facebook: app.root.querySelector("#brandFacebook").value.trim(), tiktok: app.root.querySelector("#brandTikTok").value.trim() } }, actor, reason);
+    app.renderBrandLinks();
+    app.toast("Brand settings updated.");
+    app.render();
+  });
 
   app.root.querySelector("#addPlatformStaff")?.addEventListener("click", () => openAddStaff(app, actor));
   app.root.querySelectorAll("[data-edit-platform-staff]").forEach(button => button.addEventListener("click", () => openEditStaff(app, button.dataset.editPlatformStaff, actor)));

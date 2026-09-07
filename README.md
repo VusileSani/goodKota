@@ -1,89 +1,59 @@
-# GoodKota v6.0 — Scale Foundation
+# GoodKota v6.1 — Integrated Product Rollup
 
-GoodKota v6.0 preserves the v5.0 product and governance experience while replacing prototype-shaped internal assumptions with scale-ready contracts.
+GoodKota v6.1 keeps the v6 Scale Foundation intact and rolls the agreed product capabilities back into one coherent, scale-ready application.
 
 ## Actors
 
-- **Customer** — discover nearby merchants, order, pay and track delivery.
-- **Merchant** — manage orders, menu, settlement and request GoodKota support.
-- **Driver** — manage assigned delivery and proof of delivery.
-- **Delivery Ops** — dispatch and monitor deliveries.
-- **GoodKota Admin** — run merchant support, compliance, commercial status, announcements and routine platform operations.
-- **GoodKota Owner** — govern platform authority, protected company controls and the full privileged audit.
+- **Customer** — discover nearby merchants, order, pay, schedule, apply promotions, tip, track delivery and request support.
+- **Merchant** — operate orders, maintain its own catalogue, manage settlement, monitor quality, print a direct-storefront QR and request support.
+- **Driver** — manage assigned deliveries and proof of delivery.
+- **Delivery Ops** — dispatch and monitor live delivery work.
+- **GoodKota Admin** — run merchant/driver onboarding, applications, compliance, commercial status, promotions, cross-merchant orders, support, announcements and routine platform operations.
+- **GoodKota Owner** — govern GoodKota authority, company-wide controls, official brand/social configuration and the full privileged audit.
 
-The actor dropdown is a testing convenience. Production authorization is enforced by Firebase Authentication, Security Rules and server-side commands.
+The actor switcher exists for product testing. Production authority is enforced with Firebase Authentication/custom claims, App Check, Firestore Security Rules and Cloud Functions.
 
-## What changed in v6
+## v6.1 product rollup
 
-- views use bounded repository/query contracts instead of reading global collections directly
-- list contracts use limits and cursor-shaped pagination
-- internal order IDs are UUID/scattered IDs; human GoodKota order numbers are separate display identifiers
-- operational money uses integer cents
-- geospatial discovery uses bounded candidate windows before exact distance calculation
-- current driver location is one expiring snapshot per driver
-- consequential operations have server-side Cloud Function transaction boundaries
-- payment, order, support, compliance, commercial and delivery histories are append-oriented
-- Owner/Admin authority is designed for server enforcement and immutable audit
-- Admin/Owner dashboards consume materialized attention summaries instead of rebuilding global metrics in their views
-- quality aggregation updates the affected merchant rather than scanning every merchant on render
-- production indexes, Security Rules, retention, observability, analytics, load-test and disaster-recovery specifications are included
+- any real merchant street address can be captured and resolved to coordinates
+- merchant catalogue add/edit/hide plus optional product-image URLs
+- merchant-specific storefront deep links and printable QR codes
+- public GoodKota website for Kota Culture, promotions, merchant applications, driver applications and customer waitlist
+- Owner-configured official website/social links with light app navigation
+- Admin application queues, driver administration, promotions and bounded all-order oversight
+- promo-code checkout, tips and scheduled orders
+- customer/merchant/driver support continuity through the GoodKota Admin queue
+- stronger but restrained GoodKota orange brand presence
+- v6.0 browser-state migration to v6.1 without wiping operational data
+
+## Scale foundation retained
+
+- bounded repository/query contracts and cursor-shaped pagination
+- scattered internal IDs separate from human GoodKota order numbers
+- integer-cents financial storage
+- bounded geospatial discovery and dispatch candidate queries
+- idempotent commands and concurrency-protected delivery assignment
+- append-oriented payment, delivery, support, audit and administration events
+- materialized operational summaries rather than global dashboard scans
+- short-lived current driver-location snapshots
+- server-authoritative production commands for consequential writes
+- Firestore indexes, Security Rules, retention, observability, analytics, load-test and disaster-recovery specifications
 
 ## Merchant model
 
-A Merchant is the actual operating store/location. Merchant records directly own address, coordinates, operations, delivery, compliance, settlement, quality and commercial status. Orders reference `merchantId` only.
+A Merchant is the actual operating store/location. It directly owns its address, coordinates, menu, delivery, compliance, settlement, quality and commercial state. Orders reference `merchantId`; no mandatory Outlet layer is introduced.
 
-Merchant onboarding accepts any real South African address and resolves it to coordinates. Manual latitude/longitude entry remains available if address lookup is unavailable.
-
-## Architecture
+## Production flow
 
 ```text
-index.html
-css/styles.css
-js/app.js
-js/core/
-js/data/
-js/infrastructure/
-js/repositories/
-js/services/
-js/views/
-functions/src/
-config/production.json
-firestore.rules
-firestore.indexes.json
-firebase.json
-docs/
-tests/
+clients / public website
+  -> Firebase Authentication where required + App Check
+  -> indexed / bounded Firestore reads
+  -> Cloud Functions for consequential or public-intake writes
+  -> Firestore transactions + append-only event records
+  -> async jobs / FCM / analytics export
 ```
 
-Browser test flow:
+Direct browser writes remain prohibited for platform authority, public applications, merchant catalogue changes, payments, order/delivery transitions, driver administration and privileged audit.
 
-```text
-views
-  -> RepositoryHub (bounded reads)
-  -> GoodKotaCommandService (consequential writes)
-  -> LocalCollectionDatabase (test adapter)
-```
-
-Production flow:
-
-```text
-clients
-  -> Firebase Authentication + App Check
-  -> indexed Firestore reads
-  -> Cloud Functions for consequential writes
-  -> Firestore transactions / append-only events
-  -> FCM / async jobs / BigQuery analytics
-```
-
-## Production safety boundary
-
-The included payment provider adapter deliberately fails closed until a real South African marketplace payment provider and signed-webhook verification are configured. Do not weaken this safeguard to make a production checkout appear to work.
-
-Production Owner/Admin authority, payment confirmation, merchant state interventions, order/delivery transitions, refunds and audit writes must remain server-authoritative.
-
-See:
-- `docs/SCALE-FOUNDATION.md`
-- `docs/SECURITY-AUTH.md`
-- `FIREBASE-SCHEMA.md`
-- `PLATFORM-GOVERNANCE.md`
-- `VALIDATION.md`
+See `docs/INTEGRATED-PRODUCT-ROLLUP.md`, `docs/SCALE-FOUNDATION.md`, `PLATFORM-GOVERNANCE.md`, `FIREBASE-SCHEMA.md` and `VALIDATION.md`.

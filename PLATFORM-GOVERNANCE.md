@@ -74,3 +74,11 @@ Support cases and operational audit history exist so stakeholder support does no
 ## Merchant location
 
 Merchant creation accepts any real South African street address. The browser build can resolve the address to latitude/longitude using an address lookup and also permits manual coordinates when lookup is unavailable. Production should replace the public lookup with the selected geocoding provider, persist geohashes, and validate service radius server-side.
+
+## v6.1 operating extensions
+
+GoodKota Admin now also owns the day-to-day queues for merchant applications, driver applications, driver administration, promotions and bounded cross-merchant order oversight. These remain operational powers and do not confer ownership authority.
+
+GoodKota Owner additionally governs the official public brand configuration (public website and official social channels). Admin cannot change this Owner-only company identity control.
+
+Public merchant/driver/waitlist submissions are intake records, not authority grants. Approval never automatically creates platform staff authority. Merchant and driver onboarding remain explicit Admin operations with their own audit events.

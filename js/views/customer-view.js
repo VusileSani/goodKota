@@ -1,4 +1,5 @@
 import { escapeHtml, formatDateTime, money, uid } from "../core/utils.js";
+import { calculateOrderPricing } from "../services/pricing-service.js";
 import { qualityBadge, isEligibleForProximityRecommendation } from "../services/quality-service.js";
 import { deliveryProgress, deliveryStatusLabel } from "../services/delivery-service.js";
 
@@ -101,7 +102,7 @@ function productCard(product) {
         <p>${escapeHtml(product.desc || "")}</p>
         <strong class="price">${money(product.priceCents)}</strong>
       </div>
-      <div class="customer-product-visual" aria-hidden="true">${product.emoji || "🥪"}</div>
+      <div class="customer-product-visual" aria-hidden="true">${product.imageUrl ? `<img src="${escapeHtml(product.imageUrl)}" alt="" />` : (product.emoji || "🥪")}</div>
       <button class="customer-add-button" data-add-product="${product.id}" aria-label="Add ${escapeHtml(product.name)} to cart">+</button>
     </article>`;
 }
@@ -520,10 +521,8 @@ function openCheckout(app) {
   if (!controls.paymentsEnabled) return alert("GoodKota payments are temporarily unavailable.");
   const merchant = app.repos.merchants.get(app.selectedMerchantId);
   if (!merchant || !app.cart.length) return;
-  const subtotal = cartSubtotal(app);
-  const delivery = app.deliveryMode === "Home Delivery" ? merchant.deliveryFeeCents : 0;
-  const total = subtotal + delivery;
   const customer = app.repos.users.customer();
+  const checkoutLines = () => app.cart.map(line => ({ productId: line.productId, qty: line.qty }));
 
   app.openDialog(`
     <div class="dialog-inner customer-dialog-inner">
@@ -533,16 +532,52 @@ function openCheckout(app) {
         <label class="field">Phone<input id="checkoutPhone" value="${escapeHtml(customer.phone)}" /></label>
         <label class="field">Email<input id="checkoutEmail" type="email" value="${escapeHtml(customer.email)}" /></label>
         ${app.deliveryMode === "Home Delivery" ? '<label class="field">Delivery address<input id="checkoutAddress" placeholder="Street / complex / suburb" required /></label>' : ""}
+        <label class="field">When<select id="checkoutTiming"><option value="asap">As soon as possible</option><option value="scheduled">Schedule</option></select></label>
+        <label class="field" id="scheduledField" hidden>Scheduled time<input id="checkoutSchedule" type="datetime-local" /></label>
+        <label class="field">Promo code<input id="checkoutPromo" autocomplete="off" placeholder="Optional" /></label>
+        <label class="field">Tip<select id="checkoutTip"><option value="0">No tip</option><option value="10">10%</option><option value="15">15%</option><option value="20">20%</option></select></label>
         <label class="field full">Order notes<textarea id="checkoutNotes" rows="3" placeholder="No onions, extra sauce..."></textarea></label>
       </div>
-      <div class="card soft" style="margin-top:14px">
-        <div class="summary-line"><span>Merchant</span><strong>${escapeHtml(merchant.name)}</strong></div>
-        <div class="summary-line"><span>Subtotal</span><strong>${money(subtotal)}</strong></div>
-        <div class="summary-line"><span>Delivery</span><strong>${money(delivery)}</strong></div>
-        <div class="summary-line total"><span>To pay</span><strong>${money(total)}</strong></div>
-      </div>
-      <button class="btn primary customer-primary-action" id="payButton">Pay ${money(total)} securely</button>
+      <div class="card soft" style="margin-top:14px" id="checkoutSummary"></div>
+      <div class="muted small" id="checkoutPricingMessage" style="margin-top:8px"></div>
+      <button class="btn primary customer-primary-action" id="payButton">Continue to secure payment</button>
     </div>`);
+
+  const summary = app.dialog.querySelector("#checkoutSummary");
+  const pricingMessage = app.dialog.querySelector("#checkoutPricingMessage");
+  const getPricing = () => {
+    const promoCode = app.dialog.querySelector("#checkoutPromo").value.trim().toUpperCase();
+    const promo = promoCode ? app.repos.promotions.byCode(promoCode) : null;
+    const subtotal = cartSubtotal(app);
+    const tipPercent = Number(app.dialog.querySelector("#checkoutTip").value || 0);
+    const tipCents = Math.round(subtotal * tipPercent / 100);
+    if (promoCode && !promo) throw new Error("Promotion code is not valid.");
+    return calculateOrderPricing({ merchant, items: checkoutLines(), productsById: id => app.repos.products.get(id), promo, tipCents, fulfilment: app.deliveryMode === "Home Delivery" ? { type: "delivery" } : { type: "pickup" } });
+  };
+  const renderPricing = () => {
+    try {
+      const price = getPricing();
+      summary.innerHTML = `
+        <div class="summary-line"><span>Merchant</span><strong>${escapeHtml(merchant.name)}</strong></div>
+        <div class="summary-line"><span>Subtotal</span><strong>${money(price.subtotalCents)}</strong></div>
+        ${price.discountCents ? `<div class="summary-line"><span>Promotion ${escapeHtml(price.promoCode)}</span><strong>−${money(price.discountCents)}</strong></div>` : ""}
+        <div class="summary-line"><span>Delivery</span><strong>${money(price.deliveryFeeCents)}</strong></div>
+        ${price.tipCents ? `<div class="summary-line"><span>Tip</span><strong>${money(price.tipCents)}</strong></div>` : ""}
+        <div class="summary-line total"><span>To pay</span><strong>${money(price.totalCents)}</strong></div>`;
+      pricingMessage.textContent = price.promoCode ? `Promotion ${price.promoCode} applied.` : "Final pricing is verified by GoodKota before payment.";
+      return price;
+    } catch (error) {
+      summary.innerHTML = `<div class="notice">${escapeHtml(error.message)}</div>`;
+      pricingMessage.textContent = "";
+      return null;
+    }
+  };
+  renderPricing();
+  app.dialog.querySelector("#checkoutPromo")?.addEventListener("input", renderPricing);
+  app.dialog.querySelector("#checkoutTip")?.addEventListener("change", renderPricing);
+  app.dialog.querySelector("#checkoutTiming")?.addEventListener("change", event => {
+    app.dialog.querySelector("#scheduledField").hidden = event.currentTarget.value !== "scheduled";
+  });
 
   const checkoutIdempotencyKey = uid("checkout");
   app.dialog.querySelector("#payButton")?.addEventListener("click", async event => {
@@ -550,6 +585,8 @@ function openCheckout(app) {
     button.disabled = true;
     button.textContent = "Confirming payment…";
     try {
+      const pricing = getPricing();
+      if (!pricing) throw new Error("Pricing could not be confirmed.");
       const customerDetails = {
         name: app.dialog.querySelector("#checkoutName").value.trim(),
         phone: app.dialog.querySelector("#checkoutPhone").value.trim(),
@@ -557,16 +594,14 @@ function openCheckout(app) {
       };
       const deliveryAddress = app.dialog.querySelector("#checkoutAddress")?.value.trim() || "";
       if (!customerDetails.name || !customerDetails.phone || !customerDetails.email) throw new Error("Name, phone and email are required.");
-      if (subtotal < merchant.minOrderCents) throw new Error(`Minimum order is ${money(merchant.minOrderCents)}.`);
+      if (pricing.subtotalCents < merchant.minOrderCents) throw new Error(`Minimum order is ${money(merchant.minOrderCents)}.`);
       if (app.deliveryMode === "Home Delivery" && !app.repos.platform.controls().deliveryEnabled) throw new Error("GoodKota delivery is temporarily unavailable.");
       if (app.deliveryMode === "Home Delivery" && !deliveryAddress) throw new Error("Delivery address is required.");
+      const scheduled = app.dialog.querySelector("#checkoutTiming").value === "scheduled" ? app.dialog.querySelector("#checkoutSchedule").value : null;
+      if (app.dialog.querySelector("#checkoutTiming").value === "scheduled" && !scheduled) throw new Error("Choose a scheduled order time.");
 
       const fulfilment = app.deliveryMode === "Home Delivery"
-        ? {
-            type: "delivery",
-            provider: merchant.delivery?.providerPreference || "goodkota_fleet",
-            destination: { address: deliveryAddress, latitude: app.location.lat, longitude: app.location.lng }
-          }
+        ? { type: "delivery", provider: merchant.delivery?.providerPreference || "goodkota_fleet", destination: { address: deliveryAddress, latitude: app.location.lat, longitude: app.location.lng } }
         : { type: "pickup" };
 
       const result = await app.commands.checkout({
@@ -576,14 +611,12 @@ function openCheckout(app) {
         mode: app.deliveryMode,
         address: deliveryAddress,
         notes: app.dialog.querySelector("#checkoutNotes").value.trim(),
-        amountCents: total,
-        deliveryFeeCents: delivery,
         fulfilment,
+        promoCode: app.dialog.querySelector("#checkoutPromo").value.trim().toUpperCase(),
+        tipCents: pricing.tipCents,
+        scheduledFor: scheduled,
         idempotencyKey: checkoutIdempotencyKey,
-        items: app.cart.map(line => {
-          const product = app.repos.products.get(line.productId);
-          return { productId: product.id, name: product.name, qty: line.qty, priceCents: product.priceCents };
-        })
+        items: checkoutLines()
       });
       app.cart = [];
       app.customerSection = "orders";
@@ -594,7 +627,7 @@ function openCheckout(app) {
       app.render();
     } catch (error) {
       button.disabled = false;
-      button.textContent = `Pay ${money(total)} securely`;
+      button.textContent = "Continue to secure payment";
       alert(error.message);
     }
   });

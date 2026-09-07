@@ -51,6 +51,10 @@ export const seed = {
       paymentsEnabled: true,
       deliveryEnabled: true,
       merchantOnboardingEnabled: true
+    },
+    brand: {
+      publicWebsite: "./website.html",
+      social: { instagram: "", facebook: "", tiktok: "" }
     }
   },
   users: [
@@ -268,5 +272,16 @@ export const seed = {
   auditTrail: [
     { id: "audit_1", actorId: "staff_owner_1", actorRole: "owner", actorName: "GoodKota Owner", action: "platform_governance_enabled", targetType: "platform", targetId: "goodkota", reason: "Establish protected Owner and Admin operating authority", visibility: "owner", createdAt: ago(60 * 24) }
   ],
-  promos: [{ id: "promo1", code: "KOTA10", discount: 10, minCents: 6000, status: "active" }]
+  promos: [{ id: "promo1", code: "KOTA10", discountPercent: 10, minCents: 6000, status: "active", createdAt: ago(60 * 24 * 7), version: 1 }],
+  merchantApplications: [
+    { id: "merchant_application_seed_1", businessName: "Soweto Kota Corner", contactName: "Thabo M.", email: "owner@sowetokotacorner.example", phone: "071 444 1111", address: "Vilakazi Street, Orlando West, Soweto, Gauteng", area: "Soweto", latitude: -26.2383, longitude: 27.9088, status: "new", note: "Interested in GoodKota ordering and delivery.", createdAt: ago(60 * 18), updatedAt: ago(60 * 18), version: 1 }
+  ],
+  driverApplications: [
+    { id: "driver_application_seed_1", name: "Kagiso N.", phone: "071 444 2222", email: "kagiso.driver@example.com", vehicleType: "Motorbike", registration: "GP 21 GK", operatingArea: "Midrand", status: "new", note: "Available evenings and weekends.", createdAt: ago(60 * 8), updatedAt: ago(60 * 8), version: 1 }
+  ],
+  waitlistEntries: [
+    { id: "waitlist_seed_1", name: "Naledi", email: "naledi@example.com", area: "Pretoria", createdAt: ago(60 * 24 * 2) }
+  ],
+  promotionEvents: [],
+  driverAdministrationEvents: []
 };

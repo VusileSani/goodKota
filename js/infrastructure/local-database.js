@@ -1,8 +1,24 @@
-const PREFIX = "goodkota_scale_v6";
-const LEGACY_KEYS = ["goodkota_foundation_v4", "goodkota_foundation_v5"];
+const PREFIX = "goodkota_integrated_v6_1";
+const LEGACY_SINGLE_KEYS = ["goodkota_foundation_v4", "goodkota_foundation_v5"];
+const LEGACY_COLLECTION_PREFIXES = ["goodkota_scale_v6"];
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function loadCollectionPrefix(prefix, seed) {
+  try {
+    const manifest = JSON.parse(localStorage.getItem(`${prefix}:manifest`) || "null");
+    if (!manifest?.collections?.length) return null;
+    const state = {};
+    for (const name of manifest.collections) {
+      const raw = localStorage.getItem(`${prefix}:${name}`);
+      state[name] = raw === null ? clone(seed[name]) : JSON.parse(raw);
+    }
+    return state;
+  } catch {
+    return null;
+  }
 }
 
 export class LocalCollectionDatabase {
@@ -16,18 +32,18 @@ export class LocalCollectionDatabase {
   }
 
   load() {
-    const manifest = JSON.parse(localStorage.getItem(this.key("manifest")) || "null");
-    if (manifest?.collections?.length) {
-      const state = {};
-      for (const name of manifest.collections) {
-        const raw = localStorage.getItem(this.key(name));
-        state[name] = raw === null ? clone(this.seed[name]) : JSON.parse(raw);
-        this.cache.set(name, JSON.stringify(state[name]));
-      }
-      return state;
+    const current = loadCollectionPrefix(PREFIX, this.seed);
+    if (current) {
+      for (const [name, value] of Object.entries(current)) this.cache.set(name, JSON.stringify(value));
+      return current;
     }
 
-    for (const legacyKey of LEGACY_KEYS) {
+    for (const prefix of LEGACY_COLLECTION_PREFIXES) {
+      const migrated = loadCollectionPrefix(prefix, this.seed);
+      if (migrated) return migrated;
+    }
+
+    for (const legacyKey of LEGACY_SINGLE_KEYS) {
       try {
         const legacy = JSON.parse(localStorage.getItem(legacyKey) || "null");
         if (legacy) return legacy;
@@ -46,7 +62,7 @@ export class LocalCollectionDatabase {
       localStorage.setItem(this.key(name), serialized);
       this.cache.set(name, serialized);
     }
-    localStorage.setItem(this.key("manifest"), JSON.stringify({ schemaVersion: 6, collections }));
+    localStorage.setItem(this.key("manifest"), JSON.stringify({ schemaVersion: "6.1", collections }));
   }
 
   clear() {

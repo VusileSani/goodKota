@@ -38,11 +38,16 @@ class GoodKotaApp {
     this.retention = new RetentionService(this.store);
     this.jobs = new JobService(this.store, this.telemetry);
     this.adminSection = "overview";
+    this.adminMerchantQuery = "";
+    this.adminOrderQuery = "";
+    this.adminDriverQuery = "";
     this.ownerSection = "control";
   }
 
   start() {
     this.bindShell();
+    this.applyDeepLink();
+    this.renderBrandLinks();
     this.retention.enforce();
     this.processLocalBackgroundJobs();
     registerServiceWorker();
@@ -62,6 +67,25 @@ class GoodKotaApp {
       driver_assignment_notification: payload => ({ accepted: true, taskId: payload.taskId, driverId: payload.driverId })
     };
     this.jobs.processBatch(handlers, 20);
+  }
+
+  applyDeepLink() {
+    const params = new URLSearchParams(window.location.search);
+    const merchantId = params.get("merchant");
+    if (merchantId && this.repos.merchants.get(merchantId)) {
+      this.route = "customer";
+      this.selectedMerchantId = merchantId;
+      this.customerSection = "browse";
+    }
+  }
+
+  renderBrandLinks() {
+    const host = document.querySelector("#brandLinks");
+    if (!host) return;
+    const brand = this.repos.platform.brand();
+    const social = brand.social || {};
+    const links = [["Instagram", social.instagram], ["Facebook", social.facebook], ["TikTok", social.tiktok]].filter(([, url]) => /^https?:\/\//i.test(String(url || "")));
+    host.innerHTML = `<a class="brand-link explore-link" href="${brand.publicWebsite || "./website.html"}">Explore GoodKota</a>${links.map(([label, url]) => `<a class="brand-link social-link" href="${url}" target="_blank" rel="noopener noreferrer" aria-label="GoodKota on ${label}">${label}</a>`).join("")}`;
   }
 
   bindShell() {

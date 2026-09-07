@@ -1,5 +1,6 @@
 import { requireRole } from "./authorization-service.js";
 import { uid } from "../core/utils.js";
+import { calculateOrderPricing } from "./pricing-service.js";
 
 export class GoodKotaCommandService {
   constructor({ store, paymentService, telemetry }) {
@@ -26,7 +27,7 @@ export class GoodKotaCommandService {
     return result;
   }
 
-  async checkout({ merchantId, customerId, customerDetails, mode, address, notes, amountCents, deliveryFeeCents, fulfilment, items, idempotencyKey }) {
+  async checkout({ merchantId, customerId, customerDetails, mode, address, notes, fulfilment, items, promoCode = "", tipCents = 0, scheduledFor = null, idempotencyKey }) {
     this.assertRateLimit(`checkout:${customerId}`, 10, 60_000);
     const controls = this.store.state.platform.controls || {};
     if (!controls.orderingEnabled) throw new Error("GoodKota ordering is temporarily paused.");
@@ -38,13 +39,19 @@ export class GoodKotaCommandService {
 
     const merchant = this.store.merchant(merchantId);
     if (!merchant || !merchant.enabled || merchant.commercial?.status === "suspended" || merchant.compliance?.status === "suspended") throw new Error("This merchant is not currently available.");
-    if (Number(amountCents) < Number(merchant.minOrderCents || 0)) throw new Error("The order is below the merchant minimum.");
+    const promo = promoCode ? this.store.state.promos.find(item => item.code === String(promoCode).trim().toUpperCase()) : null;
+    if (promoCode && !promo) throw new Error("Promotion code is not valid.");
+    const pricing = calculateOrderPricing({ merchant, items, productsById: id => this.store.product(id), promo, tipCents, fulfilment });
+    if (pricing.subtotalCents < Number(merchant.minOrderCents || 0)) throw new Error("The order is below the merchant minimum.");
+
+    const scheduledTimestamp = scheduledFor ? Number(new Date(scheduledFor).getTime()) : null;
+    if (scheduledFor && (!Number.isFinite(scheduledTimestamp) || scheduledTimestamp <= Date.now())) throw new Error("Scheduled order time must be in the future.");
 
     const orderId = uid("order");
     const orderNumber = this.store.generateOrderNumber();
     const intent = await this.paymentService.createPaymentIntent({
-      amountCents, orderId, merchant, customer: customerDetails,
-      breakdown: { foodAmountCents: amountCents - deliveryFeeCents, deliveryAmountCents: deliveryFeeCents },
+      amountCents: pricing.totalCents, orderId, merchant, customer: customerDetails,
+      breakdown: { foodAmountCents: pricing.subtotalCents - pricing.discountCents + pricing.tipCents, deliveryAmountCents: pricing.deliveryFeeCents },
       fulfilment, idempotencyKey
     });
     const verified = await this.paymentService.simulateVerifiedWebhook(intent);
@@ -53,13 +60,18 @@ export class GoodKotaCommandService {
     const result = this.store.transaction(() => {
       const payment = this.store.appendPaymentTransaction({ ...verified, version: 1 });
       this.store.appendPaymentEvent({ paymentId: payment.paymentId, orderId, type: "payment_captured", providerStatus: payment.providerStatus, amountCents: payment.amountCents, idempotencyKey, signatureVerified: true });
-      this.store.state.feeAllocations.push({ id: uid("fee"), orderId, paymentId: payment.paymentId, merchantId, foodAmountCents: amountCents - deliveryFeeCents, deliveryAmountCents: deliveryFeeCents, createdAt: Date.now() });
+      this.store.state.feeAllocations.push({ id: uid("fee"), orderId, paymentId: payment.paymentId, merchantId, foodAmountCents: pricing.subtotalCents - pricing.discountCents, tipAmountCents: pricing.tipCents, deliveryAmountCents: pricing.deliveryFeeCents, createdAt: Date.now() });
       const order = this.store.createPaidOrder({
         id: orderId, orderNumber, customerId, merchantId, customer: customerDetails.name, phone: customerDetails.phone, email: customerDetails.email,
-        mode, address, notes, amountCents, deliveryFeeCents, fulfilment, paymentId: payment.paymentId, items, idempotencyKey
+        mode, address, notes, amountCents: pricing.totalCents, deliveryFeeCents: pricing.deliveryFeeCents, fulfilment, paymentId: payment.paymentId, items: pricing.lines, idempotencyKey
       });
+      order.subtotalCents = pricing.subtotalCents;
+      order.discountCents = pricing.discountCents;
+      order.tipCents = pricing.tipCents;
+      order.promoCode = pricing.promoCode;
+      order.scheduledFor = scheduledTimestamp;
       this.store.enqueueJob({ type: "order_notifications", payload: { orderId: order.id, merchantId }, idempotencyKey: `notify:${order.id}:created` });
-      const response = { orderId: order.id, orderNumber: order.orderNumber, paymentId: payment.paymentId };
+      const response = { orderId: order.id, orderNumber: order.orderNumber, paymentId: payment.paymentId, totalCents: pricing.totalCents };
       this.store.rememberIdempotency(idempotencyKey, "checkout", response);
       return response;
     });
@@ -93,7 +105,17 @@ export class GoodKotaCommandService {
   setDriverShift({ driverId, shiftStatus }) { return this.store.transaction(() => this.store.setDriverShift(driverId, shiftStatus)); }
   submitRating(data) { return this.store.transaction(() => this.store.addRating(data)); }
   setNearbyNotifications(enabled) { return this.store.transaction(() => this.store.setNearbyNotifications(enabled)); }
-  addProduct(product) { return this.store.transaction(() => this.store.addProduct(product)); }
+  addProduct(product, actor = null) {
+    if (actor?.role === "merchant" && actor.id !== product.merchantId) throw new Error("Menu item is outside this merchant scope.");
+    return this.store.transaction(() => this.store.addProduct(product));
+  }
+  updateProduct(productId, merchantId, changes, actor = null) {
+    if (actor?.role === "merchant" && actor.id !== merchantId) throw new Error("Menu item is outside this merchant scope.");
+    return this.store.transaction(() => this.store.updateProduct(productId, merchantId, changes));
+  }
+  applyMerchant(data) { this.assertRateLimit(`merchant-application:${data.email || data.phone || "anon"}`, 4, 60_000); return this.store.transaction(() => this.store.addMerchantApplication(data)); }
+  applyDriver(data) { this.assertRateLimit(`driver-application:${data.email || data.phone || "anon"}`, 4, 60_000); return this.store.transaction(() => this.store.addDriverApplication(data)); }
+  joinWaitlist(data) { this.assertRateLimit(`waitlist:${data.email || "anon"}`, 4, 60_000); return this.store.transaction(() => this.store.addWaitlistEntry(data)); }
   saveSettlement(merchantId, settlement, gatewayAccount, actor, reason) { return this.store.transaction(() => this.store.saveMerchantSettlement(merchantId, settlement, gatewayAccount, actor, reason)); }
   createSupportCase(data, actor = null) { this.assertRateLimit(`support:${data.source}:${data.sourceId || data.merchantId || "anon"}`, 8, 60_000); return this.store.transaction(() => this.store.addSupportCase(data, actor)); }
 
@@ -103,10 +125,16 @@ export class GoodKotaCommandService {
   adminSetCompliance(merchantId, status, note, actor, reason = "Compliance review") { requireRole(actor, ["admin", "owner"]); return this.store.transaction(() => { const item = this.store.setMerchantCompliance(merchantId, status, note, actor, reason); this.store.logAudit({ actor, action: "merchant_compliance_changed", targetType: "merchant", targetId: merchantId, reason, visibility: "operations", metadata: { status } }); return item; }); }
   adminSetQuality(merchantId, status, note, actor) { requireRole(actor, ["admin", "owner"]); return this.store.transaction(() => { const item = this.store.setQualityWorkflow(merchantId, status, note); this.store.logAudit({ actor, action: "merchant_quality_workflow_changed", targetType: "merchant", targetId: merchantId, reason: note || status, visibility: "operations" }); return item; }); }
   adminSetCommercial(merchantId, commercial, actor, reason = "Commercial status maintenance") { requireRole(actor, ["admin", "owner"]); return this.store.transaction(() => this.store.setMerchantCommercial(merchantId, commercial, actor, reason)); }
+  adminAddPromotion(data, actor) { requireRole(actor, ["admin", "owner"]); return this.store.transaction(() => this.store.addPromotion(data, actor)); }
+  adminUpdatePromotion(id, changes, actor) { requireRole(actor, ["admin", "owner"]); return this.store.transaction(() => this.store.updatePromotion(id, changes, actor)); }
+  adminAddDriver(data, actor) { requireRole(actor, ["admin", "owner"]); return this.store.transaction(() => this.store.addDriver(data, actor)); }
+  adminUpdateDriver(id, changes, actor, reason = "Driver administration") { requireRole(actor, ["admin", "owner"]); return this.store.transaction(() => this.store.updateDriverAdministration(id, changes, actor, reason)); }
+  adminUpdateApplication(kind, id, changes, actor) { requireRole(actor, ["admin", "owner"]); return this.store.transaction(() => this.store.updateApplication(kind, id, changes, actor)); }
   updateSupportCase(caseId, changes, actor) { requireRole(actor, ["admin", "owner"]); return this.store.transaction(() => this.store.updateSupportCase(caseId, changes, actor)); }
   publishAnnouncement(data, actor) { requireRole(actor, ["admin", "owner"]); return this.store.transaction(() => this.store.publishAnnouncement(data, actor)); }
   setAnnouncementActive(id, active, actor) { requireRole(actor, ["admin", "owner"]); return this.store.transaction(() => this.store.setAnnouncementActive(id, active, actor)); }
   updatePlatformControl(key, value, actor, reason) { requireRole(actor, "owner"); if (!String(reason || "").trim()) throw new Error("Owner reason is required."); return this.store.transaction(() => this.store.updatePlatformControl(key, value, actor, reason)); }
   addPlatformStaff(data, actor, reason) { requireRole(actor, "owner"); return this.store.transaction(() => this.store.addPlatformStaff(data, actor, reason)); }
   updatePlatformStaff(id, changes, actor, reason) { requireRole(actor, "owner"); return this.store.transaction(() => this.store.updatePlatformStaff(id, changes, actor, reason)); }
+  updateBrandSettings(data, actor, reason) { requireRole(actor, "owner"); return this.store.transaction(() => this.store.updateBrandSettings(data, actor, reason)); }
 }

@@ -23,6 +23,8 @@ export function renderAdminView(app) {
   const commercialAttention = snapshot.commercialAttention;
   const dispatchAttention = snapshot.dispatchAttention;
   const controls = app.repos.platform.controls();
+  const merchantApplications = app.repos.applications.merchants({ status: "new", limit: 50 }).items;
+  const driverApplications = app.repos.applications.drivers({ status: "new", limit: 50 }).items;
   const section = app.adminSection || "overview";
 
   app.root.innerHTML = `
@@ -40,17 +42,26 @@ export function renderAdminView(app) {
       <div class="stat"><span class="muted">Quality attention</span><b>${qualityAlerts.length}</b></div>
       <div class="stat"><span class="muted">Settlement attention</span><b>${settlementAttention.length}</b></div>
       <div class="stat"><span class="muted">Dispatch attention</span><b>${dispatchAttention.length}</b></div>
+      <div class="stat"><span class="muted">New applications</span><b>${merchantApplications.length + driverApplications.length}</b></div>
     </div>
 
     <nav class="section-tabs" aria-label="GoodKota Admin sections">
       ${adminTab("overview", "Overview", section)}
       ${adminTab("merchants", "Merchants", section)}
+      ${adminTab("applications", "Applications", section, merchantApplications.length + driverApplications.length)}
+      ${adminTab("drivers", "Drivers", section)}
+      ${adminTab("orders", "Orders", section)}
+      ${adminTab("promotions", "Promotions", section)}
       ${adminTab("support", "Support", section, openCases.length)}
       ${adminTab("communications", "Announcements", section)}
       ${adminTab("activity", "Activity", section)}
     </nav>
 
     ${section === "merchants" ? merchantsSection(app, qualityAlerts, commercialAttention) : ""}
+    ${section === "applications" ? applicationsSection(app, merchantApplications, driverApplications) : ""}
+    ${section === "drivers" ? driversSection(app) : ""}
+    ${section === "orders" ? ordersSection(app) : ""}
+    ${section === "promotions" ? promotionsSection(app) : ""}
     ${section === "support" ? supportSection(app, openCases) : ""}
     ${section === "communications" ? communicationsSection(app) : ""}
     ${section === "activity" ? activitySection(app) : ""}
@@ -118,7 +129,8 @@ function merchantsSection(app, qualityAlerts, commercialAttention) {
       <button class="btn primary" id="addMerchantButton" ${enabled ? "" : "disabled"}>+ Add merchant</button>
     </section>
     ${!enabled ? '<div class="notice">Merchant onboarding is paused by the GoodKota Owner.</div>' : ""}
-    <section class="section"><div class="table-wrap">${merchantTable(app.repos.merchants.list({ limit: 50, sortBy: "createdAt", direction: "desc" }).items)}</div></section>
+    <div class="toolbar compact-toolbar"><input id="adminMerchantSearch" type="search" placeholder="Search merchant, area or address" value="${escapeHtml(app.adminMerchantQuery || "")}" /></div>
+    <section class="section"><div class="table-wrap">${merchantTable(app.repos.merchants.list({ query: app.adminMerchantQuery || "", limit: 25, sortBy: "createdAt", direction: "desc" }).items)}</div><div class="muted small" style="margin-top:8px">Showing up to 25 matching merchants. Search narrows the operational view.</div></section>
     ${qualityAlerts.length || commercialAttention.length ? `
       <section class="section grid grid-2">
         <div class="card"><h3>Quality attention</h3>${qualityAlerts.length ? qualityTable(qualityAlerts) : '<div class="empty">No quality interventions.</div>'}</div>
@@ -157,6 +169,16 @@ function bindCommonAdminActions(app, actor) {
     app.adminSection = button.dataset.jumpAdmin;
     app.render();
   }));
+
+  app.root.querySelector("#adminMerchantSearch")?.addEventListener("input", event => { app.adminMerchantQuery = event.currentTarget.value; app.render(); });
+  app.root.querySelector("#adminOrderSearch")?.addEventListener("input", event => { app.adminOrderQuery = event.currentTarget.value; app.render(); });
+  app.root.querySelector("#adminDriverSearch")?.addEventListener("input", event => { app.adminDriverQuery = event.currentTarget.value; app.render(); });
+  app.root.querySelector("#addDriverButton")?.addEventListener("click", () => openAddDriver(app, actor));
+  app.root.querySelector("#addPromotionButton")?.addEventListener("click", () => openPromotion(app, actor));
+  app.root.querySelectorAll("[data-manage-driver]").forEach(button => button.addEventListener("click", () => openDriverAdmin(app, button.dataset.manageDriver, actor)));
+  app.root.querySelectorAll("[data-manage-promo]").forEach(button => button.addEventListener("click", () => openPromotion(app, actor, button.dataset.managePromo)));
+  app.root.querySelectorAll("[data-merchant-application]").forEach(button => button.addEventListener("click", () => openMerchantApplication(app, button.dataset.merchantApplication, actor)));
+  app.root.querySelectorAll("[data-driver-application]").forEach(button => button.addEventListener("click", () => openDriverApplication(app, button.dataset.driverApplication, actor)));
 
   app.root.querySelector("#addMerchantButton")?.addEventListener("click", () => openAddMerchant(app, actor));
   app.root.querySelector("#newAnnouncementButton")?.addEventListener("click", () => openAnnouncementDialog(app, actor));
@@ -375,6 +397,111 @@ function openSupportCase(app, caseId, actor) {
 function openAnnouncementDialog(app, actor) {
   app.openDialog(`<div class="dialog-inner"><div class="dialog-head"><div><span class="eyebrow">GoodKota communication</span><h2>New announcement</h2></div><button class="icon-btn" data-close-dialog>✕</button></div><form id="announcementForm" class="form-grid"><label class="field full">Title<input id="announcementTitle" required /></label><label class="field full">Message<textarea id="announcementMessage" rows="4" required></textarea></label><label class="field">Audience<select id="announcementAudience"><option value="all">Everyone</option><option value="customers">Customers</option><option value="merchants">Merchants</option><option value="drivers">Drivers</option><option value="operations">Delivery Ops</option><option value="internal">GoodKota staff</option></select></label><label class="field">Importance<select id="announcementSeverity"><option value="info">Information</option><option value="warn">Important</option><option value="danger">Critical</option></select></label><button class="btn primary field full">Publish</button></form></div>`);
   app.dialog.querySelector("#announcementForm").addEventListener("submit", event => { event.preventDefault(); app.commands.publishAnnouncement({ title: app.dialog.querySelector("#announcementTitle").value, message: app.dialog.querySelector("#announcementMessage").value, audience: app.dialog.querySelector("#announcementAudience").value, severity: app.dialog.querySelector("#announcementSeverity").value }, actor); app.closeDialog(); app.toast("Announcement published."); app.render(); });
+}
+
+function applicationsSection(app, merchantApplications, driverApplications) {
+  const allMerchants = app.repos.applications.merchants({ limit: 25 }).items;
+  const allDrivers = app.repos.applications.drivers({ limit: 25 }).items;
+  return `
+    <section class="section-head"><div><h2>Applications</h2><p>Public merchant and driver applications enter a durable GoodKota operating queue.</p></div></section>
+    <section class="section grid grid-2">
+      <div class="card"><div class="section-head"><div><h3>Merchant applications</h3><p>${merchantApplications.length} new</p></div></div>${applicationMerchantTable(allMerchants)}</div>
+      <div class="card"><div class="section-head"><div><h3>Driver applications</h3><p>${driverApplications.length} new</p></div></div>${applicationDriverTable(allDrivers)}</div>
+    </section>
+    <section class="section card"><h3>Customer waitlist</h3><p class="muted small">Latest public interest captured from the GoodKota website.</p>${waitlistTable(app.repos.applications.waitlist({ limit: 25 }).items)}</section>`;
+}
+
+function applicationMerchantTable(items) {
+  if (!items.length) return '<div class="empty">No merchant applications.</div>';
+  return `<div class="table-wrap"><table><thead><tr><th>Business</th><th>Status</th><th></th></tr></thead><tbody>${items.map(item => `<tr><td><strong>${escapeHtml(item.businessName)}</strong><div class="muted small">${escapeHtml(item.contactName)} · ${escapeHtml(item.address)}</div></td><td><span class="badge ${item.status === "new" ? "warn" : item.status === "approved" ? "ok" : ""}">${escapeHtml(item.status)}</span></td><td><button class="btn ghost small" data-merchant-application="${item.id}">Open</button></td></tr>`).join("")}</tbody></table></div>`;
+}
+
+function applicationDriverTable(items) {
+  if (!items.length) return '<div class="empty">No driver applications.</div>';
+  return `<div class="table-wrap"><table><thead><tr><th>Driver</th><th>Status</th><th></th></tr></thead><tbody>${items.map(item => `<tr><td><strong>${escapeHtml(item.name)}</strong><div class="muted small">${escapeHtml(item.operatingArea)} · ${escapeHtml(item.vehicleType)}</div></td><td><span class="badge ${item.status === "new" ? "warn" : item.status === "approved" ? "ok" : ""}">${escapeHtml(item.status)}</span></td><td><button class="btn ghost small" data-driver-application="${item.id}">Open</button></td></tr>`).join("")}</tbody></table></div>`;
+}
+
+function waitlistTable(items) {
+  if (!items.length) return '<div class="empty">No waitlist entries.</div>';
+  return `<div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Area</th><th>Joined</th></tr></thead><tbody>${items.map(item => `<tr><td>${escapeHtml(item.name || "—")}</td><td>${escapeHtml(item.email)}</td><td>${escapeHtml(item.area || "—")}</td><td>${formatDateTime(item.createdAt)}</td></tr>`).join("")}</tbody></table></div>`;
+}
+
+function driversSection(app) {
+  const query = String(app.adminDriverQuery || "").trim().toLowerCase();
+  const page = app.repos.delivery.listDrivers({ limit: 50 });
+  const drivers = query ? page.items.filter(driver => {
+    const vehicle = app.repos.delivery.vehicle(driver.vehicleId);
+    return `${driver.name} ${driver.phone} ${vehicle?.registration || ""} ${driver.operatorType}`.toLowerCase().includes(query);
+  }) : page.items;
+  return `
+    <section class="section-head"><div><h2>Drivers</h2><p>GoodKota and merchant-fleet driver administration stays separate from live dispatch.</p></div><button class="btn primary" id="addDriverButton">+ Add driver</button></section>
+    <div class="toolbar compact-toolbar"><input id="adminDriverSearch" type="search" placeholder="Search driver or registration" value="${escapeHtml(app.adminDriverQuery || "")}" /></div>
+    <section class="section"><div class="table-wrap">${driverAdminTable(app, drivers)}</div><div class="muted small" style="margin-top:8px">Driver Ops remains separate: Delivery Ops assigns live jobs; Admin maintains people, vehicles and access.</div></section>`;
+}
+
+function driverAdminTable(app, drivers) {
+  if (!drivers.length) return '<div class="empty">No matching drivers.</div>';
+  return `<table><thead><tr><th>Driver</th><th>Vehicle</th><th>Operator</th><th>Shift</th><th>Status</th><th></th></tr></thead><tbody>${drivers.map(driver => { const vehicle = app.repos.delivery.vehicle(driver.vehicleId); return `<tr><td><strong>${escapeHtml(driver.name)}</strong><div class="muted small">${escapeHtml(driver.phone || "")}</div></td><td>${escapeHtml(vehicle?.type || "—")}<div class="muted small">${escapeHtml(vehicle?.registration || "")}</div></td><td>${escapeHtml(driver.operatorType)}</td><td>${escapeHtml(driver.shiftStatus)}</td><td><span class="badge ${driver.enabled !== false ? "ok" : "danger"}">${driver.enabled !== false ? "Active" : "Disabled"}</span></td><td><button class="btn ghost small" data-manage-driver="${driver.id}">Manage</button></td></tr>`; }).join("")}</tbody></table>`;
+}
+
+function ordersSection(app) {
+  const page = app.repos.orders.listAll({ query: app.adminOrderQuery || "", limit: 50 });
+  return `
+    <section class="section-head"><div><h2>Orders</h2><p>Bounded cross-merchant oversight for support and operational investigation.</p></div></section>
+    <div class="toolbar compact-toolbar"><input id="adminOrderSearch" type="search" placeholder="Search order, customer or merchant" value="${escapeHtml(app.adminOrderQuery || "")}" /></div>
+    <section class="section"><div class="table-wrap">${adminOrdersTable(app, page.items)}</div><div class="muted small" style="margin-top:8px">Showing up to 50 matching orders. Production queries use indexed cursors rather than loading the full order history.</div></section>`;
+}
+
+function adminOrdersTable(app, orders) {
+  if (!orders.length) return '<div class="empty">No matching orders.</div>';
+  return `<table><thead><tr><th>Order</th><th>Merchant</th><th>Customer</th><th>Total</th><th>Status</th><th>Placed</th></tr></thead><tbody>${orders.map(order => `<tr><td><strong>${escapeHtml(order.orderNumber || order.id)}</strong>${order.scheduledFor ? `<div class="muted small">Scheduled ${formatDateTime(order.scheduledFor)}</div>` : ""}</td><td>${escapeHtml(app.repos.merchants.get(order.merchantId)?.name || "—")}</td><td>${escapeHtml(order.customer || "—")}</td><td>${money(order.amountCents)}</td><td><span class="badge ${order.status === "completed" ? "ok" : "info"}">${escapeHtml(order.status)}</span></td><td>${formatDateTime(order.createdAt)}</td></tr>`).join("")}</tbody></table>`;
+}
+
+function promotionsSection(app) {
+  const promos = app.repos.promotions.list({ limit: 50 }).items;
+  return `
+    <section class="section-head"><div><h2>Promotions</h2><p>GoodKota-wide promotion codes with controlled status and minimum-spend rules.</p></div><button class="btn primary" id="addPromotionButton">+ New promotion</button></section>
+    <section class="section"><div class="table-wrap">${promotionTable(promos)}</div></section>`;
+}
+
+function promotionTable(items) {
+  if (!items.length) return '<div class="empty">No promotions configured.</div>';
+  return `<table><thead><tr><th>Code</th><th>Discount</th><th>Minimum</th><th>Status</th><th></th></tr></thead><tbody>${items.map(item => `<tr><td><strong>${escapeHtml(item.code)}</strong></td><td>${Number(item.discountPercent || 0)}%</td><td>${money(item.minCents || 0)}</td><td><span class="badge ${item.status === "active" ? "ok" : ""}">${escapeHtml(item.status)}</span></td><td><button class="btn ghost small" data-manage-promo="${item.id}">Manage</button></td></tr>`).join("")}</tbody></table>`;
+}
+
+function openAddDriver(app, actor, source = null) {
+  app.openDialog(`<div class="dialog-inner"><div class="dialog-head"><div><span class="eyebrow">GoodKota Admin</span><h2>Add driver</h2></div><button class="icon-btn" data-close-dialog>✕</button></div><form id="addDriverForm" class="form-grid"><label class="field">Name<input id="driverName" value="${escapeHtml(source?.name || "")}" required /></label><label class="field">Phone<input id="driverPhone" value="${escapeHtml(source?.phone || "")}" required /></label><label class="field">Email<input id="driverEmail" type="email" value="${escapeHtml(source?.email || "")}" /></label><label class="field">Vehicle type<input id="driverVehicle" value="${escapeHtml(source?.vehicleType || "Motorbike")}" required /></label><label class="field">Registration<input id="driverRegistration" value="${escapeHtml(source?.registration || "")}" /></label><label class="field">Operator<select id="driverOperator"><option value="goodkota">GoodKota fleet</option><option value="merchant">Merchant fleet</option></select></label><button class="btn primary field full">Add driver</button></form></div>`);
+  app.dialog.querySelector("#addDriverForm").addEventListener("submit", event => { event.preventDefault(); try { const driver = app.commands.adminAddDriver({ name: app.dialog.querySelector("#driverName").value, phone: app.dialog.querySelector("#driverPhone").value, email: app.dialog.querySelector("#driverEmail").value, vehicleType: app.dialog.querySelector("#driverVehicle").value, registration: app.dialog.querySelector("#driverRegistration").value, operatorType: app.dialog.querySelector("#driverOperator").value, operatorId: app.dialog.querySelector("#driverOperator").value === "goodkota" ? "goodkota" : null }, actor); if (source?.id) app.commands.adminUpdateApplication("driver", source.id, { status: "approved", note: `Onboarded as ${driver.name}` }, actor); app.closeDialog(); app.toast("Driver added."); app.adminSection = "drivers"; app.render(); } catch (error) { alert(error.message); } });
+}
+
+function openDriverAdmin(app, driverId, actor) {
+  const driver = app.repos.delivery.driver(driverId); if (!driver) return;
+  const vehicle = app.repos.delivery.vehicle(driver.vehicleId);
+  app.openDialog(`<div class="dialog-inner"><div class="dialog-head"><div><span class="eyebrow">Driver administration</span><h2>${escapeHtml(driver.name)}</h2></div><button class="icon-btn" data-close-dialog>✕</button></div><div class="form-grid"><label class="field">Name<input id="editDriverName" value="${escapeHtml(driver.name)}" /></label><label class="field">Phone<input id="editDriverPhone" value="${escapeHtml(driver.phone || "")}" /></label><label class="field">Vehicle<input id="editDriverVehicle" value="${escapeHtml(vehicle?.type || "")}" /></label><label class="field">Registration<input id="editDriverRegistration" value="${escapeHtml(vehicle?.registration || "")}" /></label><label class="field">Status<select id="editDriverEnabled"><option value="true" ${driver.enabled !== false ? "selected" : ""}>Active</option><option value="false" ${driver.enabled === false ? "selected" : ""}>Disabled</option></select></label><label class="field full">Reason<textarea id="editDriverReason" rows="3" placeholder="Reason for this administration change" required></textarea></label><button class="btn primary field full" id="saveDriverAdmin">Save</button></div></div>`);
+  app.dialog.querySelector("#saveDriverAdmin").addEventListener("click", () => { const reason = app.dialog.querySelector("#editDriverReason").value.trim(); if (!reason) return alert("A reason is required."); app.commands.adminUpdateDriver(driverId, { name: app.dialog.querySelector("#editDriverName").value, phone: app.dialog.querySelector("#editDriverPhone").value, vehicleType: app.dialog.querySelector("#editDriverVehicle").value, registration: app.dialog.querySelector("#editDriverRegistration").value, enabled: app.dialog.querySelector("#editDriverEnabled").value === "true" }, actor, reason); app.closeDialog(); app.toast("Driver updated."); app.render(); });
+}
+
+function openPromotion(app, actor, promoId = null) {
+  const promo = promoId ? app.repos.promotions.get(promoId) : null;
+  app.openDialog(`<div class="dialog-inner"><div class="dialog-head"><div><span class="eyebrow">Promotion</span><h2>${promo ? escapeHtml(promo.code) : "New promotion"}</h2></div><button class="icon-btn" data-close-dialog>✕</button></div><form id="promotionForm" class="form-grid"><label class="field">Code<input id="promoCode" value="${escapeHtml(promo?.code || "")}" ${promo ? "readonly" : ""} required /></label><label class="field">Discount %<input id="promoDiscount" type="number" min="0" max="100" value="${Number(promo?.discountPercent || 10)}" required /></label><label class="field">Minimum spend (R)<input id="promoMinimum" type="number" min="0" step="1" value="${fromCents(promo?.minCents || 0)}" /></label><label class="field">Status<select id="promoStatus"><option value="active" ${promo?.status !== "inactive" ? "selected" : ""}>Active</option><option value="inactive" ${promo?.status === "inactive" ? "selected" : ""}>Inactive</option></select></label><button class="btn primary field full">Save promotion</button></form></div>`);
+  app.dialog.querySelector("#promotionForm").addEventListener("submit", event => { event.preventDefault(); const data = { code: app.dialog.querySelector("#promoCode").value.trim().toUpperCase(), discountPercent: Number(app.dialog.querySelector("#promoDiscount").value), minCents: toCents(app.dialog.querySelector("#promoMinimum").value), status: app.dialog.querySelector("#promoStatus").value }; try { if (promo) app.commands.adminUpdatePromotion(promo.id, data, actor); else app.commands.adminAddPromotion(data, actor); app.closeDialog(); app.toast("Promotion saved."); app.render(); } catch (error) { alert(error.message); } });
+}
+
+function openMerchantApplication(app, id, actor) {
+  const item = app.repos.applications.merchant(id); if (!item) return;
+  app.openDialog(`<div class="dialog-inner dialog-wide-inner"><div class="dialog-head"><div><span class="eyebrow">Merchant application</span><h2>${escapeHtml(item.businessName)}</h2></div><button class="icon-btn" data-close-dialog>✕</button></div><form id="approveMerchantApplication" class="form-grid"><label class="field">Trading name<input id="applicationMerchantName" value="${escapeHtml(item.businessName)}" required /></label><label class="field">Contact name<input value="${escapeHtml(item.contactName)}" readonly /></label><label class="field">Email<input id="applicationMerchantEmail" value="${escapeHtml(item.email)}" /></label><label class="field">Phone<input value="${escapeHtml(item.phone)}" readonly /></label>${locationFields("applicationMerchant", { address: item.address, area: item.area, latitude: item.latitude, longitude: item.longitude })}<label class="field full">Application note<textarea rows="3" readonly>${escapeHtml(item.note || "")}</textarea></label><div class="inline-actions field full"><button class="btn primary" type="submit">Approve & onboard</button><button class="btn ghost" type="button" id="holdMerchantApplication">Keep under review</button><button class="btn danger" type="button" id="declineMerchantApplication">Decline</button></div></form></div>`);
+  app.dialog.querySelector("#applicationMerchantResolveLocation")?.addEventListener("click", () => populateGeocode(app, "applicationMerchant"));
+  app.dialog.querySelector("#approveMerchantApplication").addEventListener("submit", event => { event.preventDefault(); const latitude = Number(app.dialog.querySelector("#applicationMerchantLatitude").value); const longitude = Number(app.dialog.querySelector("#applicationMerchantLongitude").value); if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return alert("Resolve the physical address before onboarding."); try { const merchant = app.commands.adminAddMerchant({ name: app.dialog.querySelector("#applicationMerchantName").value.trim(), legalName: app.dialog.querySelector("#applicationMerchantName").value.trim(), contact: { email: app.dialog.querySelector("#applicationMerchantEmail").value.trim() }, area: app.dialog.querySelector("#applicationMerchantArea").value.trim(), address: app.dialog.querySelector("#applicationMerchantAddress").value.trim(), latitude, longitude, prepMinutes: 20, minOrderCents: 3000, deliveryFeeCents: 2000, delivery: { enabled: true, radiusKm: 7, providerPreference: "goodkota_fleet" } }, actor); app.commands.adminUpdateApplication("merchant", id, { status: "approved", note: `Onboarded as ${merchant.name}` }, actor); app.closeDialog(); app.toast("Merchant approved and onboarded."); app.adminSection = "merchants"; app.render(); } catch (error) { alert(error.message); } });
+  app.dialog.querySelector("#holdMerchantApplication")?.addEventListener("click", () => { app.commands.adminUpdateApplication("merchant", id, { status: "review", note: "Application retained for review" }, actor); app.closeDialog(); app.render(); });
+  app.dialog.querySelector("#declineMerchantApplication")?.addEventListener("click", () => { app.commands.adminUpdateApplication("merchant", id, { status: "declined", note: "Application declined" }, actor); app.closeDialog(); app.render(); });
+}
+
+function openDriverApplication(app, id, actor) {
+  const item = app.repos.applications.driver(id); if (!item) return;
+  app.openDialog(`<div class="dialog-inner"><div class="dialog-head"><div><span class="eyebrow">Driver application</span><h2>${escapeHtml(item.name)}</h2></div><button class="icon-btn" data-close-dialog>✕</button></div><div class="summary-line"><span>Phone</span><strong>${escapeHtml(item.phone)}</strong></div><div class="summary-line"><span>Email</span><strong>${escapeHtml(item.email)}</strong></div><div class="summary-line"><span>Area</span><strong>${escapeHtml(item.operatingArea)}</strong></div><div class="summary-line"><span>Vehicle</span><strong>${escapeHtml(item.vehicleType)} ${escapeHtml(item.registration || "")}</strong></div>${item.note ? `<div class="notice" style="margin-top:12px">${escapeHtml(item.note)}</div>` : ""}<div class="inline-actions" style="margin-top:16px"><button class="btn primary" id="onboardDriverApplication">Approve & onboard</button><button class="btn ghost" id="holdDriverApplication">Keep under review</button><button class="btn danger" id="declineDriverApplication">Decline</button></div></div>`);
+  app.dialog.querySelector("#onboardDriverApplication")?.addEventListener("click", () => openAddDriver(app, actor, item));
+  app.dialog.querySelector("#holdDriverApplication")?.addEventListener("click", () => { app.commands.adminUpdateApplication("driver", id, { status: "review", note: "Application retained for review" }, actor); app.closeDialog(); app.render(); });
+  app.dialog.querySelector("#declineDriverApplication")?.addEventListener("click", () => { app.commands.adminUpdateApplication("driver", id, { status: "declined", note: "Application declined" }, actor); app.closeDialog(); app.render(); });
 }
 
 function requestReason(app, { title, description, confirmLabel = "Confirm", danger = false, onConfirm }) {

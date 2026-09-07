@@ -39,10 +39,10 @@ test("views do not read global store collections directly", () => {
   }
 });
 
-test("package/config/index files identify v6 and parse cleanly", () => {
+test("package/config/index files identify v6.1 and parse cleanly", () => {
   const pkg = JSON.parse(read("package.json"));
-  assert.equal(pkg.version, "6.0.0");
-  assert.equal(pkg.name, "goodkota-v6-scale-foundation");
+  assert.equal(pkg.version, "6.1.0");
+  assert.equal(pkg.name, "goodkota-v6-1-integrated-product-rollup");
   JSON.parse(read("firestore.indexes.json"));
   JSON.parse(read("firebase.json"));
   JSON.parse(read("config/production.json"));
@@ -54,6 +54,9 @@ test("HTML shell has unique IDs and every local asset reference exists", () => {
   assert.equal(new Set(ids).size, ids.length, "Duplicate HTML IDs detected");
   const refs = [...html.matchAll(/(?:src|href)=["'](\.\/[^"'#?]+)["']/g)].map(match => match[1]);
   for (const ref of refs) assert.ok(fs.existsSync(path.resolve(root, ref)), `Missing referenced asset ${ref}`);
+  const website = read("website.html");
+  for (const id of ["merchantApplicationForm", "driverApplicationForm", "waitlistForm", "publicPromotions", "socialLinks"]) assert.match(website, new RegExp(`id=["']${id}["']`), `Public website missing ${id}`);
+  for (const ref of [...website.matchAll(/(?:src|href)=["'](\.\/[^"'#?]+)["']/g)].map(match => match[1])) assert.ok(fs.existsSync(path.resolve(root, ref)), `Public website missing referenced asset ${ref}`);
 });
 
 test("active UI source contains no prototype/demo labels", () => {
@@ -75,6 +78,9 @@ test("scale foundation includes production enforcement artefacts", () => {
   assert.match(read("functions/src/index.js"), /runTransaction/);
   assert.match(read("functions/src/index.js"), /idempotencyRecords/);
   assert.match(read("functions/src/index.js"), /deliveryCredentials/);
+  for (const command of ["submitMerchantApplication", "submitDriverApplication", "joinPublicWaitlist", "updateMerchantCatalogueItem", "adminManageDriver", "adminManagePromotion", "adminUpdateApplication", "ownerUpdateBrandSettings"]) assert.match(read("functions/src/index.js"), new RegExp(`export const ${command}`), `Missing production command ${command}`);
+  assert.match(read("firestore.rules"), /merchantApplications/);
+  assert.match(read("firestore.rules"), /promos/);
 });
 
 

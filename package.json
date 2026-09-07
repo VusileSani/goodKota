@@ -1,8 +1,8 @@
 {
-  "name": "goodkota-v6-scale-foundation",
+  "name": "goodkota-v6-1-integrated-product-rollup",
   "private": true,
   "type": "module",
-  "version": "6.0.0",
+  "version": "6.1.0",
   "scripts": {
     "test": "node tests/scale-foundation.test.mjs && node tests/static-validation.mjs",
     "test:scale": "node tests/scale-foundation.test.mjs",

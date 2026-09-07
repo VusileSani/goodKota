@@ -384,3 +384,19 @@ Delivery quality should later be a separate dimension so logistics problems do n
 ## v6 operational event and retention collections
 
 Additional production collections include `idempotencyRecords`, `jobs`, `rateLimits`, `operationalAlerts`, `analyticsEvents`, `telemetryEvents`, `merchantQualityAggregates` and materialized/aggregate documents. Ephemeral collections use TTL where appropriate; audit and financial histories are never client-deletable.
+
+## v6.1 integrated product collections
+
+```text
+promos/{promoId}
+promotionEvents/{eventId}
+merchantApplications/{applicationId}
+driverApplications/{applicationId}
+waitlistEntries/{entryId}
+driverAdministrationEvents/{eventId}
+publicBrand/current
+```
+
+Public applications and waitlist entries are created through App Check protected Cloud Functions; direct Firestore writes are denied. Admin reads/reviews applications through bounded queries. Promotion and driver administration changes are written through Admin commands with event/audit records.
+
+Merchant catalogue changes remain in `products/{productId}` and are performed through a tenant-scoped Cloud Function that verifies active `merchantMemberships` before create/update. `publicBrand/current` is a read-only public projection of Owner-controlled brand links so the public website does not need access to protected platform controls.

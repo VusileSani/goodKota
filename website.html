@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f15a29" />
+  <meta name="description" content="GoodKota — kota culture, nearby ordering, merchant partnership and delivery opportunities." />
+  <title>GoodKota — Kota Culture, Nearby</title>
+  <link rel="icon" href="./assets/goodkota-logo.png" type="image/png" />
+  <link rel="stylesheet" href="./css/website.css" />
+</head>
+<body>
+  <header class="site-header">
+    <a class="site-brand" href="#top"><img src="./assets/goodkota-logo.png" alt="GoodKota" /><strong>GoodKota</strong></a>
+    <nav class="site-nav" aria-label="GoodKota website">
+      <a href="#culture">Kota Culture</a>
+      <a href="#merchants">For Merchants</a>
+      <a href="#drivers">Drivers</a>
+      <a href="#promotions">Promotions</a>
+      <a class="app-link" href="./index.html">Open GoodKota</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="site-hero">
+      <div class="hero-copy">
+        <span class="kicker">South Africa's kota platform</span>
+        <h1>Good kota.<br />Closer to you.</h1>
+        <p>Discover nearby kota merchants, order with confidence and follow the culture behind the food.</p>
+        <div class="hero-actions"><a class="button primary" href="./index.html">Find a kota</a><a class="button light" href="#waitlist">Join the community</a></div>
+      </div>
+      <div class="hero-mark"><img src="./assets/goodkota-logo.png" alt="" /></div>
+    </section>
+
+    <section id="culture" class="site-section">
+      <div class="section-intro"><span class="kicker">Kota Culture</span><h2>More than an order screen.</h2><p>The public website carries the stories, recipes, events and community side of GoodKota while the ordering app stays focused.</p></div>
+      <div class="story-grid">
+        <article><span>01</span><h3>Kota stories</h3><p>Meet the people and neighbourhoods shaping South Africa's kota culture.</p></article>
+        <article><span>02</span><h3>Recipes</h3><p>Classic combinations, regional variations and merchant-inspired kota ideas.</p></article>
+        <article><span>03</span><h3>Events</h3><p>GoodKota pop-ups, community food moments and future kota experiences.</p></article>
+      </div>
+    </section>
+
+    <section id="promotions" class="site-section alt">
+      <div class="section-intro"><span class="kicker">Promotions</span><h2>What's happening on GoodKota.</h2></div>
+      <div id="publicPromotions" class="promotion-grid"></div>
+    </section>
+
+    <section id="merchants" class="site-section split-section">
+      <div class="section-intro"><span class="kicker">For Merchants</span><h2>Bring your store onto GoodKota.</h2><p>Apply with your real operating address. GoodKota Admin receives the application in the platform queue for review and onboarding.</p></div>
+      <form id="merchantApplicationForm" class="public-form">
+        <label>Trading name<input id="merchantBusinessName" required /></label>
+        <label>Contact person<input id="merchantContactName" required /></label>
+        <label>Email<input id="merchantEmail" type="email" required /></label>
+        <label>Phone<input id="merchantPhone" required /></label>
+        <label class="full">Physical address<input id="merchantAddress" placeholder="Street, suburb, city" required /></label>
+        <div class="location-row full"><button type="button" class="button secondary" id="resolveMerchantAddress">Find location</button><span id="merchantLocationStatus">Use the actual operating address.</span></div>
+        <input id="merchantLatitude" type="hidden" /><input id="merchantLongitude" type="hidden" /><input id="merchantArea" type="hidden" />
+        <label class="full">Anything GoodKota should know?<textarea id="merchantNote" rows="3"></textarea></label>
+        <button class="button primary full">Submit merchant application</button>
+      </form>
+    </section>
+
+    <section id="drivers" class="site-section split-section alt">
+      <div class="section-intro"><span class="kicker">Drivers</span><h2>Apply to deliver with GoodKota.</h2><p>Driver applications enter the same GoodKota operating queue used by Admin staff. Live dispatch remains a separate Delivery Ops function.</p></div>
+      <form id="driverApplicationForm" class="public-form">
+        <label>Name<input id="driverName" required /></label>
+        <label>Phone<input id="driverPhone" required /></label>
+        <label>Email<input id="driverEmail" type="email" required /></label>
+        <label>Operating area<input id="driverArea" placeholder="Midrand, Tembisa…" required /></label>
+        <label>Vehicle type<input id="driverVehicle" placeholder="Motorbike, car…" required /></label>
+        <label>Registration<input id="driverRegistration" /></label>
+        <label class="full">Availability / note<textarea id="driverNote" rows="3"></textarea></label>
+        <button class="button primary full">Submit driver application</button>
+      </form>
+    </section>
+
+    <section id="waitlist" class="site-section waitlist-section">
+      <div><span class="kicker">Stay close</span><h2>Join the GoodKota list.</h2><p>Hear about new merchant areas, promotions and GoodKota community launches.</p></div>
+      <form id="waitlistForm" class="waitlist-form"><input id="waitlistName" placeholder="Name" /><input id="waitlistEmail" type="email" placeholder="Email" required /><input id="waitlistArea" placeholder="Area" /><button class="button dark">Join</button></form>
+    </section>
+
+    <section class="site-section social-section">
+      <div class="section-intro"><span class="kicker">Follow GoodKota</span><h2>Culture lives outside checkout.</h2><p>Official social links appear here once configured by the GoodKota Owner.</p></div>
+      <div id="socialLinks" class="social-links"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer"><a class="site-brand" href="#top"><img src="./assets/goodkota-logo.png" alt="" /><strong>GoodKota</strong></a><span>Kota culture. Nearby ordering. Quality that matters.</span><a href="./index.html">Open ordering app</a></footer>
+  <div id="publicToast" class="public-toast" hidden></div>
+  <script type="module" src="./js/public-portal.js"></script>
+</body>
+</html>

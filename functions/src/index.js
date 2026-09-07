@@ -377,10 +377,17 @@ export const paymentWebhook = onRequest({ region: REGION }, async (request, resp
       const amountCents = cents(verified.amountCents);
       const deliveryFeeCents = cents(verified.deliveryFeeCents || 0);
       const discountCents = cents(verified.discountCents || 0);
+      const tipCents = cents(verified.tipCents || 0);
+      const promoCode = text(verified.promoCode).toUpperCase().slice(0, 80);
       const items = normaliseItems(verified.items || []);
       const itemTotalCents = items.reduce((sum, item) => sum + item.priceCents * item.qty, 0);
-      if (itemTotalCents + deliveryFeeCents - discountCents !== amountCents) throw new Error("Verified payment amount does not match the signed order breakdown.");
-      if (amountCents < Number(merchant.minOrderCents || 0)) throw new Error("Order is below merchant minimum.");
+      if (itemTotalCents + deliveryFeeCents - discountCents + tipCents !== amountCents) throw new Error("Verified payment amount does not match the signed order breakdown.");
+      if (itemTotalCents < Number(merchant.minOrderCents || 0)) throw new Error("Order is below merchant minimum.");
+      let scheduledFor = null;
+      if (verified.scheduledFor) {
+        scheduledFor = new Date(verified.scheduledFor);
+        if (!Number.isFinite(scheduledFor.getTime()) || scheduledFor.getTime() <= Date.now()) throw new Error("Scheduled order time must be in the future.");
+      }
 
       const fulfilment = verified.fulfilment || { type: "pickup" };
       const isDelivery = fulfilment.type === "delivery";
@@ -414,17 +421,17 @@ export const paymentWebhook = onRequest({ region: REGION }, async (request, resp
       const order = {
         id: orderRef.id, orderNumber: display, customerId: verified.customerId, merchantId: verified.merchantId,
         customer: text(verified.customer?.name), phone: text(verified.customer?.phone), email: text(verified.customer?.email),
-        amountCents, deliveryFeeCents, discountCents, items, fulfilment, paymentStatus: "paid", paymentId: paymentRef.id,
+        amountCents, subtotalCents: itemTotalCents, deliveryFeeCents, discountCents, tipCents, promoCode, scheduledFor, items, fulfilment, paymentStatus: "paid", paymentId: paymentRef.id,
         status: "pending", deliveryTaskId: taskRef?.id || null, createdAt: serverTime(), version: 1, rated: false
       };
 
       tx.create(paymentRef, {
         paymentId: paymentRef.id, providerReference: text(verified.providerReference), customerId: verified.customerId,
-        merchantId: verified.merchantId, orderId: orderRef.id, amountCents, deliveryFeeCents, discountCents,
+        merchantId: verified.merchantId, orderId: orderRef.id, amountCents, deliveryFeeCents, discountCents, tipCents, promoCode,
         providerStatus: text(verified.providerStatus || verified.status), status: "paid", signatureVerified: true, createdAt: serverTime(), version: 1
       });
       tx.create(db.collection("paymentEvents").doc(), { paymentId: paymentRef.id, orderId: orderRef.id, type: "payment_captured", amountCents, signatureVerified: true, createdAt: serverTime() });
-      tx.create(db.collection("feeAllocations").doc(), { orderId: orderRef.id, paymentId: paymentRef.id, merchantId: verified.merchantId, foodAmountCents: itemTotalCents - discountCents, deliveryAmountCents: deliveryFeeCents, createdAt: serverTime() });
+      tx.create(db.collection("feeAllocations").doc(), { orderId: orderRef.id, paymentId: paymentRef.id, merchantId: verified.merchantId, foodAmountCents: itemTotalCents - discountCents, tipAmountCents: tipCents, deliveryAmountCents: deliveryFeeCents, createdAt: serverTime() });
       tx.create(orderRef, order);
       tx.create(db.collection("orderEvents").doc(), { orderId: orderRef.id, type: "order_created", status: "pending", actorType: "system", actorId: "payment_webhook", createdAt: serverTime() });
       if (taskRef) {
@@ -640,6 +647,255 @@ export const recordRefund = onCall({ region: REGION, enforceAppCheck: true }, as
     tx.create(idemRef, { key: idempotencyKey, command: "refund", result, createdAt: serverTime(), expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60_000) });
     return result;
   });
+});
+
+
+
+// -----------------------------------------------------------------------------
+// v6.1 integrated product roll-up commands
+// Public intake is write-only through App Check protected Cloud Functions.
+// Merchant catalogue writes are tenant-scoped. Company operations remain Admin
+// scoped, while brand authority remains Owner-only.
+// -----------------------------------------------------------------------------
+
+function publicScope(kind, value) {
+  return `${kind}-${createHash("sha256").update(text(value).toLowerCase() || "anonymous").digest("hex").slice(0, 20)}`;
+}
+
+function validHttpUrl(value) {
+  const raw = text(value);
+  if (!raw) return true;
+  try {
+    const url = new URL(raw);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+export const submitMerchantApplication = onCall({ region: REGION, enforceAppCheck: true }, async request => {
+  const data = request.data || {};
+  const businessName = text(data.businessName).slice(0, 160);
+  const contactName = text(data.contactName).slice(0, 160);
+  const email = text(data.email).toLowerCase().slice(0, 320);
+  const phone = text(data.phone).slice(0, 80);
+  const address = text(data.address).slice(0, 500);
+  if (!businessName || !contactName || !email || !phone || !address) {
+    throw new HttpsError("invalid-argument", "Business, contact and physical address details are required.");
+  }
+  await enforceRateLimit(db, { scope: publicScope("merchant-application", email || phone), limit: 4, windowSeconds: 60 });
+  const latitude = data.latitude == null || data.latitude === "" ? null : Number(data.latitude);
+  const longitude = data.longitude == null || data.longitude === "" ? null : Number(data.longitude);
+  if ((latitude != null || longitude != null) && !validCoordinate(latitude, longitude)) {
+    throw new HttpsError("invalid-argument", "Application coordinates are invalid.");
+  }
+  const ref = db.collection("merchantApplications").doc();
+  await ref.create({
+    businessName, contactName, email, phone, address, area: text(data.area).slice(0, 160),
+    latitude, longitude, geohash: latitude != null ? encodeGeohash(latitude, longitude) : null,
+    note: text(data.note).slice(0, 2000), status: "new", createdAt: serverTime(), updatedAt: serverTime(), version: 1
+  });
+  return { applicationId: ref.id, status: "new" };
+});
+
+export const submitDriverApplication = onCall({ region: REGION, enforceAppCheck: true }, async request => {
+  const data = request.data || {};
+  const name = text(data.name).slice(0, 160);
+  const email = text(data.email).toLowerCase().slice(0, 320);
+  const phone = text(data.phone).slice(0, 80);
+  const vehicleType = text(data.vehicleType).slice(0, 120);
+  const operatingArea = text(data.operatingArea).slice(0, 200);
+  if (!name || !email || !phone || !vehicleType || !operatingArea) {
+    throw new HttpsError("invalid-argument", "Driver contact, vehicle and operating area are required.");
+  }
+  await enforceRateLimit(db, { scope: publicScope("driver-application", email || phone), limit: 4, windowSeconds: 60 });
+  const ref = db.collection("driverApplications").doc();
+  await ref.create({
+    name, email, phone, vehicleType, registration: text(data.registration).slice(0, 80), operatingArea,
+    note: text(data.note).slice(0, 2000), status: "new", createdAt: serverTime(), updatedAt: serverTime(), version: 1
+  });
+  return { applicationId: ref.id, status: "new" };
+});
+
+export const joinPublicWaitlist = onCall({ region: REGION, enforceAppCheck: true }, async request => {
+  const data = request.data || {};
+  const email = text(data.email).toLowerCase().slice(0, 320);
+  if (!email) throw new HttpsError("invalid-argument", "Email is required.");
+  await enforceRateLimit(db, { scope: publicScope("waitlist", email), limit: 4, windowSeconds: 60 });
+  const digest = createHash("sha256").update(email).digest("hex").slice(0, 40);
+  const ref = db.doc(`waitlistEntries/${digest}`);
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    const values = { name: text(data.name).slice(0, 160), email, area: text(data.area).slice(0, 160), updatedAt: serverTime() };
+    if (snap.exists) tx.set(ref, values, { merge: true });
+    else tx.create(ref, { ...values, createdAt: serverTime() });
+  });
+  return { waitlistId: ref.id };
+});
+
+export const updateMerchantCatalogueItem = onCall({ region: REGION, enforceAppCheck: true }, async request => {
+  const auth = requireAuth(request);
+  const data = request.data || {};
+  const merchantId = text(data.merchantId);
+  const productId = text(data.productId);
+  if (!merchantId || !(await merchantMembership(auth.uid, merchantId))) {
+    throw new HttpsError("permission-denied", "Active merchant membership is required.");
+  }
+  const name = data.name === undefined ? undefined : text(data.name).slice(0, 160);
+  const priceCents = data.priceCents === undefined ? undefined : cents(data.priceCents);
+  const category = data.category === undefined ? undefined : text(data.category).slice(0, 120);
+  const desc = data.desc === undefined ? undefined : text(data.desc).slice(0, 2000);
+  const emoji = data.emoji === undefined ? undefined : text(data.emoji).slice(0, 16);
+  const imageUrl = data.imageUrl === undefined ? undefined : text(data.imageUrl).slice(0, 2000);
+  if (imageUrl !== undefined && !validHttpUrl(imageUrl)) throw new HttpsError("invalid-argument", "Menu image URL must use http or https.");
+
+  if (!productId) {
+    if (!name || !priceCents) throw new HttpsError("invalid-argument", "Menu item name and positive price are required.");
+    const ref = db.collection("products").doc();
+    await ref.create({ merchantId, name, priceCents, category: category || "Kotas", desc: desc || "", emoji: emoji || "🥪", imageUrl: imageUrl || "", enabled: data.enabled !== false, createdAt: serverTime(), updatedAt: serverTime(), version: 1 });
+    return { productId: ref.id, created: true };
+  }
+
+  const ref = db.doc(`products/${productId}`);
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    if (!snap.exists || snap.data().merchantId !== merchantId) throw new HttpsError("not-found", "Menu item was not found in this merchant account.");
+    const changes = {};
+    if (name !== undefined) changes.name = name;
+    if (priceCents !== undefined) changes.priceCents = priceCents;
+    if (category !== undefined) changes.category = category;
+    if (desc !== undefined) changes.desc = desc;
+    if (emoji !== undefined) changes.emoji = emoji;
+    if (imageUrl !== undefined) changes.imageUrl = imageUrl;
+    if (data.enabled !== undefined) changes.enabled = Boolean(data.enabled);
+    if (changes.name === "" || changes.priceCents === 0) throw new HttpsError("invalid-argument", "Menu item name and positive price are required.");
+    tx.update(ref, { ...changes, updatedAt: serverTime(), version: FieldValue.increment(1) });
+  });
+  return { productId, created: false };
+});
+
+export const adminManagePromotion = onCall({ region: REGION, enforceAppCheck: true }, async request => {
+  const auth = requireRole(request, "admin");
+  const data = request.data || {};
+  const promoId = text(data.promoId);
+  const requestedCode = data.code === undefined ? undefined : text(data.code).toUpperCase().slice(0, 80);
+  const ref = promoId ? db.doc(`promos/${promoId}`) : db.collection("promos").doc();
+
+  await db.runTransaction(async tx => {
+    const beforeSnap = promoId ? await tx.get(ref) : null;
+    if (promoId && !beforeSnap.exists) throw new HttpsError("not-found", "Promotion not found.");
+    const before = beforeSnap?.data() || null;
+    const code = requestedCode ?? before?.code ?? "";
+    const discountPercent = data.discountPercent === undefined
+      ? Number(before?.discountPercent || 0)
+      : Math.max(0, Math.min(100, Number(data.discountPercent || 0)));
+    const minCents = data.minCents === undefined ? Number(before?.minCents || 0) : cents(data.minCents || 0);
+    const status = data.status === undefined ? (before?.status || "active") : (["active", "disabled"].includes(data.status) ? data.status : "active");
+    if (!code || discountPercent <= 0) throw new HttpsError("invalid-argument", "Promotion code and discount are required.");
+
+    const duplicateSnap = await tx.get(db.collection("promos").where("code", "==", code).limit(2));
+    if (duplicateSnap.docs.some(doc => doc.id !== ref.id)) throw new HttpsError("already-exists", "Promotion code already exists.");
+
+    const next = promoId
+      ? { code, discountPercent, minCents, status, updatedAt: serverTime(), version: FieldValue.increment(1) }
+      : { code, discountPercent, minCents, status, createdAt: serverTime(), updatedAt: serverTime(), version: 1 };
+    if (promoId) tx.update(ref, next); else tx.create(ref, next);
+    tx.create(db.collection("promotionEvents").doc(), { promoId: ref.id, type: promoId ? "updated" : "created", actorUid: auth.uid, metadata: { before: before ? { code: before.code, status: before.status, discountPercent: before.discountPercent, minCents: before.minCents } : null, after: { code, status, discountPercent, minCents } }, createdAt: serverTime() });
+    tx.create(db.collection("platformAudit").doc(), auditEvent({ actor: auth, action: promoId ? "promotion_updated" : "promotion_created", targetType: "promotion", targetId: ref.id, reason: code, visibility: "operations", timestamp: serverTime() }));
+  });
+  return { promoId: ref.id };
+});
+
+export const adminManageDriver = onCall({ region: REGION, enforceAppCheck: true }, async request => {
+  const auth = requireRole(request, "admin");
+  const data = request.data || {};
+  const driverId = text(data.driverId);
+  const reason = text(data.reason || (driverId ? "Driver administration" : "Driver onboarding"));
+  if (!reason) throw new HttpsError("invalid-argument", "Reason is required.");
+
+  if (!driverId) {
+    const name = text(data.name).slice(0, 160);
+    const phone = text(data.phone).slice(0, 80);
+    if (!name || !phone) throw new HttpsError("invalid-argument", "Driver name and phone are required.");
+    const vehicleRef = db.collection("driverVehicles").doc();
+    const driverRef = db.collection("drivers").doc();
+    const batch = db.batch();
+    batch.create(vehicleRef, { driverId: driverRef.id, type: text(data.vehicleType || "Vehicle").slice(0, 120), registration: text(data.registration).slice(0, 80), ownerType: text(data.operatorType || "goodkota"), ownerId: text(data.operatorId || "goodkota"), createdAt: serverTime(), version: 1 });
+    batch.create(driverRef, { name, phone, email: text(data.email).toLowerCase().slice(0, 320), authUid: data.authUid || null, operatorType: text(data.operatorType || "goodkota"), operatorId: text(data.operatorId || "goodkota"), enabled: true, shiftStatus: "offline", availability: "available", vehicleId: vehicleRef.id, activeTaskId: null, rating: 0, completedDeliveries: 0, trackingConsent: true, createdAt: serverTime(), updatedAt: serverTime(), version: 1 });
+    batch.create(db.collection("driverAdministrationEvents").doc(), { driverId: driverRef.id, type: "driver_added", actorUid: auth.uid, reason, createdAt: serverTime() });
+    batch.create(db.collection("platformAudit").doc(), auditEvent({ actor: auth, action: "driver_added", targetType: "driver", targetId: driverRef.id, reason, visibility: "operations", timestamp: serverTime() }));
+    await batch.commit();
+    return { driverId: driverRef.id };
+  }
+
+  const driverRef = db.doc(`drivers/${driverId}`);
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(driverRef);
+    if (!snap.exists) throw new HttpsError("not-found", "Driver not found.");
+    const before = snap.data();
+    let vehicleRef = null;
+    let vehicleSnap = null;
+    if ((data.vehicleType !== undefined || data.registration !== undefined) && before.vehicleId) {
+      vehicleRef = db.doc(`driverVehicles/${before.vehicleId}`);
+      vehicleSnap = await tx.get(vehicleRef);
+    }
+    const changes = {};
+    for (const key of ["name", "phone", "email", "operatorType", "operatorId", "authUid"]) if (data[key] !== undefined) changes[key] = text(data[key]);
+    if (data.enabled !== undefined) changes.enabled = Boolean(data.enabled);
+    tx.update(driverRef, { ...changes, updatedAt: serverTime(), version: FieldValue.increment(1) });
+    if (vehicleRef && vehicleSnap?.exists) {
+      tx.update(vehicleRef, { ...(data.vehicleType !== undefined ? { type: text(data.vehicleType).slice(0, 120) } : {}), ...(data.registration !== undefined ? { registration: text(data.registration).slice(0, 80) } : {}), version: FieldValue.increment(1), updatedAt: serverTime() });
+    }
+    tx.create(db.collection("driverAdministrationEvents").doc(), { driverId, type: "driver_updated", actorUid: auth.uid, reason, metadata: { before: { enabled: before.enabled, operatorType: before.operatorType, operatorId: before.operatorId } }, createdAt: serverTime() });
+    tx.create(db.collection("platformAudit").doc(), auditEvent({ actor: auth, action: "driver_updated", targetType: "driver", targetId: driverId, reason, visibility: "operations", timestamp: serverTime() }));
+  });
+  return { driverId };
+});
+
+export const adminUpdateApplication = onCall({ region: REGION, enforceAppCheck: true }, async request => {
+  const auth = requireRole(request, "admin");
+  const { kind, applicationId, status = "review", note = "" } = request.data || {};
+  if (!['merchant', 'driver'].includes(kind) || !applicationId || !['new', 'review', 'approved', 'declined'].includes(status)) {
+    throw new HttpsError("invalid-argument", "Valid application kind, id and status are required.");
+  }
+  const collection = kind === "merchant" ? "merchantApplications" : "driverApplications";
+  const ref = db.doc(`${collection}/${applicationId}`);
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw new HttpsError("not-found", "Application not found.");
+    tx.update(ref, { status, adminNote: text(note).slice(0, 2000), reviewedByUid: auth.uid, updatedAt: serverTime(), version: FieldValue.increment(1) });
+    tx.create(db.collection("platformAudit").doc(), auditEvent({ actor: auth, action: `${kind}_application_updated`, targetType: `${kind}_application`, targetId: applicationId, reason: text(note || status), visibility: "operations", metadata: { status }, timestamp: serverTime() }));
+  });
+  return { applicationId, status };
+});
+
+export const ownerUpdateBrandSettings = onCall({ region: REGION, enforceAppCheck: true }, async request => {
+  const auth = requireRole(request, "owner");
+  const data = request.data || {};
+  const reason = text(data.reason);
+  if (!reason) throw new HttpsError("invalid-argument", "Owner reason is required.");
+  const publicWebsite = text(data.publicWebsite || "./website.html");
+  const social = {
+    instagram: text(data.social?.instagram),
+    facebook: text(data.social?.facebook),
+    tiktok: text(data.social?.tiktok)
+  };
+  if (![publicWebsite, ...Object.values(social)].every(validHttpUrl)) {
+    // Relative in-app public website is deliberately supported.
+    if (!(publicWebsite.startsWith("./") && Object.values(social).every(validHttpUrl))) {
+      throw new HttpsError("invalid-argument", "Brand links must use http/https, except the in-app public website path.");
+    }
+  }
+  const ref = db.doc(PLATFORM_CONFIG);
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    const before = snap.data()?.brand || null;
+    const brand = { publicWebsite, social };
+    tx.set(ref, { brand, updatedAt: serverTime() }, { merge: true });
+    tx.set(db.doc("publicBrand/current"), { ...brand, updatedAt: serverTime() }, { merge: true });
+    tx.create(db.collection("platformAudit").doc(), auditEvent({ actor: auth, action: "brand_settings_updated", targetType: "platform_brand", targetId: "goodkota", reason, visibility: "owner", metadata: { before, after: brand }, timestamp: serverTime() }));
+  });
+  return { publicWebsite, social };
 });
 
 export const rollupPaidOrder = onDocumentCreated({ region: REGION, document: "orders/{orderId}" }, async event => {

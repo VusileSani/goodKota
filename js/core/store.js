@@ -15,7 +15,8 @@ const ARRAY_COLLECTIONS = [
   "drivers", "driverVehicles", "driverLocations", "deliveryTasks", "deliveryAssignments", "deliveryEvents", "proofsOfDelivery",
   "platformStaff", "merchantMemberships", "supportCases", "supportCaseEvents", "announcements", "auditTrail",
   "orderEvents", "merchantComplianceEvents", "commercialStatusEvents", "idempotencyRecords", "jobs",
-  "telemetryEvents", "operationalAlerts", "analyticsEvents", "promos"
+  "telemetryEvents", "operationalAlerts", "analyticsEvents", "promos",
+  "merchantApplications", "driverApplications", "waitlistEntries", "promotionEvents", "driverAdministrationEvents"
 ];
 
 function normaliseDeliveryStatus(status) {
@@ -133,7 +134,11 @@ function migrateMoney(state) {
   state.paymentTransactions = payments;
   delete state.payments;
   (state.deliveryTasks || []).forEach(task => centsField(task, "deliveryFeeCents", "deliveryFee", 0));
-  (state.promos || []).forEach(promo => centsField(promo, "minCents", "min", 0));
+  (state.promos || []).forEach(promo => {
+    centsField(promo, "minCents", "min", 0);
+    if (promo.discountPercent === undefined) promo.discountPercent = Number(promo.discount ?? 0);
+    delete promo.discount;
+  });
 }
 
 function migrateOrderIds(state) {
@@ -198,7 +203,20 @@ export class AppStore {
       if (Number.isFinite(Number(merchant.latitude)) && Number.isFinite(Number(merchant.longitude))) merchant.geohash = encodeGeohash(merchant.latitude, merchant.longitude);
       merchant.version = Number(merchant.version || 1);
     });
-    this.state.products.forEach(product => { product.createdAt ||= Date.now(); product.version = Number(product.version || 1); });
+    this.state.products.forEach(product => {
+      product.createdAt ||= Date.now();
+      product.version = Number(product.version || 1);
+      product.imageUrl ||= "";
+    });
+    this.state.promos.forEach(promo => {
+      promo.code = String(promo.code || "").trim().toUpperCase();
+      promo.discountPercent = Number(promo.discountPercent ?? promo.discount ?? 0);
+      promo.minCents = Number(promo.minCents || 0);
+      promo.status ||= "active";
+      promo.createdAt ||= Date.now();
+      promo.version = Number(promo.version || 1);
+      delete promo.discount;
+    });
   }
 
   ensurePlatformGovernance() {
@@ -212,6 +230,8 @@ export class AppStore {
       deliveryDispatchV2: { enabled: true, rolloutPercent: 100 }
     };
     this.state.platform.retention ||= { driverLocationMinutes: 30, telemetryDays: 30, supportDays: 730, auditDays: 2555 };
+    this.state.platform.brand ||= { publicWebsite: "./website.html", social: { instagram: "", facebook: "", tiktok: "" } };
+    this.state.platform.brand.social ||= { instagram: "", facebook: "", tiktok: "" };
 
     if (!this.state.platformStaff.some(person => person.role === "owner" && person.active !== false)) {
       this.state.platformStaff.unshift({ id: uid("staff"), authUid: null, name: "GoodKota Owner", email: "owner@goodkota.co.za", role: "owner", active: true, createdAt: Date.now() });
@@ -239,6 +259,9 @@ export class AppStore {
     this.state.driverLocations = [...latestLocations.values()];
     this.state.deliveryTasks.forEach(task => { task.version = Number(task.version || 1); });
     this.state.supportCases.forEach(item => { item.version = Number(item.version || 1); });
+    this.state.merchantApplications.forEach(item => { item.status ||= "new"; item.updatedAt ||= item.createdAt || Date.now(); item.version = Number(item.version || 1); });
+    this.state.driverApplications.forEach(item => { item.status ||= "new"; item.updatedAt ||= item.createdAt || Date.now(); item.version = Number(item.version || 1); });
+    this.state.waitlistEntries.forEach(item => { item.createdAt ||= Date.now(); });
     this.state.idempotencyRecords = this.state.idempotencyRecords.filter(record => !record.expiresAt || record.expiresAt > Date.now());
 
     if (!this.state.merchantMemberships.length) {
@@ -621,7 +644,128 @@ export class AppStore {
     this.state.merchants.push(item); this.refreshQualitySummary(item.id, false); this.syncMerchantMaterialized(item, null, true); return item;
   }
 
-  addProduct(product) { const item = { id: product.id || uid("product"), createdAt: Date.now(), version: 1, enabled: true, ...product }; this.state.products.push(item); return item; }
+  addProduct(product) {
+    const merchant = this.merchant(product.merchantId);
+    if (!merchant) throw new Error("Merchant not found.");
+    const item = { id: product.id || uid("product"), createdAt: Date.now(), version: 1, enabled: true, imageUrl: "", ...product };
+    item.priceCents = Number(item.priceCents || 0);
+    if (!item.name || item.priceCents <= 0) throw new Error("Menu item name and price are required.");
+    this.state.products.push(item);
+    return item;
+  }
+
+  updateProduct(productId, merchantId, changes = {}) {
+    const item = this.product(productId);
+    if (!item || item.merchantId !== merchantId) throw new Error("Menu item is outside this merchant scope.");
+    const allowed = ["name", "category", "desc", "emoji", "imageUrl", "enabled", "priceCents"];
+    for (const key of allowed) if (changes[key] !== undefined) item[key] = changes[key];
+    item.priceCents = Number(item.priceCents || 0);
+    if (!String(item.name || "").trim() || item.priceCents <= 0) throw new Error("Menu item name and price are required.");
+    item.version = Number(item.version || 1) + 1;
+    item.updatedAt = Date.now();
+    return item;
+  }
+
+  addPromotion(data, actor) {
+    const code = String(data.code || "").trim().toUpperCase();
+    if (!code) throw new Error("Promotion code is required.");
+    if (this.state.promos.some(item => item.code === code)) throw new Error("Promotion code already exists.");
+    const item = { id: uid("promo"), code, discountPercent: Math.max(0, Math.min(100, Number(data.discountPercent || 0))), minCents: Math.max(0, Number(data.minCents || 0)), status: data.status || "active", createdAt: Date.now(), version: 1 };
+    this.state.promos.unshift(item);
+    this.state.promotionEvents.unshift({ id: uid("promo_event"), promoId: item.id, type: "created", actorId: actor?.id || "system", createdAt: Date.now(), metadata: { code } });
+    this.logAudit({ actor, action: "promotion_created", targetType: "promotion", targetId: item.id, reason: code, visibility: "operations" });
+    return item;
+  }
+
+  updatePromotion(promoId, changes, actor) {
+    const item = this.state.promos.find(entry => entry.id === promoId);
+    if (!item) throw new Error("Promotion not found.");
+    const before = { status: item.status, discountPercent: item.discountPercent, minCents: item.minCents };
+    if (changes.status !== undefined) item.status = changes.status;
+    if (changes.discountPercent !== undefined) item.discountPercent = Math.max(0, Math.min(100, Number(changes.discountPercent || 0)));
+    if (changes.minCents !== undefined) item.minCents = Math.max(0, Number(changes.minCents || 0));
+    item.version = Number(item.version || 1) + 1;
+    item.updatedAt = Date.now();
+    this.state.promotionEvents.unshift({ id: uid("promo_event"), promoId: item.id, type: "updated", actorId: actor?.id || "system", createdAt: Date.now(), metadata: { before, after: { status: item.status, discountPercent: item.discountPercent, minCents: item.minCents } } });
+    this.logAudit({ actor, action: "promotion_updated", targetType: "promotion", targetId: item.id, reason: item.code, visibility: "operations" });
+    return item;
+  }
+
+  addMerchantApplication(data) {
+    const item = { id: uid("merchant_application"), businessName: String(data.businessName || "").trim(), contactName: String(data.contactName || "").trim(), email: String(data.email || "").trim(), phone: String(data.phone || "").trim(), address: String(data.address || "").trim(), area: String(data.area || "").trim(), latitude: Number.isFinite(Number(data.latitude)) ? Number(data.latitude) : null, longitude: Number.isFinite(Number(data.longitude)) ? Number(data.longitude) : null, note: String(data.note || "").trim(), status: "new", createdAt: Date.now(), updatedAt: Date.now(), version: 1 };
+    if (!item.businessName || !item.contactName || !item.email || !item.phone || !item.address) throw new Error("Business, contact and address details are required.");
+    this.state.merchantApplications.unshift(item);
+    return item;
+  }
+
+  addDriverApplication(data) {
+    const item = { id: uid("driver_application"), name: String(data.name || "").trim(), email: String(data.email || "").trim(), phone: String(data.phone || "").trim(), vehicleType: String(data.vehicleType || "").trim(), registration: String(data.registration || "").trim(), operatingArea: String(data.operatingArea || "").trim(), note: String(data.note || "").trim(), status: "new", createdAt: Date.now(), updatedAt: Date.now(), version: 1 };
+    if (!item.name || !item.email || !item.phone || !item.vehicleType || !item.operatingArea) throw new Error("Driver contact, vehicle and operating area are required.");
+    this.state.driverApplications.unshift(item);
+    return item;
+  }
+
+  addWaitlistEntry(data) {
+    const email = String(data.email || "").trim().toLowerCase();
+    if (!email) throw new Error("Email is required.");
+    const existing = this.state.waitlistEntries.find(item => String(item.email || "").toLowerCase() === email);
+    if (existing) return existing;
+    const item = { id: uid("waitlist"), name: String(data.name || "").trim(), email, area: String(data.area || "").trim(), createdAt: Date.now() };
+    this.state.waitlistEntries.unshift(item);
+    return item;
+  }
+
+  updateApplication(kind, id, changes, actor) {
+    const collection = kind === "driver" ? this.state.driverApplications : this.state.merchantApplications;
+    const item = collection.find(entry => entry.id === id);
+    if (!item) throw new Error("Application not found.");
+    if (changes.status !== undefined) item.status = changes.status;
+    if (changes.note !== undefined) item.adminNote = String(changes.note || "").trim();
+    item.updatedAt = Date.now(); item.version = Number(item.version || 1) + 1;
+    this.logAudit({ actor, action: `${kind}_application_updated`, targetType: `${kind}_application`, targetId: id, reason: item.adminNote || item.status, visibility: "operations" });
+    return item;
+  }
+
+  addDriver(data, actor) {
+    const vehicle = { id: uid("vehicle"), type: String(data.vehicleType || "Vehicle").trim(), registration: String(data.registration || "").trim(), ownerType: "goodkota", ownerId: "goodkota", createdAt: Date.now(), version: 1 };
+    const driver = { id: uid("driver"), name: String(data.name || "").trim(), phone: String(data.phone || "").trim(), email: String(data.email || "").trim(), operatorType: data.operatorType || "goodkota", operatorId: data.operatorId || "goodkota", enabled: true, shiftStatus: "offline", availability: "available", vehicleId: vehicle.id, activeTaskId: null, rating: 0, completedDeliveries: 0, trackingConsent: true, createdAt: Date.now(), version: 1 };
+    if (!driver.name || !driver.phone) throw new Error("Driver name and phone are required.");
+    this.state.driverVehicles.push(vehicle); this.state.drivers.push(driver);
+    this.state.driverAdministrationEvents.unshift({ id: uid("driver_admin_event"), driverId: driver.id, type: "driver_added", actorId: actor?.id || "system", createdAt: Date.now() });
+    this.logAudit({ actor, action: "driver_added", targetType: "driver", targetId: driver.id, reason: driver.name, visibility: "operations" });
+    return driver;
+  }
+
+  updateDriverAdministration(driverId, changes, actor, reason = "Driver administration") {
+    const driver = this.driver(driverId); if (!driver) throw new Error("Driver not found.");
+    const before = { enabled: driver.enabled, operatorType: driver.operatorType, operatorId: driver.operatorId, vehicleId: driver.vehicleId };
+    if (changes.enabled !== undefined) driver.enabled = Boolean(changes.enabled);
+    if (changes.operatorType !== undefined) driver.operatorType = changes.operatorType;
+    if (changes.operatorId !== undefined) driver.operatorId = changes.operatorId;
+    if (changes.name !== undefined) driver.name = String(changes.name || "").trim();
+    if (changes.phone !== undefined) driver.phone = String(changes.phone || "").trim();
+    driver.version = Number(driver.version || 1) + 1; driver.updatedAt = Date.now();
+    const vehicle = this.vehicle(driver.vehicleId);
+    if (vehicle) {
+      if (changes.vehicleType !== undefined) vehicle.type = String(changes.vehicleType || "").trim();
+      if (changes.registration !== undefined) vehicle.registration = String(changes.registration || "").trim();
+      vehicle.version = Number(vehicle.version || 1) + 1;
+    }
+    this.state.driverAdministrationEvents.unshift({ id: uid("driver_admin_event"), driverId, type: "driver_updated", actorId: actor?.id || "system", reason, createdAt: Date.now(), metadata: { before } });
+    this.logAudit({ actor, action: "driver_updated", targetType: "driver", targetId: driverId, reason, visibility: "operations" });
+    return driver;
+  }
+
+  updateBrandSettings(data, actor, reason = "Brand settings updated") {
+    if (actor?.role !== "owner") throw new Error("Owner authority is required for company-wide brand settings.");
+    const brand = this.state.platform.brand ||= { publicWebsite: "./website.html", social: {} };
+    if (data.publicWebsite !== undefined) brand.publicWebsite = String(data.publicWebsite || "./website.html").trim();
+    brand.social ||= {};
+    for (const key of ["instagram", "facebook", "tiktok"]) if (data.social?.[key] !== undefined) brand.social[key] = String(data.social[key] || "").trim();
+    this.logAudit({ actor, action: "brand_settings_updated", targetType: "platform_brand", targetId: "goodkota", reason, visibility: "owner" });
+    return brand;
+  }
+
   platformActor(role) { return this.state.platformStaff.find(person => person.role === role && person.active !== false) || null; }
 
   logAudit({ actor, action, targetType = "platform", targetId = "goodkota", reason = "", visibility = "operations", metadata = {} }) {

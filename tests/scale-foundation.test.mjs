@@ -18,6 +18,7 @@ const { RepositoryHub } = await import("../js/repositories/repository-hub.js");
 const { GoodKotaCommandService } = await import("../js/services/command-service.js");
 const { LocalMarketplacePaymentAdapter } = await import("../js/services/payment-service.js");
 const { FinancialLedgerService } = await import("../js/services/financial-ledger-service.js");
+const { merchantStorefrontUrl, qrImageUrl } = await import("../js/services/storefront-service.js");
 
 function fresh() {
   localStorage.clear();
@@ -29,11 +30,11 @@ function fresh() {
   return { store, repos, commands };
 }
 
-test("v6 persists top-level collections separately and uses integer cents", () => {
+test("v6.1 persists top-level collections separately and uses integer cents", () => {
   const { store } = fresh();
-  assert.ok(localStorage.getItem("goodkota_scale_v6:manifest"));
-  assert.ok(localStorage.getItem("goodkota_scale_v6:orders"));
-  assert.ok(localStorage.getItem("goodkota_scale_v6:merchants"));
+  assert.ok(localStorage.getItem("goodkota_integrated_v6_1:manifest"));
+  assert.ok(localStorage.getItem("goodkota_integrated_v6_1:orders"));
+  assert.ok(localStorage.getItem("goodkota_integrated_v6_1:merchants"));
   assert.equal(localStorage.getItem("goodkota_scale_v6"), null);
 
   for (const merchant of store.state.merchants) {
@@ -232,4 +233,113 @@ test("large synthetic datasets still return bounded UI-facing pages", () => {
   assert.equal(customerOrders.items.length, 20);
   assert.equal(merchantOrders.items.length, 50);
   assert.ok(elapsed < 5000, `Local adapter sanity query took ${elapsed}ms`);
+});
+
+
+test("v6.0 collection storage migrates to v6.1 without losing operational state", () => {
+  const { store } = fresh();
+  const snapshot = JSON.parse(JSON.stringify(store.state));
+  localStorage.clear();
+  const collections = Object.keys(snapshot);
+  localStorage.setItem("goodkota_scale_v6:manifest", JSON.stringify({ schemaVersion: "6.0", collections }));
+  for (const name of collections) localStorage.setItem(`goodkota_scale_v6:${name}`, JSON.stringify(snapshot[name]));
+  const migrated = new AppStore();
+  assert.equal(migrated.state.orders.length, snapshot.orders.length);
+  assert.equal(migrated.state.merchants.length, snapshot.merchants.length);
+  assert.equal(migrated.state.platformStaff.filter(item => item.role === "owner" && item.active !== false).length >= 1, true);
+  assert.ok(localStorage.getItem("goodkota_integrated_v6_1:manifest"));
+  assert.equal(JSON.parse(localStorage.getItem("goodkota_integrated_v6_1:manifest")).schemaVersion, "6.1");
+});
+
+test("promo, tip and scheduled checkout pricing is derived from catalogue cents", async () => {
+  const { store, commands } = fresh();
+  const scheduledFor = new Date(Date.now() + 60 * 60_000).toISOString();
+  const result = await commands.checkout({
+    merchantId: "m1", customerId: "u_customer_1",
+    customerDetails: { name: "Customer", phone: "0710000000", email: "customer@example.com" },
+    mode: "Home Delivery", address: "1 Test Street, Midrand", notes: "",
+    fulfilment: { type: "delivery", provider: "goodkota_fleet", destination: { address: "1 Test Street, Midrand", latitude: -26.001, longitude: 28.127 } },
+    items: [{ productId: "p2", qty: 1, priceCents: 1, name: "Tampered browser price" }],
+    promoCode: "KOTA10", tipCents: 500, scheduledFor, idempotencyKey: "v61-pricing"
+  });
+  assert.equal(result.totalCents, 9740);
+  const order = store.order(result.orderId);
+  assert.equal(order.subtotalCents, 7600);
+  assert.equal(order.discountCents, 760);
+  assert.equal(order.deliveryFeeCents, 2400);
+  assert.equal(order.tipCents, 500);
+  assert.equal(order.promoCode, "KOTA10");
+  assert.ok(order.scheduledFor > Date.now());
+  assert.equal(order.items[0].priceCents, 7600);
+});
+
+test("merchant catalogue maintenance is tenant-scoped and supports images and visibility", () => {
+  const { store, commands } = fresh();
+  const actor = { role: "merchant", id: "m1" };
+  const item = commands.addProduct({ merchantId: "m1", name: "Photo Kota", priceCents: 6500, category: "Kotas", imageUrl: "https://example.com/kota.jpg" }, actor);
+  assert.equal(item.merchantId, "m1");
+  assert.equal(item.imageUrl, "https://example.com/kota.jpg");
+  commands.updateProduct(item.id, "m1", { enabled: false, priceCents: 6700 }, actor);
+  assert.equal(store.product(item.id).enabled, false);
+  assert.equal(store.product(item.id).priceCents, 6700);
+  assert.throws(() => commands.updateProduct("p4", "m2", { enabled: false }, actor), /outside this merchant scope/);
+});
+
+test("public merchant, driver and waitlist intake reaches durable operating queues", () => {
+  const { store, commands } = fresh();
+  const merchantsBefore = store.state.merchantApplications.length;
+  const driversBefore = store.state.driverApplications.length;
+  const waitlistBefore = store.state.waitlistEntries.length;
+  const merchant = commands.applyMerchant({ businessName: "Scale Kota", contactName: "Owner", email: "scale@example.com", phone: "0711111111", address: "12 Main Road, Soweto", area: "Soweto" });
+  const driver = commands.applyDriver({ name: "New Driver", email: "driver-new@example.com", phone: "0722222222", vehicleType: "motorbike", registration: "NEW 01", operatingArea: "Johannesburg" });
+  const wait = commands.joinWaitlist({ name: "Future Customer", email: "wait-new@example.com", area: "Pretoria" });
+  const duplicateWait = commands.joinWaitlist({ name: "Future Customer", email: "WAIT-NEW@example.com", area: "Pretoria" });
+  assert.equal(store.state.merchantApplications.length, merchantsBefore + 1);
+  assert.equal(store.state.driverApplications.length, driversBefore + 1);
+  assert.equal(store.state.waitlistEntries.length, waitlistBefore + 1);
+  assert.equal(merchant.status, "new");
+  assert.equal(driver.status, "new");
+  assert.equal(duplicateWait.id, wait.id);
+});
+
+test("GoodKota Admin can onboard and administer drivers with an audit trail", () => {
+  const { store, commands } = fresh();
+  const admin = store.platformActor("admin");
+  const beforeEvents = store.state.driverAdministrationEvents.length;
+  const driver = commands.adminAddDriver({ name: "Admin Driver", phone: "0733333333", email: "admin-driver@example.com", vehicleType: "scooter", registration: "GK NEW" }, admin);
+  commands.adminUpdateDriver(driver.id, { enabled: false, vehicleType: "motorbike", registration: "GK NEW 2" }, admin, "Vehicle and availability review");
+  assert.equal(store.driver(driver.id).enabled, false);
+  assert.equal(store.vehicle(store.driver(driver.id).vehicleId).registration, "GK NEW 2");
+  assert.equal(store.state.driverAdministrationEvents.length, beforeEvents + 2);
+  assert.ok(store.state.auditTrail.some(event => event.targetType === "driver" && event.targetId === driver.id));
+});
+
+test("merchant storefront links deep-link to a specific merchant and generate a QR adapter URL", () => {
+  const link = merchantStorefrontUrl("m2", "https://goodkota.co.za/app/");
+  const parsed = new URL(link);
+  assert.equal(parsed.searchParams.get("merchant"), "m2");
+  assert.match(parsed.pathname, /index\.html$/);
+  const qr = qrImageUrl(link, 280);
+  assert.match(qr, /^https:\/\/api\.qrserver\.com\//);
+  assert.ok(qr.includes(encodeURIComponent(link)));
+});
+
+test("brand and social settings remain Owner-only company authority", () => {
+  const { store, commands } = fresh();
+  const owner = store.platformActor("owner");
+  const admin = store.platformActor("admin");
+  assert.throws(() => commands.updateBrandSettings({ social: { instagram: "https://instagram.com/goodkota" } }, admin, "Brand update"), /Owner authority|permission/i);
+  commands.updateBrandSettings({ publicWebsite: "./website.html", social: { instagram: "https://instagram.com/goodkota", facebook: "", tiktok: "" } }, owner, "Official social channels");
+  assert.equal(store.state.platform.brand.social.instagram, "https://instagram.com/goodkota");
+  assert.ok(store.state.auditTrail.some(event => event.action === "brand_settings_updated" && event.visibility === "owner"));
+});
+
+test("GoodKota Admin all-order oversight stays bounded and searchable", () => {
+  const { store, repos } = fresh();
+  const base = store.state.orders[0];
+  for (let i = 0; i < 600; i += 1) store.state.orders.push({ ...base, id: `admin_order_${i}`, orderNumber: `GK-ADMIN-${i}`, customer: i % 2 ? "Needle Customer" : "Other Customer", createdAt: Date.now() + i });
+  const page = repos.orders.listAll({ limit: 500, query: "Needle" });
+  assert.ok(page.items.length <= 100);
+  assert.equal(page.hasMore, true);
+  assert.ok(page.items.every(order => String(order.customer).includes("Needle")));
 });

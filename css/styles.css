@@ -2214,3 +2214,18 @@ body {
   .merchant-section-tabs { grid-template-columns: 1fr; }
   .app-toast { left: 12px; right: 12px; bottom: 12px; width: auto; }
 }
+
+
+/* v6.9 Authentication behaviour + Account continuity */
+.auth-button[disabled] { cursor: wait; opacity: .78 !important; }
+.customer-auth-prompt {
+  border: 1px solid #70462f;
+  background: #2b211c;
+  color: #f4d2c3;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: .84rem;
+  line-height: 1.4;
+}
+.customer-auth-required { gap: 10px; }
+.customer-auth-required .btn { width: 100%; }

@@ -1,3 +1,16 @@
+# Yagoya v6.9 — Authentication Behaviour & Account Continuity
+
+- Restored explicit, visible authentication behaviour on top of v6.8 without removing the newer Merchant workspaces.
+- Firebase Email/Password authentication now explicitly uses browser-local persistence, so valid signed-in sessions restore after refresh/reopen.
+- Header authentication control shows a short session-check state, then **Sign in** or **Account**.
+- Anonymous discovery remains open. Checkout requires authentication and resumes automatically after sign-in with the cart preserved.
+- Customer order history and private Account sections no longer expose seeded/local customer data while signed out.
+- Signed-out access to My Orders, My Favourites, My Addresses, My Details, Payments and Preferences routes through Account & Security, then resumes the requested section after successful authentication.
+- Account & Security keeps sign-in/create-account inline and compact.
+- Log Out remains separate and clears pending private-account navigation before returning to signed-out state.
+- **Preview as** remains a UI preview mechanism only and does not mutate Firebase identity or grant authenticated authority.
+- Premium Graphite, v6.8 Merchant workspaces/action confirmations, Yagoya quality/recommendation logic, delivery foundation and governance controls are retained.
+
 # Yagoya v6.8 — Merchant Workspaces & Action Confirmation
 
 - Replaced the long Merchant page with focused workspace navigation: **Overview, Orders, Menu, Quality, Brand Materials, Store Settings, Support**.

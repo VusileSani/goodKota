@@ -1,4 +1,4 @@
-const CACHE = "yagoya-v6-8-merchant-workspaces-shell";
+const CACHE = "yagoya-v6-9-auth-account-continuity-shell";
 const SHELL = [
   "./",
   "./index.html",

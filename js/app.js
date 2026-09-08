@@ -38,6 +38,7 @@ class YagoyaApp {
     this.customerAccountPanel = null;
     this.customerAuthMode = "signin";
     this.customerAuthError = "";
+    this.customerAuthPrompt = "";
     this.paymentService = new LocalMarketplacePaymentAdapter(this.repos.platform.paymentGateway());
     this.commands = new YagoyaCommandService({ store: this.store, paymentService: this.paymentService, telemetry: this.telemetry });
     this.retention = new RetentionService(this.store);
@@ -51,6 +52,7 @@ class YagoyaApp {
     this.ownerSection = "control";
     this.auth = new FirebaseAuthService();
     this.authUser = null;
+    this.authResolved = false;
     this.pendingCustomerAction = null;
   }
 
@@ -73,12 +75,14 @@ class YagoyaApp {
   bindAuthentication() {
     const authButton = document.querySelector("#authButton");
     authButton?.removeAttribute("hidden");
+    this.renderAuthControls();
     authButton?.addEventListener("click", () => {
       this.route = "customer";
       this.customerSection = "account";
       this.customerAccountPanel = "security";
       this.customerAuthMode = this.authUser ? "account" : "signin";
       this.customerAuthError = "";
+      this.customerAuthPrompt = "";
       const roleSelect = document.querySelector("#roleSelect");
       if (roleSelect) roleSelect.value = "customer";
       this.render();
@@ -86,29 +90,58 @@ class YagoyaApp {
     });
     this.auth.onChange(user => {
       this.authUser = user;
+      this.authResolved = true;
       this.renderAuthControls();
-      if (this.route === "customer" && this.customerSection === "account") this.render();
-      if (user && this.pendingCustomerAction === "checkout") {
-        this.pendingCustomerAction = null;
-        this.customerSection = "cart";
-        this.render();
-        window.setTimeout(() => document.querySelector("#checkoutButton")?.click(), 0);
+
+      if (!user) {
+        this.customerAuthMode = "signin";
+        if (this.route === "customer" && this.customerSection === "account" && this.customerAccountPanel && this.customerAccountPanel !== "security" && this.customerAccountPanel !== "support") {
+          this.customerAccountPanel = "security";
+          this.customerAuthPrompt = "Sign in to open your private Yagoya account information.";
+        }
       }
+
+      if (user && this.pendingCustomerAction) {
+        const action = this.pendingCustomerAction;
+        this.pendingCustomerAction = null;
+        this.customerAuthPrompt = "";
+        if (action === "checkout") {
+          this.customerSection = "cart";
+          this.render();
+          window.setTimeout(() => document.querySelector("#checkoutButton")?.click(), 0);
+          return;
+        }
+        if (action.startsWith("account:")) {
+          this.customerSection = "account";
+          this.customerAccountPanel = action.slice("account:".length);
+        }
+      }
+
+      if (this.route === "customer" && this.customerSection === "account") this.render();
     });
   }
 
   renderAuthControls() {
     const button = document.querySelector("#authButton");
     if (!button) return;
+    button.hidden = false;
+    if (!this.authResolved) {
+      button.disabled = true;
+      button.textContent = "Checking…";
+      button.setAttribute("aria-busy", "true");
+      button.setAttribute("aria-label", "Checking Yagoya sign-in status");
+      return;
+    }
+    button.disabled = false;
+    button.removeAttribute("aria-busy");
     if (!this.authUser) {
-      button.hidden = false;
       button.textContent = "Sign in";
       button.setAttribute("aria-label", "Sign in to Yagoya");
       return;
     }
-    button.hidden = false;
-    button.textContent = this.authUser.displayName || this.authUser.email || "Account";
-    button.setAttribute("aria-label", "Open Yagoya account");
+    button.textContent = "Account";
+    button.setAttribute("title", this.authUser.email || this.authUser.displayName || "Signed in");
+    button.setAttribute("aria-label", "Open Yagoya account. Signed in.");
   }
 
   openAuthDialog(mode = "signin") {

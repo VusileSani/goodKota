@@ -144,6 +144,7 @@ function cartSummary(app, merchant, includeCheckout = true) {
 }
 
 function recentOrders(app) {
+  if (!app.authUser) return '<div class="empty customer-auth-required"><strong>Sign in to view your orders.</strong><span>Your order history is private account information.</span><button class="btn primary" data-auth-mode="signin">Sign in</button></div>';
   const customer = app.repos.users.customer();
   const orders = app.repos.orders.listForCustomer(customer.id, { limit: 10 }).items;
   if (!orders.length) return '<div class="empty">No orders yet.</div>';
@@ -174,12 +175,13 @@ function recentOrders(app) {
 function renderHome(app, ranked) {
   const customer = app.repos.users.customer();
   const eligible = ranked.filter(isEligibleForProximityRecommendation).length;
+  const greetingName = app.authUser?.displayName || customer.name || "";
   return `
     ${locationStrip(app)}
     <section class="customer-screen customer-home-screen">
       <div class="customer-greeting">
         <div class="customer-greeting-copy">
-          <span class="eyebrow">Hi ${escapeHtml(customer.name.split(" ")[0] || "there")}</span>
+          <span class="eyebrow">Hi ${escapeHtml(app.authUser ? (greetingName.split(" ")[0] || "there") : "there")}</span>
           <h1>Find the good food nearby.</h1>
           <p>Recommended using verified quality, consistency and convenience — not distance alone.</p>
         </div>
@@ -309,8 +311,15 @@ function accountPanelHeader(title, description = "") {
 }
 
 function renderAccountPanel(app, customer, panel) {
-  const orders = app.repos.orders.listForCustomer(customer.id, { limit: 5 }).items;
   const authUser = app.authUser;
+  const privatePanels = new Set(["orders", "favourites", "addresses", "details", "payments", "preferences"]);
+  if (!authUser && privatePanels.has(panel)) {
+    return `
+      ${accountPanelHeader("Sign in required", "This section belongs to your private Yagoya customer account.")}
+      <div class="empty customer-account-empty customer-auth-required"><strong>Sign in to continue.</strong><span>Browsing stays open. Saved orders, addresses, details, payments and preferences require your authenticated account.</span><button class="btn primary" data-auth-mode="signin">Sign in</button><button class="btn ghost" data-auth-mode="register">Create account</button></div>`;
+  }
+
+  const orders = authUser ? app.repos.orders.listForCustomer(customer.id, { limit: 5 }).items : [];
   const preferenceOn = Boolean(customer.notificationPreferences?.nearbyQualityMerchants);
 
   if (panel === "orders") {
@@ -415,8 +424,10 @@ function renderAccountPanel(app, customer, panel) {
 function renderAccount(app) {
   const customer = app.repos.users.customer();
   const panel = app.customerAccountPanel || null;
-  const authLabel = app.authUser ? "Signed in" : "Sign in";
-  const orderCount = app.repos.orders.listForCustomer(customer.id, { limit: 100 }).items.length;
+  const authLabel = !app.authResolved ? "Checking" : app.authUser ? "Signed in" : "Sign in";
+  const orderCount = app.authUser ? app.repos.orders.listForCustomer(customer.id, { limit: 100 }).items.length : 0;
+  const accountName = app.authUser?.displayName || (app.authResolved ? "Not signed in" : "Checking session…");
+  const accountDetail = app.authUser?.email || (app.authResolved ? "Sign in to access saved account information." : "Restoring your Yagoya session.");
 
   return `
     ${locationStrip(app)}
@@ -424,7 +435,7 @@ function renderAccount(app) {
       <div class="customer-screen-title"><h1>Account</h1><p>Everything about your Yagoya account, kept compact.</p></div>
       ${panel ? `<div class="customer-account-panel">${renderAccountPanel(app, customer, panel)}</div>` : `
         <div class="customer-account-summary ${app.authUser ? "is-authenticated" : ""}">
-          <div><span class="eyebrow">Yagoya account</span><strong>${escapeHtml(app.authUser?.displayName || customer.name || "Customer")}</strong><small>${escapeHtml(app.authUser?.email || customer.email || "")}</small></div>
+          <div><span class="eyebrow">Yagoya account</span><strong>${escapeHtml(accountName)}</strong><small>${escapeHtml(accountDetail)}</small></div>
           <span class="customer-auth-state">${authLabel}</span>
         </div>
         <div class="customer-account-menu" aria-label="Account settings">
@@ -547,12 +558,29 @@ function bindCustomerEvents(app) {
   app.root.querySelector("#checkoutButton")?.addEventListener("click", () => openCheckout(app));
   app.root.querySelector("#notificationButton")?.addEventListener("click", () => app.enableNearbyNotifications());
   app.root.querySelector("#customerSupportButton")?.addEventListener("click", () => openCustomerSupport(app));
-  app.root.querySelectorAll("[data-account-target]").forEach(button => button.addEventListener("click", () => { app.customerAccountPanel = button.dataset.accountTarget; app.render(); window.scrollTo(0, 0); }));
+  app.root.querySelectorAll("[data-account-target]").forEach(button => button.addEventListener("click", () => {
+    const target = button.dataset.accountTarget;
+    const privatePanels = new Set(["orders", "favourites", "addresses", "details", "payments", "preferences"]);
+    if (!app.authUser && privatePanels.has(target)) {
+      app.pendingCustomerAction = `account:${target}`;
+      app.customerAccountPanel = "security";
+      app.customerAuthMode = "signin";
+      app.customerAuthError = "";
+      app.customerAuthPrompt = `Sign in or create an account to open ${button.querySelector("strong")?.textContent || "this section"}.`;
+    } else {
+      app.customerAccountPanel = target;
+      app.customerAuthPrompt = "";
+    }
+    app.render();
+    window.scrollTo(0, 0);
+  }));
   app.root.querySelector("[data-account-back]")?.addEventListener("click", () => { app.customerAccountPanel = null; app.render(); window.scrollTo(0, 0); });
   app.root.querySelectorAll("[data-auth-mode]").forEach(button => button.addEventListener("click", () => {
+    app.customerSection = "account";
     app.customerAccountPanel = "security";
     app.customerAuthMode = button.dataset.authMode || "signin";
     app.customerAuthError = "";
+    if (!app.customerAuthPrompt) app.customerAuthPrompt = "Sign in to access your private Yagoya account information.";
     app.render();
     window.scrollTo(0, 0);
   }));
@@ -570,6 +598,7 @@ function bindCustomerEvents(app) {
       if (registering) await app.auth.registerCustomer(form.get("name"), form.get("email"), form.get("password"));
       else await app.auth.signIn(form.get("email"), form.get("password"));
       app.customerAuthMode = "account";
+      app.customerAuthPrompt = "";
       app.toast(registering ? "Your customer account is ready to use." : "You can continue with your Yagoya session.", { title: registering ? "Yagoya account created" : "Signed in to Yagoya" });
       app.render();
     } catch (error) {
@@ -577,7 +606,16 @@ function bindCustomerEvents(app) {
       app.render();
     }
   });
-  app.root.querySelector("[data-account-logout]")?.addEventListener("click", async () => { await app.auth.signOut(); app.customerAuthMode = "signin"; app.customerAuthError = ""; app.toast("Your authenticated session has ended.", { title: "Signed out of Yagoya" }); app.render(); });
+  app.root.querySelector("[data-account-logout]")?.addEventListener("click", async () => {
+    await app.auth.signOut();
+    app.pendingCustomerAction = null;
+    app.customerAccountPanel = null;
+    app.customerAuthMode = "signin";
+    app.customerAuthError = "";
+    app.customerAuthPrompt = "";
+    app.toast("Your authenticated session has ended.", { title: "Signed out of Yagoya" });
+    app.render();
+  });
   app.root.querySelectorAll("[data-rate-order]").forEach(button => button.addEventListener("click", () => openRating(app, button.dataset.rateOrder)));
   app.root.querySelectorAll("[data-track-order]").forEach(button => button.addEventListener("click", () => openTracking(app, button.dataset.trackOrder)));
 }
@@ -740,7 +778,8 @@ function openCheckout(app) {
     app.customerSection = "account";
     app.customerAccountPanel = "security";
     app.customerAuthMode = "signin";
-    app.customerAuthError = "Sign in or create an account to continue checkout. Your cart is saved.";
+    app.customerAuthError = "";
+    app.customerAuthPrompt = "Sign in or create an account to continue checkout. Your cart is saved.";
     app.render();
     window.scrollTo(0, 0);
     return;

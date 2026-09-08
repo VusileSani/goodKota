@@ -1,8 +1,10 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
 import {
+  browserLocalPersistence,
   createUserWithEmailAndPassword,
   getAuth,
   onAuthStateChanged,
+  setPersistence,
   signInWithEmailAndPassword,
   signOut,
   updateProfile
@@ -20,35 +22,44 @@ const firebaseConfig = {
 
 const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
+const persistenceReady = setPersistence(auth, browserLocalPersistence).catch(error => {
+  console.warn("Yagoya authentication persistence could not use local browser storage; continuing with the available Firebase fallback.", error);
+});
 
 export class FirebaseAuthService {
   constructor() {
     this.user = auth.currentUser;
     this.listeners = new Set();
+    this.initialized = false;
+    this.ready = persistenceReady;
     onAuthStateChanged(auth, user => {
       this.user = user;
+      this.initialized = true;
       this.listeners.forEach(listener => listener(user));
     });
   }
 
   onChange(listener) {
     this.listeners.add(listener);
-    listener(this.user);
+    if (this.initialized) listener(this.user);
     return () => this.listeners.delete(listener);
   }
 
   async signIn(email, password) {
+    await this.ready;
     const credential = await signInWithEmailAndPassword(auth, String(email || '').trim(), password);
     return credential.user;
   }
 
   async registerCustomer(name, email, password) {
+    await this.ready;
     const credential = await createUserWithEmailAndPassword(auth, String(email || '').trim(), password);
     if (String(name || '').trim()) await updateProfile(credential.user, { displayName: String(name).trim() });
     return credential.user;
   }
 
   async signOut() {
+    await this.ready;
     await signOut(auth);
   }
 

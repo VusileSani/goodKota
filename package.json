@@ -1,10 +1,10 @@
 {
-  "name": "yagoya-v6-8-merchant-workspaces",
+  "name": "yagoya-v6-9-auth-account-continuity",
   "private": true,
   "type": "module",
-  "version": "6.8.0",
+  "version": "6.9.0",
   "scripts": {
-    "test": "node tests/merchant-workspaces-confirmations.test.mjs && node tests/trust-access-materials.test.mjs && node tests/account-auth-refinement.test.mjs && node tests/firebase-auth-foundation.test.mjs && node tests/scale-foundation.test.mjs && node tests/static-validation.mjs && node tests/ui-rollup.test.mjs && node tests/runtime-render-smoke.test.mjs && node tests/location-foundation.test.mjs && node tests/recommendation-foundation.test.mjs && node tests/brand-continuity.test.mjs",
+    "test": "node tests/auth-behaviour-continuity.test.mjs && node tests/merchant-workspaces-confirmations.test.mjs && node tests/trust-access-materials.test.mjs && node tests/account-auth-refinement.test.mjs && node tests/firebase-auth-foundation.test.mjs && node tests/scale-foundation.test.mjs && node tests/static-validation.mjs && node tests/ui-rollup.test.mjs && node tests/runtime-render-smoke.test.mjs && node tests/location-foundation.test.mjs && node tests/recommendation-foundation.test.mjs && node tests/brand-continuity.test.mjs",
     "test:scale": "node tests/scale-foundation.test.mjs",
     "test:static": "node tests/static-validation.mjs"
   }

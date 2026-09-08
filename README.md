@@ -1,9 +1,9 @@
-# Yagoya v6.8 Merchant Workspaces & Action Confirmation
+# Yagoya v6.9 Authentication Behaviour & Account Continuity
 
-Yagoya v6.8 restructures the Merchant actor into focused menu workspaces rather than one long operational page. The Merchant navigation is now **Overview · Orders · Menu · Quality · Brand Materials · Store Settings · Support**. Each section owns its task and deeper actions remain inside that section.
+Yagoya v6.9 builds directly on v6.8. The Merchant workspaces, Premium Graphite visual system, recommendation foundation, delivery architecture and governance work remain intact.
 
-Brand Materials is now actionable: merchants can order banners, stickers, serviettes, customer-experience materials and eligible Yagoya Verified kits from the Merchant workspace, with persistent order history and reorder. Verified-material eligibility follows the live Yagoya quality/compliance state; physical branding never overrides the app.
+This release makes customer authentication unmistakable and durable: anonymous discovery remains open, private customer information and checkout require Firebase authentication, Firebase explicitly uses local browser persistence so a signed-in session is restored after refresh/reopen, and logout returns the customer to a signed-out state.
 
-Authentication repair from v6.6.1/v6.7 is retained: anonymous browsing stays open, checkout requires Firebase customer authentication, the header Sign in / Account control remains visible, and checkout resumes with the cart preserved after authentication.
+Customer → Account retains the compact progressive-disclosure structure: **My Orders · My Favourites · My Addresses · My Details · Payments · Preferences · Help & Support · Account & Security**, with **Log Out** separate at the bottom when authenticated. Signed-out customers can see the Account structure, but private sections route through Account & Security before their data is shown.
 
-Routine state-changing actions now use explicit post-action confirmations; higher-impact flows retain review/reason steps before submission where already applicable.
+The **Preview as** actor switcher remains a prototype screen switcher only. It does not create or change Firebase identity, claims, or authenticated authority. Production authorization remains server-enforced.

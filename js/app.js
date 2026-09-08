@@ -34,6 +34,7 @@ class YagoyaApp {
     this.customerSection = "home";
     this.customerMenuQuery = "";
     this.customerCategory = "All";
+    this.customerAccountPanel = null;
     this.paymentService = new LocalMarketplacePaymentAdapter(this.repos.platform.paymentGateway());
     this.commands = new YagoyaCommandService({ store: this.store, paymentService: this.paymentService, telemetry: this.telemetry });
     this.retention = new RetentionService(this.store);
@@ -71,6 +72,7 @@ class YagoyaApp {
     this.auth.onChange(user => {
       this.authUser = user;
       this.renderAuthControls();
+      if (this.route === "customer" && this.customerSection === "account") this.render();
     });
   }
 
@@ -296,6 +298,7 @@ class YagoyaApp {
       this.cart = [];
       this.customerMenuQuery = "";
       this.customerCategory = "All";
+    this.customerAccountPanel = null;
     }
     this.selectedMerchantId = merchantId;
     this.customerSection = "browse";
@@ -305,6 +308,7 @@ class YagoyaApp {
 
   navigateCustomerSection(section) {
     this.customerSection = section;
+    if (section !== "account") this.customerAccountPanel = null;
     this.render();
     window.scrollTo(0, 0);
   }

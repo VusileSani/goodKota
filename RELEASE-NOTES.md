@@ -1,3 +1,21 @@
+# Yagoya v6.6 — Premium Graphite
+
+- Replaced the bright white application background with dark graphite.
+- Converted principal cards, navigation, forms, dialogs, tables, account settings and list surfaces to coordinated charcoal elevations.
+- Preserved the existing orange Yagoya identity and strengthened it as the primary action/accent colour.
+- Added off-white typography, muted secondary text and subtler dark borders/shadows for a more finished production feel.
+- Preserved white only where function requires it, notably the merchant QR scan field.
+- No product workflows, authentication behavior, account architecture, recommendation logic or backend contracts were removed.
+
+# Yagoya v6.5 — Authentication & Account Refinement
+
+- Preserves the Firebase Email/Password authentication foundation introduced in v6.4.
+- Refines Customer → Account into compact progressive-disclosure rows.
+- Adds focused sections for My Orders, My Favourites, My Addresses, My Details, Payments, Preferences, Help & Support, and Account & Security.
+- Keeps Log Out separate at the bottom and only shows it when authenticated.
+- Account & Security reflects live Firebase authentication state and exposes sign-in/create-account controls when signed out.
+- Existing customer, merchant, delivery, governance, location and recommendation foundations remain intact.
+
 # Yagoya v6.4.0 — Firebase Authentication Foundation
 
 - Connected the Yagoya web app to Firebase project `yagoya-7dad0`.

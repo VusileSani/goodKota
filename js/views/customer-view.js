@@ -291,28 +291,136 @@ function renderCart(app, selectedMerchant) {
     </section>`;
 }
 
+function accountRow(id, title, description, meta = "") {
+  return `
+    <button type="button" class="customer-account-menu-row" data-account-target="${id}">
+      <span class="customer-account-menu-copy"><strong>${title}</strong><small>${description}</small></span>
+      <span class="customer-account-menu-end">${meta ? `<span class="customer-account-meta">${meta}</span>` : ""}<span class="customer-account-chevron" aria-hidden="true">›</span></span>
+    </button>`;
+}
+
+function accountPanelHeader(title, description = "") {
+  return `
+    <div class="customer-account-panel-head">
+      <button type="button" class="customer-account-back" data-account-back aria-label="Back to account">‹</button>
+      <div><h2>${title}</h2>${description ? `<p>${description}</p>` : ""}</div>
+    </div>`;
+}
+
+function renderAccountPanel(app, customer, panel) {
+  const orders = app.repos.orders.listForCustomer(customer.id, { limit: 5 }).items;
+  const authUser = app.authUser;
+  const preferenceOn = Boolean(customer.notificationPreferences?.nearbyQualityMerchants);
+
+  if (panel === "orders") {
+    return `
+      ${accountPanelHeader("My Orders", "Recent Yagoya orders and their current status.")}
+      <div class="customer-account-detail-list">
+        ${orders.length ? orders.map(order => {
+          const merchant = app.repos.merchants.get(order.merchantId);
+          return `<div class="customer-account-detail-row"><span><strong>${escapeHtml(merchant?.name || "Yagoya order")}</strong><small>${escapeHtml(order.orderNumber || order.id)} · ${formatDateTime(order.createdAt)}</small></span><span class="badge">${escapeHtml(order.status)}</span></div>`;
+        }).join("") : '<div class="empty customer-account-empty"><strong>No orders yet.</strong><span>Your completed and active orders will appear here.</span></div>'}
+      </div>
+      <button class="btn ghost customer-primary-action" data-customer-section="orders">Open full order history</button>`;
+  }
+
+  if (panel === "favourites") {
+    return `
+      ${accountPanelHeader("My Favourites", "Keep good local food easy to find again.")}
+      <div class="empty customer-account-empty"><strong>No favourites saved yet.</strong><span>Favourite merchants will appear here without crowding the main Account screen.</span></div>
+      <button class="btn primary customer-primary-action" data-customer-section="home">Find good food</button>`;
+  }
+
+  if (panel === "addresses") {
+    return `
+      ${accountPanelHeader("My Addresses", "Saved delivery and discovery locations.")}
+      <div class="customer-account-detail-list">
+        <div class="customer-account-detail-row"><span><strong>Current location</strong><small>${escapeHtml(app.location.label)}</small></span><button class="btn ghost small" data-change-location>Change</button></div>
+        <div class="customer-account-detail-row subdued"><span><strong>Home</strong><small>Add a saved Home address when needed.</small></span><span class="customer-account-chevron">›</span></div>
+        <div class="customer-account-detail-row subdued"><span><strong>Work</strong><small>Add a saved Work address when needed.</small></span><span class="customer-account-chevron">›</span></div>
+      </div>`;
+  }
+
+  if (panel === "details") {
+    const name = authUser?.displayName || customer.name || "";
+    const email = authUser?.email || customer.email || "";
+    return `
+      ${accountPanelHeader("My Details", "Your basic Yagoya customer information.")}
+      <div class="card customer-account-card">
+        <div class="customer-account-row"><span>Name</span><strong>${escapeHtml(name || "Not set")}</strong></div>
+        <div class="customer-account-row"><span>Phone</span><strong>${escapeHtml(customer.phone || "Not set")}</strong></div>
+        <div class="customer-account-row"><span>Email</span><strong>${escapeHtml(email || "Not set")}</strong></div>
+      </div>
+      <p class="muted small customer-account-note">Profile editing will remain a focused action here rather than exposing permanent form fields on the Account landing screen.</p>`;
+  }
+
+  if (panel === "payments") {
+    return `
+      ${accountPanelHeader("Payments", "Payment preferences and transaction-related settings.")}
+      <div class="empty customer-account-empty"><strong>No saved payment method.</strong><span>Yagoya will only expose saved-payment controls when the payment provider supports them securely.</span></div>`;
+  }
+
+  if (panel === "preferences") {
+    return `
+      ${accountPanelHeader("Preferences", "Control optional Yagoya customer features.")}
+      <div class="card customer-account-card customer-preference-card">
+        <div><strong>Good food alerts</strong><p class="muted small">Nearby recommendations are limited to merchants meeting the Yagoya quality standard.</p></div>
+        <button class="btn ${preferenceOn ? "dark" : "primary"}" id="notificationButton">${preferenceOn ? "Turn off" : "Enable alerts"}</button>
+      </div>`;
+  }
+
+  if (panel === "support") {
+    return `
+      ${accountPanelHeader("Help & Support", "Get help without filling the Account screen with support controls.")}
+      <div class="card customer-account-card action-card"><div><strong>Yagoya support</strong><p class="muted small">Send an issue or question to the Yagoya support team.</p></div><button class="btn primary" id="customerSupportButton">Get help</button></div>`;
+  }
+
+  if (panel === "security") {
+    return `
+      ${accountPanelHeader("Account & Security", "Authentication and access to your Yagoya customer account.")}
+      ${authUser ? `
+        <div class="card customer-account-card">
+          <div class="customer-account-row"><span>Status</span><strong>Signed in</strong></div>
+          <div class="customer-account-row"><span>Email</span><strong>${escapeHtml(authUser.email || "Authenticated account")}</strong></div>
+          <div class="customer-account-row"><span>Email verified</span><strong>${authUser.emailVerified ? "Yes" : "Not yet"}</strong></div>
+        </div>
+        <button class="btn ghost customer-primary-action" data-open-auth-account>Open account controls</button>
+      ` : `
+        <div class="empty customer-account-empty"><strong>You are browsing without signing in.</strong><span>Sign in to keep your Yagoya account available across devices.</span></div>
+        <div class="customer-account-auth-actions"><button class="btn primary" data-auth-mode="signin">Sign in</button><button class="btn ghost" data-auth-mode="register">Create account</button></div>
+      `}`;
+  }
+
+  return "";
+}
+
 function renderAccount(app) {
   const customer = app.repos.users.customer();
+  const panel = app.customerAccountPanel || null;
+  const authLabel = app.authUser ? "Signed in" : "Sign in";
+  const orderCount = app.repos.orders.listForCustomer(customer.id, { limit: 100 }).items.length;
+
   return `
     ${locationStrip(app)}
-    <section class="customer-screen">
-      <div class="customer-screen-title"><h1>Account</h1><p>Your Yagoya account essentials.</p></div>
-      <div class="card customer-account-card">
-        <div class="customer-account-row"><span>Name</span><strong>${escapeHtml(customer.name)}</strong></div>
-        <div class="customer-account-row"><span>Phone</span><strong>${escapeHtml(customer.phone)}</strong></div>
-        <div class="customer-account-row"><span>Email</span><strong>${escapeHtml(customer.email)}</strong></div>
-      </div>
-      <div class="card customer-account-card">
-        <div>
-          <strong>Good food alerts</strong>
-          <p class="muted small">Optional alerts for nearby merchants meeting the Yagoya quality standard.</p>
+    <section class="customer-screen customer-account-screen">
+      <div class="customer-screen-title"><h1>Account</h1><p>Everything about your Yagoya account, kept compact.</p></div>
+      ${panel ? `<div class="customer-account-panel">${renderAccountPanel(app, customer, panel)}</div>` : `
+        <div class="customer-account-summary ${app.authUser ? "is-authenticated" : ""}">
+          <div><span class="eyebrow">Yagoya account</span><strong>${escapeHtml(app.authUser?.displayName || customer.name || "Customer")}</strong><small>${escapeHtml(app.authUser?.email || customer.email || "")}</small></div>
+          <span class="customer-auth-state">${authLabel}</span>
         </div>
-        <button class="btn ${customer.notificationPreferences.nearbyQualityMerchants ? "dark" : "primary"}" id="notificationButton">${customer.notificationPreferences.nearbyQualityMerchants ? "Turn off" : "Enable alerts"}</button>
-      </div>
-      <div class="card customer-account-card action-card">
-        <div><strong>Help & support</strong><p class="muted small">Send an issue to the Yagoya support team.</p></div>
-        <button class="btn ghost" id="customerSupportButton">Get help</button>
-      </div>
+        <div class="customer-account-menu" aria-label="Account settings">
+          ${accountRow("orders", "My Orders", "Track and review your Yagoya orders.", orderCount ? String(orderCount) : "")}
+          ${accountRow("favourites", "My Favourites", "Keep your favourite food spots close.")}
+          ${accountRow("addresses", "My Addresses", "Delivery locations and location shortcuts.")}
+          ${accountRow("details", "My Details", "Name, phone and contact information.")}
+          ${accountRow("payments", "Payments", "Payment preferences and saved methods.")}
+          ${accountRow("preferences", "Preferences", "Alerts and customer experience settings.")}
+          ${accountRow("support", "Help & Support", "Questions, issues and Yagoya support.")}
+          ${accountRow("security", "Account & Security", "Sign-in and account access.", authLabel)}
+        </div>
+        ${app.authUser ? '<button type="button" class="customer-account-logout" data-account-logout>Log Out</button>' : ""}
+      `}
     </section>`;
 }
 
@@ -421,6 +529,11 @@ function bindCustomerEvents(app) {
   app.root.querySelector("#checkoutButton")?.addEventListener("click", () => openCheckout(app));
   app.root.querySelector("#notificationButton")?.addEventListener("click", () => app.enableNearbyNotifications());
   app.root.querySelector("#customerSupportButton")?.addEventListener("click", () => openCustomerSupport(app));
+  app.root.querySelectorAll("[data-account-target]").forEach(button => button.addEventListener("click", () => { app.customerAccountPanel = button.dataset.accountTarget; app.render(); window.scrollTo(0, 0); }));
+  app.root.querySelector("[data-account-back]")?.addEventListener("click", () => { app.customerAccountPanel = null; app.render(); window.scrollTo(0, 0); });
+  app.root.querySelectorAll("[data-auth-mode]").forEach(button => button.addEventListener("click", () => app.openAuthDialog(button.dataset.authMode)));
+  app.root.querySelector("[data-open-auth-account]")?.addEventListener("click", () => app.openAccountDialog());
+  app.root.querySelector("[data-account-logout]")?.addEventListener("click", async () => { await app.auth.signOut(); app.customerAccountPanel = null; app.toast("Signed out of Yagoya."); app.render(); });
   app.root.querySelectorAll("[data-rate-order]").forEach(button => button.addEventListener("click", () => openRating(app, button.dataset.rateOrder)));
   app.root.querySelectorAll("[data-track-order]").forEach(button => button.addEventListener("click", () => openTracking(app, button.dataset.trackOrder)));
 }

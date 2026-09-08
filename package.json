@@ -1,10 +1,10 @@
 {
-  "name": "yagoya-v6-4-firebase-auth",
+  "name": "yagoya-v6-6-premium-graphite",
   "private": true,
   "type": "module",
-  "version": "6.4.0",
+  "version": "6.6.0",
   "scripts": {
-    "test": "node tests/firebase-auth-foundation.test.mjs && node tests/scale-foundation.test.mjs && node tests/static-validation.mjs && node tests/ui-rollup.test.mjs && node tests/runtime-render-smoke.test.mjs && node tests/location-foundation.test.mjs && node tests/recommendation-foundation.test.mjs && node tests/brand-continuity.test.mjs",
+    "test": "node tests/account-auth-refinement.test.mjs && node tests/firebase-auth-foundation.test.mjs && node tests/scale-foundation.test.mjs && node tests/static-validation.mjs && node tests/ui-rollup.test.mjs && node tests/runtime-render-smoke.test.mjs && node tests/location-foundation.test.mjs && node tests/recommendation-foundation.test.mjs && node tests/brand-continuity.test.mjs",
     "test:scale": "node tests/scale-foundation.test.mjs",
     "test:static": "node tests/static-validation.mjs"
   }

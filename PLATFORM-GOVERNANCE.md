@@ -60,8 +60,8 @@ Delivery Ops remains operationally narrow: assignment and monitoring of delivery
 The actor selector in this browser build is for product testing only. Production must enforce authority with Firebase Authentication, server-issued custom claims, Firestore/Realtime Database Security Rules and Cloud Functions for privileged transitions.
 
 Recommended claims include:
-- `goodkotaOwner: true`
-- `goodkotaAdmin: true`
+- `yagoyaOwner: true`
+- `yagoyaAdmin: true`
 - `deliveryOps: true`
 - merchant-scoped and driver-scoped identifiers/roles
 

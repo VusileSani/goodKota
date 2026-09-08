@@ -2,8 +2,8 @@ import { AppStore } from "./core/store.js";
 import { RepositoryHub } from "./repositories/repository-hub.js";
 import { TelemetryService } from "./services/telemetry-service.js";
 import { YagoyaCommandService } from "./services/command-service.js";
-import { defaultLocation, getCurrentPosition, resolveArea } from "./services/location-service.js";
-import { geocodeSouthAfricanAddress } from "./services/geocoding-service.js";
+import { defaultLocation, getCurrentPosition, normalizeLocation, resolveArea } from "./services/location-service.js";
+import { geocodeSouthAfricanAddress, suggestSouthAfricanLocations } from "./services/geocoding-service.js";
 import { LocalMarketplacePaymentAdapter } from "./services/payment-service.js";
 import { RetentionService } from "./services/retention-service.js";
 import { JobService } from "./services/job-service.js";
@@ -15,6 +15,7 @@ import { renderDriverView } from "./views/driver-view.js";
 import { renderDeliveryOpsView } from "./views/delivery-ops-view.js";
 import { renderAdminView } from "./views/admin-view.js";
 import { renderOwnerView } from "./views/owner-view.js";
+import { FirebaseAuthService, friendlyAuthError } from "./infrastructure/firebase-auth-service.js";
 
 class YagoyaApp {
   constructor() {
@@ -42,10 +43,13 @@ class YagoyaApp {
     this.adminOrderQuery = "";
     this.adminDriverQuery = "";
     this.ownerSection = "control";
+    this.auth = new FirebaseAuthService();
+    this.authUser = null;
   }
 
   start() {
     this.bindShell();
+    this.bindAuthentication();
     this.applyDeepLink();
     this.renderBrandLinks();
     this.retention.enforce();
@@ -56,6 +60,77 @@ class YagoyaApp {
     const splash = document.querySelector("#brandSplash");
     window.setTimeout(() => splash?.classList.add("is-hidden"), 650);
     window.setTimeout(() => splash?.remove(), 1100);
+  }
+
+
+  bindAuthentication() {
+    document.querySelector("#authButton")?.addEventListener("click", () => {
+      if (this.authUser) this.openAccountDialog();
+      else this.openAuthDialog("signin");
+    });
+    this.auth.onChange(user => {
+      this.authUser = user;
+      this.renderAuthControls();
+    });
+  }
+
+  renderAuthControls() {
+    const button = document.querySelector("#authButton");
+    if (!button) return;
+    if (!this.authUser) {
+      button.textContent = "Sign in";
+      button.setAttribute("aria-label", "Sign in to Yagoya");
+      return;
+    }
+    button.textContent = this.authUser.displayName || this.authUser.email || "Account";
+    button.setAttribute("aria-label", "Open Yagoya account");
+  }
+
+  openAuthDialog(mode = "signin") {
+    const register = mode === "register";
+    this.openDialog(`
+      <div class="dialog-inner auth-dialog">
+        <div class="dialog-head"><div><span class="eyebrow">Yagoya account</span><h2>${register ? "Create account" : "Sign in"}</h2></div><button class="icon-btn" data-close-dialog aria-label="Close">✕</button></div>
+        <p class="muted">${register ? "Create a customer account. Merchant and platform authority are assigned separately." : "Use your Yagoya email and password."}</p>
+        <form id="yagoyaAuthForm" class="form-grid">
+          ${register ? '<label class="field full">Name<input name="name" autocomplete="name" required /></label>' : ''}
+          <label class="field full">Email<input name="email" type="email" autocomplete="email" required /></label>
+          <label class="field full">Password<input name="password" type="password" autocomplete="${register ? 'new-password' : 'current-password'}" minlength="6" required /></label>
+          <div id="authError" class="auth-error field full" role="alert"></div>
+          <div class="inline-actions field full"><button class="primary" type="submit">${register ? "Create account" : "Sign in"}</button><button class="secondary" type="button" id="authModeSwitch">${register ? "I already have an account" : "Create customer account"}</button></div>
+        </form>
+      </div>`);
+    this.dialog.querySelector("#authModeSwitch")?.addEventListener("click", () => this.openAuthDialog(register ? "signin" : "register"));
+    this.dialog.querySelector("#yagoyaAuthForm")?.addEventListener("submit", async event => {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+      const errorHost = this.dialog.querySelector("#authError");
+      errorHost.textContent = "";
+      try {
+        if (register) await this.auth.registerCustomer(form.get("name"), form.get("email"), form.get("password"));
+        else await this.auth.signIn(form.get("email"), form.get("password"));
+        this.closeDialog();
+        this.toast(register ? "Yagoya account created." : "Signed in to Yagoya.");
+      } catch (error) {
+        errorHost.textContent = friendlyAuthError(error);
+      }
+    });
+  }
+
+  openAccountDialog() {
+    const user = this.authUser;
+    if (!user) return this.openAuthDialog("signin");
+    this.openDialog(`
+      <div class="dialog-inner auth-dialog">
+        <div class="dialog-head"><div><span class="eyebrow">Yagoya account</span><h2>${user.displayName || "Signed in"}</h2></div><button class="icon-btn" data-close-dialog aria-label="Close">✕</button></div>
+        <p class="muted">${user.email || "Authenticated account"}</p>
+        <div class="inline-actions"><button class="secondary" type="button" id="signOutButton">Sign out</button></div>
+      </div>`);
+    this.dialog.querySelector("#signOutButton")?.addEventListener("click", async () => {
+      await this.auth.signOut();
+      this.closeDialog();
+      this.toast("Signed out of Yagoya.");
+    });
   }
 
   processLocalBackgroundJobs() {
@@ -188,12 +263,7 @@ class YagoyaApp {
   }
 
   async useCurrentLocation() {
-    this.location = await getCurrentPosition();
-    this.selectedMerchantId = null;
-    this.cart = [];
-    this.customerSection = "home";
-    this.render();
-    return true;
+    return this.setCustomerLocation(await getCurrentPosition());
   }
 
   async searchArea(query) {
@@ -201,9 +271,19 @@ class YagoyaApp {
     let result = known;
     if (!result) {
       const match = await geocodeSouthAfricanAddress(query);
-      result = { lat: match.latitude, lng: match.longitude, label: match.area || String(query).trim(), source: "geocoded" };
+      result = normalizeLocation({ lat: match.latitude, lng: match.longitude, label: match.address || match.area || String(query).trim(), type: match.placeType || "location", source: "geocoded", providerRef: match.providerRef });
     }
-    this.location = result;
+    return this.setCustomerLocation(result);
+  }
+
+  async suggestLocations(query, options = {}) {
+    return suggestSouthAfricanLocations(query, options);
+  }
+
+  setCustomerLocation(location) {
+    // Customer discovery location is session state only. We deliberately do not append
+    // foreground search/GPS positions to operational history.
+    this.location = normalizeLocation(location);
     this.selectedMerchantId = null;
     this.cart = [];
     this.customerSection = "home";
@@ -299,7 +379,7 @@ class YagoyaApp {
       await requestNotificationPermission();
       this.commands.setNearbyNotifications(true);
       await showLocalNotification("Yagoya alerts are ready", {
-        body: "Future proximity recommendations will be limited to merchants meeting the Yagoya Standard."
+        body: "Future proximity recommendations will be limited to merchants meeting the Yagoya quality standard."
       });
       this.render();
     } catch (error) {

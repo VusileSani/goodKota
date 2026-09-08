@@ -5,8 +5,8 @@
 Every production actor uses Firebase Authentication. Platform authority is mapped to Auth UID, never trusted from email text or the actor dropdown.
 
 Coarse claims:
-- `goodkotaOwner`
-- `goodkotaAdmin`
+- `yagoyaOwner`
+- `yagoyaAdmin`
 - `deliveryOps`
 
 Merchant access is tenant membership data (`merchantMemberships/{uid}_{merchantId}`), not a global merchant claim. Driver records map `authUid` to one driver identity.
@@ -27,3 +27,7 @@ Merchant users may read only orders/support/financial data for merchants where t
 ## Break-glass principle
 
 High-risk recovery should use time-limited elevated authority in production. The permanent Admin role should not acquire Owner powers simply because an incident is inconvenient.
+
+
+## v6.4 browser authentication
+The browser now initializes Firebase Authentication against project `yagoya-7dad0` and supports Email/Password customer identity. Self-registration must never assign merchant, delivery, Admin or Owner authority. The Preview as selector remains a presentation/test control only; production permissions continue to derive from authenticated UID, custom claims, tenant membership, Security Rules and trusted server functions.

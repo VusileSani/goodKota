@@ -30,11 +30,11 @@ function fresh() {
   return { store, repos, commands };
 }
 
-test("v6.2 persists top-level collections separately and uses integer cents", () => {
+test("v6.3 persists top-level collections separately and uses integer cents", () => {
   const { store } = fresh();
-  assert.ok(localStorage.getItem("yagoya_integrated_v6_2:manifest"));
-  assert.ok(localStorage.getItem("yagoya_integrated_v6_2:orders"));
-  assert.ok(localStorage.getItem("yagoya_integrated_v6_2:merchants"));
+  assert.ok(localStorage.getItem("yagoya_integrated_v6_3:manifest"));
+  assert.ok(localStorage.getItem("yagoya_integrated_v6_3:orders"));
+  assert.ok(localStorage.getItem("yagoya_integrated_v6_3:merchants"));
   assert.equal(localStorage.getItem("goodkota_scale_v6"), null);
 
   for (const merchant of store.state.merchants) {
@@ -236,7 +236,7 @@ test("large synthetic datasets still return bounded UI-facing pages", () => {
 });
 
 
-test("legacy collection storage migrates to Yagoya v6.2 without losing operational state", () => {
+test("v6.0 collection storage migrates to v6.3 without losing operational state", () => {
   const { store } = fresh();
   const snapshot = JSON.parse(JSON.stringify(store.state));
   localStorage.clear();
@@ -247,8 +247,8 @@ test("legacy collection storage migrates to Yagoya v6.2 without losing operation
   assert.equal(migrated.state.orders.length, snapshot.orders.length);
   assert.equal(migrated.state.merchants.length, snapshot.merchants.length);
   assert.equal(migrated.state.platformStaff.filter(item => item.role === "owner" && item.active !== false).length >= 1, true);
-  assert.ok(localStorage.getItem("yagoya_integrated_v6_2:manifest"));
-  assert.equal(JSON.parse(localStorage.getItem("yagoya_integrated_v6_2:manifest")).schemaVersion, "6.2");
+  assert.ok(localStorage.getItem("yagoya_integrated_v6_3:manifest"));
+  assert.equal(JSON.parse(localStorage.getItem("yagoya_integrated_v6_3:manifest")).schemaVersion, "6.3");
 });
 
 test("promo, tip and scheduled checkout pricing is derived from catalogue cents", async () => {

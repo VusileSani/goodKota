@@ -1,10 +1,28 @@
-# Yagoya v6.2 — Brand Transition
+# Yagoya v6.4.0 — Firebase Authentication Foundation
 
-Yagoya is the official product name. This release carries the validated v6.1.2 product, governance and scale foundation forward under Yagoya while preserving the established visual identity.
+- Connected the Yagoya web app to Firebase project `yagoya-7dad0`.
+- Added Firebase Authentication using the modular browser SDK (`12.8.0`).
+- Added Email/Password sign-in, customer account creation, account state and sign-out.
+- Kept privileged merchant/platform authority separate from customer self-registration.
+- Renamed the prototype actor control from **View as** to **Preview as** so it is not confused with authenticated authority.
+- Preserved the v6.3.1 recommendation, brand, scale, location, delivery and governance foundations.
+- No service-account credential or private server secret is included in the browser build.
 
-**Positioning:** We tell you where the good food is. Kota remains an important opening category, while Yagoya is designed for trusted discovery and ordering of good local independent food more broadly.
+# Yagoya v6.3.0 — Recommendation Foundation
 
-**Data continuity:** v6.2 migrates the existing `goodkota_integrated_v6_1` browser collections into `yagoya_integrated_v6_2` on first load. Legacy provider identifiers such as `goodkota_fleet` remain compatible internally for this transition so existing delivery records do not lose meaning.
+- Renamed the active product and public website to **Yagoya**.
+- Repositioned the product around **“We tell you where the good food is.”**
+- Broadened customer and merchant language from kota-only to trusted local independent food while retaining kota as an important category.
+- Added `recommendation-service.js`; bounded nearby candidates are now ranked by quality, evidence confidence, consistency, recent trend and proximity instead of distance alone.
+- Added explicit `recommended`, `not_enough_evidence` and `quality_concern` states.
+- `Yagoya Recommended` cannot be purchased: paid promotion is absent from the scoring contract and production configuration.
+- Expanded verified rating summaries with confidence, consistency and recent-trend evidence.
+- Added a broader local-food merchant/menu example to the seed data.
+- Kept the geospatial scale invariant: candidate discovery remains bounded before recommendation scoring.
+- Updated public website copy to make discovery, trust, quality monitoring and predictable experience the primary proposition.
+- Added natural mobile viewport fitting and 16px mobile form controls to avoid accidental focus zoom without disabling intentional user zoom.
+- Moved browser state to `yagoya_integrated_v6_3` while preserving migration reads from earlier GoodKota/Yagoya namespaces.
+- Added recommendation architecture and regression tests.
 
 # Yagoya v6.1.2 — Logo Restoration
 
@@ -35,7 +53,7 @@ v6.1.1 is the corrected release of the v6.1 Integrated Product Rollup. The v6.1 
 
 ## Compatibility
 
-The browser storage namespace and schema remain `goodkota_integrated_v6_1` / schema `6.1`, so a v6.1.1 UI correction does not wipe v6.0/v6.1 operational browser data.
+The browser storage namespace and schema remain `yagoya_integrated_v6_1` / schema `6.1`, so a v6.1.1 UI correction does not wipe v6.0/v6.1 operational browser data.
 
 ## Integrated product capabilities retained
 
@@ -70,4 +88,21 @@ Added Cloud Function contracts for public merchant/driver/waitlist intake, tenan
 
 ## Migration
 
-v6.1 reads and migrates v6.0 collection-separated browser data into the new `goodkota_integrated_v6_1` namespace. Existing v5 migration support is retained.
+v6.1 reads and migrates v6.0 collection-separated browser data into the new `yagoya_integrated_v6_1` namespace. Existing v5 migration support is retained.
+
+## Location foundation hardening
+
+- Added exact merchant Directions handoff from the storefront using stored merchant coordinates.
+- Added reusable customer location autocomplete with debounce, request cancellation, bounded results and short-lived cache.
+- Normalized location objects behind a Yagoya-owned contract instead of exposing provider response shapes to views.
+- Added server-mediated production autocomplete boundary so provider credentials, quotas and failover remain backend concerns.
+- Kept customer merchant-discovery location session-only; no passive customer location history is created.
+- Preserved geohash-first bounded merchant discovery and exact-distance ranking.
+- Added explicit location production configuration and architecture documentation.
+
+## v6.3.1 — Brand continuity lock
+
+- Confirmed that the Yagoya rename is not a visual rebrand.
+- Retained the approved logo artwork, orange patterned splash artwork, orange-led palette and established UI look and feel unchanged.
+- Added a brand-continuity invariant and regression test so future builds do not accidentally redraw or replace the approved visual assets.
+- Current user-facing naming remains Yagoya and the recommendation/quality positioning from v6.3 remains intact.

@@ -42,14 +42,14 @@ proofsOfDelivery/{proofId}
 
 ## Platform governance
 
-Platform authority is distinct from venue/merchant operations. Recommended server-issued custom claims are `goodkotaOwner` and `goodkotaAdmin`. Never allow a browser client to grant these claims to itself.
+Platform authority is distinct from venue/merchant operations. Recommended server-issued custom claims are `yagoyaOwner` and `yagoyaAdmin`. Never allow a browser client to grant these claims to itself.
 
 ### Platform staff
 
 ```json
 {
   "name": "Platform Operations",
-  "email": "operations@goodkota.co.za",
+  "email": "operations@yagoya.co.za",
   "role": "admin",
   "active": true,
   "createdAt": "server timestamp"
@@ -128,7 +128,7 @@ A merchant is the real operating store/location. Location and operating fields l
   "delivery": {
     "enabled": true,
     "radiusKm": 8,
-    "providerPreference": "goodkota_fleet"
+    "providerPreference": "yagoya_fleet"
   },
   "deliveryCapability": {
     "ownDrivers": false,
@@ -183,7 +183,7 @@ If a future business has several Yagoya stores under one brand, model the group 
   "status": "accepted",
   "fulfilment": {
     "type": "delivery",
-    "provider": "goodkota_fleet",
+    "provider": "yagoya_fleet",
     "destination": {
       "address": "...",
       "latitude": -26.0072,
@@ -201,8 +201,8 @@ Orders describe what was bought and requested fulfilment. Driver lifecycle state
 ```json
 {
   "name": "Neo M.",
-  "operatorType": "goodkota",
-  "operatorId": "goodkota",
+  "operatorType": "yagoya",
+  "operatorId": "yagoya",
   "enabled": true,
   "shiftStatus": "online",
   "availability": "available",
@@ -241,7 +241,7 @@ Apply strict read rules and short retention appropriate to operational location 
 {
   "orderId": "GK3001",
   "merchantId": "m1",
-  "providerType": "goodkota_fleet",
+  "providerType": "yagoya_fleet",
   "status": "ready_for_dispatch",
   "assignedDriverId": null,
   "assignmentId": null,
@@ -309,7 +309,7 @@ Security Rules allow only the owning customer to read this document. Cloud Funct
 {
   "taskId": "dt1",
   "driverId": "d1",
-  "providerType": "goodkota_fleet",
+  "providerType": "yagoya_fleet",
   "status": "active",
   "assignedBy": "dispatcherUid",
   "assignedAt": "server timestamp",

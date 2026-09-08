@@ -1,28 +1,3 @@
-# Yagoya v6.2 — Brand Transition Validation
-
-## Result
-
-**44 / 44 automated tests passed.**
-
-This release carries the validated v6.1.2 product, governance and scale foundation into the official Yagoya identity. The established visual identity is preserved, the active logo/splash assets are now Yagoya-named, and customer/public positioning now leads with **“We tell you where the good food is.”**
-
-## Transition checks
-
-- All active product-facing `GoodKota` naming has been replaced with `Yagoya`.
-- Customer, Merchant, Driver, Delivery Ops, Yagoya Admin and Yagoya Owner render without runtime exceptions.
-- The persistent header logo remains visible on narrow screens.
-- The public website uses Yagoya positioning while retaining Kota Culture as an important content/category pillar.
-- Existing `goodkota_integrated_v6_1` browser collections migrate into `yagoya_integrated_v6_2` on first load.
-- Legacy internal delivery/provider values such as `goodkota_fleet` remain supported as compatibility identifiers so historical delivery records retain meaning. These values are not surfaced as the customer-facing brand.
-- JavaScript syntax, relative imports, repository boundaries, HTML IDs, local asset references, manifest/service-worker assets, governance invariants, bounded repositories, idempotent checkout, concurrency protection, refund protection and scale sanity tests all pass.
-
-## Automated suites
-
-- Scale / integrity: **19 passed**
-- Static / production boundary: **8 passed**
-- Visible UI contracts: **8 passed**
-- Runtime rendering: **9 passed**
-
 # Yagoya v6.1.2 Logo Restoration — Validation
 
 This point release fixes the responsive header regression that could hide the official Yagoya logo on narrow viewports. The logo is now explicitly preserved at every breakpoint while the wordmark alone may collapse for space. A regression test rejects any blanket `.brand span { display:none }` rule.

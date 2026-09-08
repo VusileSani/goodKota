@@ -75,7 +75,7 @@ function migrateLegacyMerchantOutletModel(state) {
       id, name: outlet.name, legalName: outlet.name, contact: {}, address: outlet.address || "", area: outlet.area || "",
       latitude: outlet.latitude ?? null, longitude: outlet.longitude ?? null, enabled: outlet.enabled !== false,
       prepMinutes: outlet.prepMinutes ?? 20, deliveryFee: outlet.deliveryFee ?? 20, minOrder: outlet.minOrder ?? 30,
-      delivery: outlet.delivery || { enabled: true, radiusKm: 7, providerPreference: "goodkota_fleet" },
+      delivery: outlet.delivery || { enabled: true, radiusKm: 7, providerPreference: "yagoya_fleet" },
       compliance: { status: "pending_review", note: "Migrated merchant record" }, qualityWorkflow: { status: "healthy", note: "" }
     });
   });
@@ -193,7 +193,7 @@ export class AppStore {
       merchant.createdAt ||= Date.now();
       merchant.contact ||= {};
       merchant.compliance ||= { status: merchant.settlement?.status === "verified" ? "compliant" : "pending_review", note: "" };
-      merchant.delivery ||= { enabled: true, radiusKm: 7, providerPreference: "goodkota_fleet" };
+      merchant.delivery ||= { enabled: true, radiusKm: 7, providerPreference: "yagoya_fleet" };
       merchant.deliveryCapability ||= { ownDrivers: false, acceptsYagoyaFleet: true, thirdPartyAllowed: true };
       merchant.qualityWorkflow ||= { status: "healthy", note: "" };
       merchant.commercial ||= { plan: "Standard", status: "active", note: "" };
@@ -234,10 +234,10 @@ export class AppStore {
     this.state.platform.brand.social ||= { instagram: "", facebook: "", tiktok: "" };
 
     if (!this.state.platformStaff.some(person => person.role === "owner" && person.active !== false)) {
-      this.state.platformStaff.unshift({ id: uid("staff"), authUid: null, name: "Yagoya Owner", email: "owner@goodkota.co.za", role: "owner", active: true, createdAt: Date.now() });
+      this.state.platformStaff.unshift({ id: uid("staff"), authUid: null, name: "Yagoya Owner", email: "owner@yagoya.co.za", role: "owner", active: true, createdAt: Date.now() });
     }
     if (!this.state.platformStaff.some(person => person.role === "admin" && person.active !== false)) {
-      this.state.platformStaff.push({ id: uid("staff"), authUid: null, name: "Platform Operations", email: "admin@goodkota.co.za", role: "admin", active: true, createdAt: Date.now() });
+      this.state.platformStaff.push({ id: uid("staff"), authUid: null, name: "Platform Operations", email: "admin@yagoya.co.za", role: "admin", active: true, createdAt: Date.now() });
     }
     this.state.platformStaff.forEach(person => { if (person.authUid === undefined) person.authUid = null; person.version = Number(person.version || 1); });
     this.state.announcements.forEach(item => { if (item.active === undefined) item.active = true; });
@@ -271,10 +271,10 @@ export class AppStore {
     }
 
     if (!this.state.orderEvents.length) {
-      this.state.orders.forEach(order => this.state.orderEvents.push({ id: uid("order_event"), orderId: order.id, type: "order_migrated", status: order.status, actorType: "system", actorId: "goodkota", createdAt: order.createdAt || Date.now() }));
+      this.state.orders.forEach(order => this.state.orderEvents.push({ id: uid("order_event"), orderId: order.id, type: "order_migrated", status: order.status, actorType: "system", actorId: "yagoya", createdAt: order.createdAt || Date.now() }));
     }
     if (!this.state.supportCaseEvents.length) {
-      this.state.supportCases.forEach(item => this.state.supportCaseEvents.push({ id: uid("support_event"), caseId: item.id, type: "case_created", actorType: item.source || "system", actorId: item.sourceId || "goodkota", note: item.message || "", createdAt: item.createdAt || Date.now() }));
+      this.state.supportCases.forEach(item => this.state.supportCaseEvents.push({ id: uid("support_event"), caseId: item.id, type: "case_created", actorType: item.source || "system", actorId: item.sourceId || "yagoya", note: item.message || "", createdAt: item.createdAt || Date.now() }));
     }
   }
 
@@ -453,7 +453,7 @@ export class AppStore {
     if (this.order(id)) throw new Error("Order already exists.");
     const order = { id, orderNumber, customerId, merchantId, customer, phone, email, mode, address, notes, amountCents, deliveryFeeCents, fulfilment, status: "pending", paymentStatus: "paid", paymentId, createdAt: Date.now(), items, rated: false, idempotencyKey, version: 1 };
     this.state.orders.unshift(order);
-    this.appendOrderEvent(order.id, "order_created", "pending", "system", "goodkota", { paymentId });
+    this.appendOrderEvent(order.id, "order_created", "pending", "system", "yagoya", { paymentId });
     if (fulfilment?.type === "delivery") this.createDeliveryTaskForOrder(order);
     this.incrementPaidOrders(1);
     return order;
@@ -464,7 +464,7 @@ export class AppStore {
     const merchant = this.merchant(order.merchantId);
     const destination = order.fulfilment?.destination;
     if (!merchant || !destination) return null;
-    const providerType = order.fulfilment.provider || merchant.delivery?.providerPreference || "goodkota_fleet";
+    const providerType = order.fulfilment.provider || merchant.delivery?.providerPreference || "yagoya_fleet";
     const task = {
       id: uid("delivery"), orderId: order.id, merchantId: order.merchantId, providerType, status: "awaiting_prep",
       assignedDriverId: null, assignmentId: null, deliveryFeeCents: order.deliveryFeeCents || 0,
@@ -475,13 +475,13 @@ export class AppStore {
     };
     this.state.deliveryTasks.unshift(task);
     this.syncTaskMaterialized(task, null, true);
-    this.recordDeliveryEvent(task.id, "delivery_created", "Delivery task created", "system", "goodkota");
+    this.recordDeliveryEvent(task.id, "delivery_created", "Delivery task created", "system", "yagoya");
     return task;
   }
 
   appendPaymentTransaction(payment) { this.state.paymentTransactions.unshift({ ...payment, version: Number(payment.version || 1) }); return payment; }
   appendPaymentEvent(event) { this.state.paymentEvents.unshift({ id: uid("payment_event"), createdAt: Date.now(), ...event }); }
-  appendOrderEvent(orderId, type, status, actorType = "system", actorId = "goodkota", metadata = {}) { this.state.orderEvents.unshift({ id: uid("order_event"), orderId, type, status, actorType, actorId, metadata, createdAt: Date.now() }); }
+  appendOrderEvent(orderId, type, status, actorType = "system", actorId = "yagoya", metadata = {}) { this.state.orderEvents.unshift({ id: uid("order_event"), orderId, type, status, actorType, actorId, metadata, createdAt: Date.now() }); }
   appendSupportEvent(caseId, type, actor, note = "", metadata = {}) { this.state.supportCaseEvents.push({ id: uid("support_event"), caseId, type, actorType: actor?.role || "system", actorId: actor?.id || "system", actorName: actor?.name || "System", note: String(note || ""), metadata, createdAt: Date.now() }); }
   appendComplianceEvent(merchantId, before, after, actor, reason = "") { this.state.merchantComplianceEvents.unshift({ id: uid("compliance_event"), merchantId, before, after, actorId: actor?.id || "system", actorRole: actor?.role || "system", reason, createdAt: Date.now() }); }
   appendCommercialEvent(merchantId, before, after, actor, reason = "") { this.state.commercialStatusEvents.unshift({ id: uid("commercial_event"), merchantId, before, after, actorId: actor?.id || "system", actorRole: actor?.role || "system", reason, createdAt: Date.now() }); }
@@ -489,7 +489,7 @@ export class AppStore {
   appendOperationalAlert(alert) { this.state.operationalAlerts.unshift(alert); this.save(); return alert; }
   appendAnalyticsEvent(event) { this.state.analyticsEvents.unshift({ id: uid("analytics"), createdAt: Date.now(), ...event }); }
 
-  recordDeliveryEvent(taskId, type, message, actorType = "system", actorId = "goodkota", metadata = {}) {
+  recordDeliveryEvent(taskId, type, message, actorType = "system", actorId = "yagoya", metadata = {}) {
     this.state.deliveryEvents.push({ id: uid("delivery_event"), taskId, type, message, actorType, actorId, metadata, createdAt: Date.now() });
   }
 
@@ -634,7 +634,7 @@ export class AppStore {
     if (this.merchant(merchant.id)) throw new Error("Merchant already exists.");
     const item = {
       enabled: true, contact: {}, prepMinutes: 20, deliveryFeeCents: 2000, minOrderCents: 3000,
-      delivery: { enabled: true, radiusKm: 7, providerPreference: "goodkota_fleet" },
+      delivery: { enabled: true, radiusKm: 7, providerPreference: "yagoya_fleet" },
       deliveryCapability: { ownDrivers: false, acceptsYagoyaFleet: true, thirdPartyAllowed: true },
       gatewayAccount: { id: null, status: "not_configured" }, settlement: { bankName: "", accountHolder: "", maskedAccount: "", status: "not_configured" },
       compliance: { status: "pending_review", note: "Awaiting Yagoya Admin review" }, qualityWorkflow: { status: "healthy", note: "" }, commercial: { plan: "Standard", status: "active", note: "" },
@@ -727,8 +727,8 @@ export class AppStore {
   }
 
   addDriver(data, actor) {
-    const vehicle = { id: uid("vehicle"), type: String(data.vehicleType || "Vehicle").trim(), registration: String(data.registration || "").trim(), ownerType: "goodkota", ownerId: "goodkota", createdAt: Date.now(), version: 1 };
-    const driver = { id: uid("driver"), name: String(data.name || "").trim(), phone: String(data.phone || "").trim(), email: String(data.email || "").trim(), operatorType: data.operatorType || "goodkota", operatorId: data.operatorId || "goodkota", enabled: true, shiftStatus: "offline", availability: "available", vehicleId: vehicle.id, activeTaskId: null, rating: 0, completedDeliveries: 0, trackingConsent: true, createdAt: Date.now(), version: 1 };
+    const vehicle = { id: uid("vehicle"), type: String(data.vehicleType || "Vehicle").trim(), registration: String(data.registration || "").trim(), ownerType: "yagoya", ownerId: "yagoya", createdAt: Date.now(), version: 1 };
+    const driver = { id: uid("driver"), name: String(data.name || "").trim(), phone: String(data.phone || "").trim(), email: String(data.email || "").trim(), operatorType: data.operatorType || "yagoya", operatorId: data.operatorId || "yagoya", enabled: true, shiftStatus: "offline", availability: "available", vehicleId: vehicle.id, activeTaskId: null, rating: 0, completedDeliveries: 0, trackingConsent: true, createdAt: Date.now(), version: 1 };
     if (!driver.name || !driver.phone) throw new Error("Driver name and phone are required.");
     this.state.driverVehicles.push(vehicle); this.state.drivers.push(driver);
     this.state.driverAdministrationEvents.unshift({ id: uid("driver_admin_event"), driverId: driver.id, type: "driver_added", actorId: actor?.id || "system", createdAt: Date.now() });
@@ -762,13 +762,13 @@ export class AppStore {
     if (data.publicWebsite !== undefined) brand.publicWebsite = String(data.publicWebsite || "./website.html").trim();
     brand.social ||= {};
     for (const key of ["instagram", "facebook", "tiktok"]) if (data.social?.[key] !== undefined) brand.social[key] = String(data.social[key] || "").trim();
-    this.logAudit({ actor, action: "brand_settings_updated", targetType: "platform_brand", targetId: "goodkota", reason, visibility: "owner" });
+    this.logAudit({ actor, action: "brand_settings_updated", targetType: "platform_brand", targetId: "yagoya", reason, visibility: "owner" });
     return brand;
   }
 
   platformActor(role) { return this.state.platformStaff.find(person => person.role === role && person.active !== false) || null; }
 
-  logAudit({ actor, action, targetType = "platform", targetId = "goodkota", reason = "", visibility = "operations", metadata = {} }) {
+  logAudit({ actor, action, targetType = "platform", targetId = "yagoya", reason = "", visibility = "operations", metadata = {} }) {
     const event = { id: uid("audit"), actorId: actor?.id || "system", actorRole: actor?.role || "system", actorName: actor?.name || "System", action, targetType, targetId, reason: String(reason || "").trim(), visibility, metadata, createdAt: Date.now() };
     this.state.auditTrail.unshift(event); return event;
   }

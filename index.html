@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#F15A29" />
-  <meta name="description" content="Yagoya — trusted discovery and ordering for good local independent food, with quality you can rely on." />
+  <meta name="description" content="Yagoya — trusted local food discovery, quality-led recommendations, ordering, pickup and delivery." />
   <title>Yagoya</title>
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" href="./assets/yagoya-logo.png" type="image/png" />
@@ -19,7 +19,7 @@
     <div class="header-brand-zone">
       <button class="brand" id="brandHome" aria-label="Yagoya home">
         <span class="brand-logo-shell"><img class="brand-logo" src="./assets/yagoya-logo.png" alt="" /></span>
-        <span class="brand-wordmark"><strong>Yagoya</strong><small>We tell you where the good food is.</small></span>
+        <span class="brand-wordmark"><strong>Yagoya</strong><small>Good food. Nearby.</small></span>
       </button>
     </div>
 
@@ -28,8 +28,12 @@
         <a class="brand-link explore-link" href="./website.html">Explore Yagoya</a>
       </nav>
 
+      <div id="authControls" class="auth-controls" aria-live="polite">
+        <button type="button" class="auth-button" id="authButton">Sign in</button>
+      </div>
+
       <label class="actor-switcher">
-        <span>View as</span>
+        <span>Preview as</span>
         <select id="roleSelect" aria-label="Switch Yagoya actor">
           <option value="customer">Customer</option>
           <option value="merchant">Merchant</option>

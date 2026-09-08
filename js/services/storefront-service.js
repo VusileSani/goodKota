@@ -1,4 +1,4 @@
-export function merchantStorefrontUrl(merchantId, baseHref = globalThis.location?.href || "https://goodkota.co.za/") {
+export function merchantStorefrontUrl(merchantId, baseHref = globalThis.location?.href || "https://yagoya.co.za/") {
   const url = new URL("./index.html", baseHref);
   url.search = "";
   url.hash = "";

@@ -5,7 +5,7 @@
   "display": "standalone",
   "background_color": "#faf9f7",
   "theme_color": "#F15A29",
-  "description": "We tell you where the good food is — trusted local discovery, ordering and delivery.",
+  "description": "Discover trusted local food nearby, ordered by quality, consistency and convenience.",
   "icons": [
     {
       "src": "./assets/yagoya-logo.png",

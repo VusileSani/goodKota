@@ -129,7 +129,7 @@ function integritySection(data) {
     <section class="section-head"><div><h2>Platform Integrity</h2><p>Signals that can affect trust, money movement or operational continuity.</p></div></section>
     <div class="grid grid-2">
       ${integrityCard("Settlement verification", data.settlementAttention.length, data.settlementAttention.map(m => m.name), "Merchant money configuration")}
-      ${integrityCard("Quality intervention", data.qualityAttention.length, data.qualityAttention.map(m => m.name), "Yagoya Standard")}
+      ${integrityCard("Quality intervention", data.qualityAttention.length, data.qualityAttention.map(m => m.name), "Yagoya quality standard")}
       ${integrityCard("Commercial exceptions", data.commercialAttention.length, data.commercialAttention.map(m => m.name), "Subscription / commercial status")}
       ${integrityCard("Open support cases", data.openCases.length, data.openCases.map(c => c.subject), "Unresolved stakeholder requests")}
     </div>

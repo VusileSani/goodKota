@@ -6,7 +6,7 @@ const merchantDefaults = {
   prepMinutes: 20,
   deliveryFeeCents: 2000,
   minOrderCents: 3000,
-  delivery: { enabled: true, radiusKm: 7, providerPreference: "goodkota_fleet" },
+  delivery: { enabled: true, radiusKm: 7, providerPreference: "yagoya_fleet" },
   deliveryCapability: { ownDrivers: false, acceptsYagoyaFleet: true, thirdPartyAllowed: true },
   gatewayAccount: { id: null, status: "not_configured" },
   settlement: { bankName: "", accountHolder: "", maskedAccount: "", status: "not_configured" },
@@ -43,7 +43,7 @@ export const seed = {
       trackingModel: "current_snapshot_plus_events",
       proofOfDelivery: "customer_pin",
       driverLocationRetention: "short_lived_operational_data",
-      providerAdapters: ["goodkota_fleet", "merchant_fleet", "third_party_future"]
+      providerAdapters: ["yagoya_fleet", "merchant_fleet", "third_party_future"]
     },
     controls: {
       maintenanceMode: false,
@@ -80,7 +80,7 @@ export const seed = {
       prepMinutes: 18,
       deliveryFeeCents: 2400,
       minOrderCents: 3500,
-      delivery: { enabled: true, radiusKm: 8, providerPreference: "goodkota_fleet" },
+      delivery: { enabled: true, radiusKm: 8, providerPreference: "yagoya_fleet" },
       gatewayAccount: { id: "sub_demo_001", status: "verified" },
       settlement: { bankName: "Merchant Bank", accountHolder: "Kasi Bites (Pty) Ltd", maskedAccount: "•••• 4821", status: "verified" },
       compliance: { status: "compliant", note: "Yagoya merchant requirements verified" }
@@ -105,9 +105,9 @@ export const seed = {
     }),
     makeMerchant({
       id: "m3",
-      name: "Centurion Kota Works",
-      legalName: "Centurion Kota Works CC",
-      contact: { email: "hello@centurionkota.example" },
+      name: "Centurion Grill House",
+      legalName: "Centurion Grill House CC",
+      contact: { email: "hello@centuriongrill.example" },
       address: "Centurion, Gauteng",
       area: "Centurion",
       latitude: -25.8603,
@@ -115,7 +115,7 @@ export const seed = {
       prepMinutes: 25,
       deliveryFeeCents: 2800,
       minOrderCents: 4000,
-      delivery: { enabled: true, radiusKm: 9, providerPreference: "goodkota_fleet" },
+      delivery: { enabled: true, radiusKm: 9, providerPreference: "yagoya_fleet" },
       gatewayAccount: { id: "sub_demo_003", status: "pending" },
       settlement: { status: "pending" },
       compliance: { status: "pending_review", note: "Merchant verification still in progress" },
@@ -133,7 +133,7 @@ export const seed = {
       prepMinutes: 20,
       deliveryFeeCents: 2200,
       minOrderCents: 3500,
-      delivery: { enabled: true, radiusKm: 6, providerPreference: "goodkota_fleet" },
+      delivery: { enabled: true, radiusKm: 6, providerPreference: "yagoya_fleet" },
       gatewayAccount: { id: "sub_demo_004", status: "verified" },
       settlement: { bankName: "Merchant Bank", accountHolder: "Kasi Bites (Pty) Ltd", maskedAccount: "•••• 4821", status: "verified" },
       compliance: { status: "compliant", note: "Yagoya merchant requirements verified" },
@@ -146,7 +146,7 @@ export const seed = {
     { id: "p3", merchantId: "m1", name: "Russian & Chips", priceCents: 5800, category: "Meals", desc: "Crispy chips with sliced russian and sauce.", emoji: "🍟", enabled: true },
     { id: "p4", merchantId: "m2", name: "Tembisa Special", priceCents: 6900, category: "Kotas", desc: "Chips, vienna, cheese, egg and signature sauce.", emoji: "🥪", enabled: true },
     { id: "p5", merchantId: "m2", name: "Double Trouble", priceCents: 8400, category: "Kotas", desc: "Double protein, chips, cheese, egg and atchar.", emoji: "🍔", enabled: true },
-    { id: "p6", merchantId: "m3", name: "Centurion Crunch", priceCents: 7200, category: "Kotas", desc: "Loaded kota with crunchy chicken strips.", emoji: "🥙", enabled: true },
+    { id: "p6", merchantId: "m3", name: "Flame-Grilled Chicken Plate", priceCents: 7200, category: "Plates", desc: "Flame-grilled chicken, pap, chakalaka and slaw.", emoji: "🍗", enabled: true },
     { id: "p7", merchantId: "m1", name: "Soft Drink", priceCents: 2000, category: "Drinks", desc: "330ml cold drink.", emoji: "🥤", enabled: true },
     { id: "p8", merchantId: "m4", name: "Classic Kota", priceCents: 4800, category: "Kotas", desc: "Chips, polony, cheese, atchar and house sauces.", emoji: "🥪", enabled: true },
     { id: "p9", merchantId: "m4", name: "Loaded Kota", priceCents: 7600, category: "Kotas", desc: "Chips, cheese, russian, egg, bacon and sauces.", emoji: "🍔", enabled: true },
@@ -174,7 +174,7 @@ export const seed = {
       deliveryFeeCents: 2400,
       fulfilment: {
         type: "delivery",
-        provider: "goodkota_fleet",
+        provider: "yagoya_fleet",
         destination: { address: "Customer delivery address, Midrand", latitude: -26.0072, longitude: 28.1205 }
       },
       status: "out_for_delivery", paymentStatus: "paid", createdAt: ago(28),
@@ -190,12 +190,12 @@ export const seed = {
   reconciliationRuns: [],
   drivers: [
     {
-      id: "d1", name: "Neo M.", phone: "071 555 0101", operatorType: "goodkota", operatorId: "goodkota",
+      id: "d1", name: "Neo M.", phone: "071 555 0101", operatorType: "yagoya", operatorId: "yagoya",
       enabled: true, shiftStatus: "online", availability: "busy", vehicleId: "v1", activeTaskId: "dt1",
       rating: 4.9, completedDeliveries: 184, trackingConsent: true
     },
     {
-      id: "d2", name: "Lerato K.", phone: "071 555 0102", operatorType: "goodkota", operatorId: "goodkota",
+      id: "d2", name: "Lerato K.", phone: "071 555 0102", operatorType: "yagoya", operatorId: "yagoya",
       enabled: true, shiftStatus: "online", availability: "available", vehicleId: "v2", activeTaskId: null,
       rating: 4.8, completedDeliveries: 126, trackingConsent: true
     },
@@ -217,7 +217,7 @@ export const seed = {
   ],
   deliveryTasks: [
     {
-      id: "dt1", orderId: "order_seed_2003", merchantId: "m1", providerType: "goodkota_fleet",
+      id: "dt1", orderId: "order_seed_2003", merchantId: "m1", providerType: "yagoya_fleet",
       status: "en_route", assignedDriverId: "d1", assignmentId: "da1", deliveryFeeCents: 2400,
       pickup: { address: "Kasi Bites Midrand, Midrand, Gauteng", latitude: -25.9992, longitude: 28.1263 },
       dropoff: { address: "Customer delivery address, Midrand", latitude: -26.0072, longitude: 28.1205 },
@@ -229,9 +229,9 @@ export const seed = {
     { id: "da1", taskId: "dt1", driverId: "d1", status: "active", assignedBy: "dispatch_demo", assignedAt: ago(16) }
   ],
   deliveryEvents: [
-    { id: "de1", taskId: "dt1", type: "delivery_created", message: "Delivery task created", actorType: "system", actorId: "goodkota", createdAt: ago(28) },
+    { id: "de1", taskId: "dt1", type: "delivery_created", message: "Delivery task created", actorType: "system", actorId: "yagoya", createdAt: ago(28) },
     { id: "de2", taskId: "dt1", type: "merchant_ready", message: "Merchant marked order ready", actorType: "merchant", actorId: "m1", createdAt: ago(18) },
-    { id: "de3", taskId: "dt1", type: "driver_assigned", message: "Neo M. assigned", actorType: "dispatch", actorId: "goodkota", createdAt: ago(16) },
+    { id: "de3", taskId: "dt1", type: "driver_assigned", message: "Neo M. assigned", actorType: "dispatch", actorId: "yagoya", createdAt: ago(16) },
     { id: "de4", taskId: "dt1", type: "pickup_confirmed", message: "Order collected from merchant", actorType: "driver", actorId: "d1", createdAt: ago(7) },
     { id: "de5", taskId: "dt1", type: "en_route", message: "Driver is on the way", actorType: "driver", actorId: "d1", createdAt: ago(6) }
   ],
@@ -260,21 +260,21 @@ export const seed = {
     {id:"r21",merchantId:"m4",orderId:"hist21",verified:true,overall:4,food:4,service:4,comment:"Much better.",createdAt:ago(600)}
   ],
   platformStaff: [
-    { id: "staff_owner_1", name: "Yagoya Owner", email: "owner@goodkota.co.za", role: "owner", active: true, createdAt: ago(60 * 24 * 30) },
-    { id: "staff_admin_1", name: "Platform Operations", email: "admin@goodkota.co.za", role: "admin", active: true, createdAt: ago(60 * 24 * 10) }
+    { id: "staff_owner_1", name: "Yagoya Owner", email: "owner@yagoya.co.za", role: "owner", active: true, createdAt: ago(60 * 24 * 30) },
+    { id: "staff_admin_1", name: "Platform Operations", email: "admin@yagoya.co.za", role: "admin", active: true, createdAt: ago(60 * 24 * 10) }
   ],
   supportCases: [
-    { id: "case_1", source: "merchant", sourceId: "m3", sourceName: "Centurion Kota Works", merchantId: "m3", subject: "Settlement verification", message: "Please confirm what is still required for settlement verification.", priority: "normal", status: "open", assignedTo: "staff_admin_1", createdAt: ago(95), updatedAt: ago(95), resolutionNote: "" }
+    { id: "case_1", source: "merchant", sourceId: "m3", sourceName: "Centurion Grill House", merchantId: "m3", subject: "Settlement verification", message: "Please confirm what is still required for settlement verification.", priority: "normal", status: "open", assignedTo: "staff_admin_1", createdAt: ago(95), updatedAt: ago(95), resolutionNote: "" }
   ],
   announcements: [
     { id: "announcement_1", title: "Yagoya operations online", message: "Merchant, delivery and support operations are available.", audience: "internal", severity: "info", active: true, createdBy: "staff_admin_1", createdAt: ago(180) }
   ],
   auditTrail: [
-    { id: "audit_1", actorId: "staff_owner_1", actorRole: "owner", actorName: "Yagoya Owner", action: "platform_governance_enabled", targetType: "platform", targetId: "goodkota", reason: "Establish protected Owner and Admin operating authority", visibility: "owner", createdAt: ago(60 * 24) }
+    { id: "audit_1", actorId: "staff_owner_1", actorRole: "owner", actorName: "Yagoya Owner", action: "platform_governance_enabled", targetType: "platform", targetId: "yagoya", reason: "Establish protected Owner and Admin operating authority", visibility: "owner", createdAt: ago(60 * 24) }
   ],
   promos: [{ id: "promo1", code: "KOTA10", discountPercent: 10, minCents: 6000, status: "active", createdAt: ago(60 * 24 * 7), version: 1 }],
   merchantApplications: [
-    { id: "merchant_application_seed_1", businessName: "Soweto Kota Corner", contactName: "Thabo M.", email: "owner@sowetokotacorner.example", phone: "071 444 1111", address: "Vilakazi Street, Orlando West, Soweto, Gauteng", area: "Soweto", latitude: -26.2383, longitude: 27.9088, status: "new", note: "Interested in Yagoya ordering and delivery.", createdAt: ago(60 * 18), updatedAt: ago(60 * 18), version: 1 }
+    { id: "merchant_application_seed_1", businessName: "Soweto Local Kitchen", contactName: "Thabo M.", email: "owner@sowetolocalkitchen.example", phone: "071 444 1111", address: "Vilakazi Street, Orlando West, Soweto, Gauteng", area: "Soweto", latitude: -26.2383, longitude: 27.9088, status: "new", note: "Interested in Yagoya ordering and delivery.", createdAt: ago(60 * 18), updatedAt: ago(60 * 18), version: 1 }
   ],
   driverApplications: [
     { id: "driver_application_seed_1", name: "Kagiso N.", phone: "071 444 2222", email: "kagiso.driver@example.com", vehicleType: "Motorbike", registration: "GP 21 GK", operatingArea: "Midrand", status: "new", note: "Available evenings and weekends.", createdAt: ago(60 * 8), updatedAt: ago(60 * 8), version: 1 }

@@ -55,10 +55,10 @@ test("Yagoya Admin and Owner are visibly separate workspaces", () => {
   assert.match(css, /governance-hero\.owner-hero/);
 });
 
-test("public Yagoya website carries brand, culture and stakeholder intake", () => {
+test("public Yagoya website carries recommendation positioning and stakeholder intake", () => {
   const website = read("website.html");
-  for (const id of ["culture","promotions","merchants","drivers","waitlist"]) assert.match(website, new RegExp(`id="${id}"`));
-  assert.match(website, /Kota Culture/);
+  for (const id of ["good-food","promotions","merchants","drivers","waitlist"]) assert.match(website, new RegExp(`id="${id}"`));
+  assert.match(website, /We tell you where the good food is/);
   assert.match(website, /merchantApplicationForm/);
   assert.match(website, /driverApplicationForm/);
   assert.match(website, /socialLinks/);

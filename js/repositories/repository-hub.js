@@ -1,5 +1,6 @@
 import { pageResult } from "../core/utils.js";
 import { distanceKm } from "../services/location-service.js";
+import { rankNearbyMerchants } from "../services/recommendation-service.js";
 import { boundingBox } from "../services/geohash-service.js";
 
 function byId(items, id) {
@@ -204,10 +205,8 @@ export class RepositoryHub {
       .filter(merchant => merchant.enabled && merchant.qualityWorkflow?.status !== "suspended" && merchant.commercial?.status !== "suspended")
       .filter(merchant => inBox(merchant, box))
       .map(merchant => ({ ...merchant, distanceKm: distanceKm(origin, { lat: Number(merchant.latitude), lng: Number(merchant.longitude) }) }))
-      .filter(merchant => merchant.distanceKm <= radiusKm)
-      .sort((a, b) => a.distanceKm - b.distanceKm)
-      .slice(0, Math.max(1, Math.min(limit, 50)));
-    return { items: candidates, nextCursor: null, hasMore: false };
+      .filter(merchant => merchant.distanceKm <= radiusKm);
+    return { items: rankNearbyMerchants(candidates, { radiusKm, limit }), nextCursor: null, hasMore: false };
   }
 
   recommendDrivers(task, { radiusKm = 25, limit = 10 } = {}) {
@@ -218,8 +217,8 @@ export class RepositoryHub {
       .filter(driver => driver.enabled && driver.shiftStatus === "online" && driver.availability === "available")
       .filter(driver => {
         if (task.providerType === "merchant_fleet") return driver.operatorType === "merchant" && driver.operatorId === task.merchantId;
-        if (task.providerType === "goodkota_fleet") return driver.operatorType === "goodkota";
-        if (task.providerType === "hybrid") return driver.operatorType === "goodkota" || (driver.operatorType === "merchant" && driver.operatorId === merchant?.id);
+        if (task.providerType === "yagoya_fleet") return driver.operatorType === "yagoya";
+        if (task.providerType === "hybrid") return driver.operatorType === "yagoya" || (driver.operatorType === "merchant" && driver.operatorId === merchant?.id);
         return true;
       })
       .map(driver => ({ driver, location: this.delivery.currentLocation(driver.id) }))

@@ -1574,3 +1574,74 @@ body {
   .customer-home-screen .customer-greeting { grid-template-columns: 1fr; }
   .customer-greeting-mark { position: absolute; right: 12px; top: 12px; width: 72px; opacity: .23; }
 }
+
+/* v6.2 location foundation */
+.customer-store-location {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.customer-store-location > span {
+  color: var(--muted, #6b625e);
+  font-size: .9rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.location-autocomplete-field { position: relative; }
+.location-suggestions {
+  position: absolute;
+  z-index: 30;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid rgba(0,0,0,.12);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 14px 32px rgba(0,0,0,.12);
+  padding: 5px;
+}
+.location-suggestion {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  border-radius: 9px;
+  padding: 10px 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.location-suggestion:hover,
+.location-suggestion:focus-visible { background: #fff2ec; outline: none; }
+.location-suggestion span { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.location-suggestion small { color: var(--muted, #6b625e); text-transform: capitalize; white-space: nowrap; }
+@media (max-width: 620px) {
+  .customer-store-location { align-items: flex-start; }
+  .customer-store-location .btn { width: auto; }
+}
+
+/* v6.3 viewport stability: fit the natural device viewport without disabling accessibility zoom. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+@media (max-width: 700px) {
+  input, select, textarea, button {
+    font-size: 16px;
+  }
+}
+
+/* Firebase Authentication foundation */
+.auth-controls { display:flex; align-items:center; min-width:0; }
+.auth-button { border:1px solid #f0c4b4; background:#fff; color:#6c3d2c; border-radius:12px; padding:9px 12px; font-weight:850; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.auth-button:hover { background:#fff4ef; }
+.auth-dialog { width:min(460px, 100%); }
+.auth-error { min-height:1.1em; color:#a12618; font-size:.84rem; font-weight:750; }
+@media (max-width:700px) { .auth-button { max-width:116px; padding:8px 9px; } }

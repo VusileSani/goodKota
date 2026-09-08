@@ -1,6 +1,22 @@
-# Yagoya v6.2 — Brand Transition
+# Yagoya v6.4.0 — Firebase Authentication Foundation
 
-**Yagoya:** We tell you where the good food is.
+This build is preconfigured for the Yagoya Firebase web app (`yagoya-7dad0`) and adds real Firebase Email/Password identity while retaining the existing Yagoya product prototype.
+
+## Firebase Console prerequisite
+Enable **Authentication → Sign-in method → Email/Password**. The Firebase web configuration in the browser is project identification, not a service-account secret. Never place Admin SDK/service-account private keys in this build.
+
+## Authentication boundary
+Customer self-registration creates authentication identity only. Merchant memberships and Yagoya Admin/Owner authority remain separately assigned and must be enforced by Firestore Security Rules, custom claims and Cloud Functions in production. The header actor selector is labelled **Preview as** because it remains a prototype UI simulator, not an authorization mechanism.
+
+# Yagoya v6.3.1 — Recommendation + Brand Continuity Foundation
+
+Yagoya is now the product identity. The customer proposition is **“We tell you where the good food is.”** The platform is a trusted local-food discovery and ordering system: kota remains an important opening category, while quality independent food merchants can participate more broadly.
+
+This release adds a recommendation layer after bounded geospatial discovery. Nearby merchants are ranked using verified quality, evidence confidence, consistency, recent trend and proximity. Paid promotion is deliberately excluded from the recommendation contract. Delivery remains a fulfilment capability rather than the defining product.
+
+Mobile pages use the natural device viewport and avoid focus-induced scaling while preserving intentional accessibility zoom. Existing GoodKota/Yagoya v6.1 browser data is migrated into the v6.3 namespace.
+
+See `docs/RECOMMENDATION-QUALITY-ARCHITECTURE.md` and `docs/LOCATION-ARCHITECTURE.md`.
 
 # Yagoya v6.1.2 — Logo Restoration
 

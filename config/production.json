@@ -41,5 +41,34 @@
     "driverApplications": "cloud_function_only",
     "waitlist": "cloud_function_only",
     "brandProjection": "publicBrand/current"
+  },
+  "location": {
+    "country": "ZA",
+    "autocomplete": "server_mediated_provider_adapter",
+    "geocoding": "server_mediated_provider_adapter",
+    "merchantCoordinateSourceOfTruth": true,
+    "customerDiscoveryLocationPersistence": "session_only",
+    "autocompleteMinCharacters": 2,
+    "autocompleteDebounceMs": 280,
+    "autocompleteResultLimit": 6,
+    "autocompleteCacheTtlSeconds": 300,
+    "merchantDiscoveryMaxCandidates": 50,
+    "merchantGeohashPrecision": 7
+  },
+  "recommendation": {
+    "candidateSource": "bounded_geospatial_query",
+    "maxCandidates": 50,
+    "verifiedOrdersPrimaryEvidence": true,
+    "paidPromotionAffectsRecommendation": false,
+    "minimumVerifiedRatingsForRecommended": 5,
+    "scoreInputs": [
+      "food_quality",
+      "overall_quality",
+      "confidence",
+      "consistency",
+      "recent_trend",
+      "proximity"
+    ],
+    "qualityMonitoring": "continuous_operational_signal"
   }
 }

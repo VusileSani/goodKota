@@ -1,0 +1,14 @@
+import fs from "node:fs";
+import assert from "node:assert/strict";
+const root = new URL("../", import.meta.url);
+const index = fs.readFileSync(new URL("index.html", root), "utf8");
+const app = fs.readFileSync(new URL("js/app.js", root), "utf8");
+const auth = fs.readFileSync(new URL("js/infrastructure/firebase-auth-service.js", root), "utf8");
+assert.match(index, /Preview as/);
+assert.match(index, /id="authButton"/);
+assert.match(app, /FirebaseAuthService/);
+assert.match(auth, /yagoya-7dad0\.firebaseapp\.com/);
+assert.match(auth, /signInWithEmailAndPassword/);
+assert.match(auth, /createUserWithEmailAndPassword/);
+assert.doesNotMatch(auth, /PRIVATE KEY|serviceAccount/i);
+console.log("Firebase auth foundation test passed");

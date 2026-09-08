@@ -10,9 +10,9 @@ export function requireRole(request, allowed) {
   const list = Array.isArray(allowed) ? allowed : [allowed];
   const claims = auth.token || {};
   const roleMap = {
-    owner: claims.goodkotaOwner === true,
-    admin: claims.goodkotaOwner === true || claims.goodkotaAdmin === true,
-    delivery: claims.goodkotaOwner === true || claims.goodkotaAdmin === true || claims.deliveryOps === true
+    owner: claims.yagoyaOwner === true,
+    admin: claims.yagoyaOwner === true || claims.yagoyaAdmin === true,
+    delivery: claims.yagoyaOwner === true || claims.yagoyaAdmin === true || claims.deliveryOps === true
   };
   if (!list.some(role => roleMap[role])) throw new HttpsError("permission-denied", "Insufficient Yagoya authority.");
   return auth;

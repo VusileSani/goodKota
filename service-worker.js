@@ -1,4 +1,4 @@
-const CACHE = "yagoya-v6-2-brand-transition-shell";
+const CACHE = "yagoya-v6-3-recommendation-foundation-shell";
 const SHELL = [
   "./",
   "./index.html",
@@ -27,6 +27,7 @@ const SHELL = [
   "./js/services/payment-service.js",
   "./js/services/pricing-service.js",
   "./js/services/quality-service.js",
+  "./js/services/recommendation-service.js",
   "./js/services/retention-service.js",
   "./js/services/search-service.js",
   "./js/services/storefront-service.js",

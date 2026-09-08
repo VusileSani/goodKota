@@ -188,8 +188,8 @@ export const updatePlatformAuthority = onCall({ region: REGION, enforceAppCheck:
   const previousClaims = { ...(user.customClaims || {}) };
   const nextClaims = {
     ...previousClaims,
-    goodkotaOwner: role === "owner" && active !== false,
-    goodkotaAdmin: role === "admin" && active !== false
+    yagoyaOwner: role === "owner" && active !== false,
+    yagoyaAdmin: role === "admin" && active !== false
   };
 
   // Custom claims and Firestore cannot share one transaction. Preserve existing
@@ -238,7 +238,7 @@ export const createMerchant = onCall({ region: REGION, enforceAppCheck: true }, 
     geohash: encodeGeohash(latitude, longitude), enabled: true,
     prepMinutes: Math.max(1, Math.min(240, Number(data.prepMinutes || 20))),
     deliveryFeeCents: cents(data.deliveryFeeCents || 0), minOrderCents: cents(data.minOrderCents || 0),
-    delivery: { enabled: data.delivery?.enabled !== false, radiusKm: Math.max(0, Number(data.delivery?.radiusKm || 7)), providerPreference: text(data.delivery?.providerPreference || "goodkota_fleet") },
+    delivery: { enabled: data.delivery?.enabled !== false, radiusKm: Math.max(0, Number(data.delivery?.radiusKm || 7)), providerPreference: text(data.delivery?.providerPreference || "yagoya_fleet") },
     deliveryCapability: { ownDrivers: Boolean(data.deliveryCapability?.ownDrivers), acceptsYagoyaFleet: data.deliveryCapability?.acceptsYagoyaFleet !== false, thirdPartyAllowed: data.deliveryCapability?.thirdPartyAllowed !== false },
     compliance: { status: "pending_review", note: "Awaiting Yagoya Admin review" },
     qualityWorkflow: { status: "healthy", note: "" }, commercial: { plan: text(data.commercial?.plan || "Standard"), status: "active", note: "" },
@@ -406,7 +406,7 @@ export const paymentWebhook = onRequest({ region: REGION }, async (request, resp
         credentialRef = db.doc(`deliveryCredentials/${taskRef.id}`);
         const pin = String(randomInt(1000, 10000));
         const credentialHash = createHash("sha256").update(pin).digest("hex");
-        const providerType = text(fulfilment.provider || merchant.delivery?.providerPreference || "goodkota_fleet");
+        const providerType = text(fulfilment.provider || merchant.delivery?.providerPreference || "yagoya_fleet");
         task = {
           orderId: orderRef.id, merchantId: verified.merchantId, providerType, status: "awaiting_prep",
           assignedDriverId: null, assignmentId: null, deliveryFeeCents,
@@ -594,7 +594,7 @@ export const updateSupportCase = onCall({ region: REGION, enforceAppCheck: true 
     const before = snap.data();
     const afterStatus = status || before.status;
     tx.update(ref, { status: afterStatus, assignedTo, resolutionNote: text(note), updatedAt: serverTime(), version: FieldValue.increment(1) });
-    tx.create(db.collection("supportCaseEvents").doc(), { caseId, type: "case_updated", actorUid: auth.uid, actorRole: auth.token?.goodkotaOwner ? "owner" : "admin", note: text(note), metadata: { beforeStatus: before.status, afterStatus }, createdAt: serverTime() });
+    tx.create(db.collection("supportCaseEvents").doc(), { caseId, type: "case_updated", actorUid: auth.uid, actorRole: auth.token?.yagoyaOwner ? "owner" : "admin", note: text(note), metadata: { beforeStatus: before.status, afterStatus }, createdAt: serverTime() });
   });
   return { caseId, status: status || null };
 });
@@ -820,8 +820,8 @@ export const adminManageDriver = onCall({ region: REGION, enforceAppCheck: true 
     const vehicleRef = db.collection("driverVehicles").doc();
     const driverRef = db.collection("drivers").doc();
     const batch = db.batch();
-    batch.create(vehicleRef, { driverId: driverRef.id, type: text(data.vehicleType || "Vehicle").slice(0, 120), registration: text(data.registration).slice(0, 80), ownerType: text(data.operatorType || "goodkota"), ownerId: text(data.operatorId || "goodkota"), createdAt: serverTime(), version: 1 });
-    batch.create(driverRef, { name, phone, email: text(data.email).toLowerCase().slice(0, 320), authUid: data.authUid || null, operatorType: text(data.operatorType || "goodkota"), operatorId: text(data.operatorId || "goodkota"), enabled: true, shiftStatus: "offline", availability: "available", vehicleId: vehicleRef.id, activeTaskId: null, rating: 0, completedDeliveries: 0, trackingConsent: true, createdAt: serverTime(), updatedAt: serverTime(), version: 1 });
+    batch.create(vehicleRef, { driverId: driverRef.id, type: text(data.vehicleType || "Vehicle").slice(0, 120), registration: text(data.registration).slice(0, 80), ownerType: text(data.operatorType || "yagoya"), ownerId: text(data.operatorId || "yagoya"), createdAt: serverTime(), version: 1 });
+    batch.create(driverRef, { name, phone, email: text(data.email).toLowerCase().slice(0, 320), authUid: data.authUid || null, operatorType: text(data.operatorType || "yagoya"), operatorId: text(data.operatorId || "yagoya"), enabled: true, shiftStatus: "offline", availability: "available", vehicleId: vehicleRef.id, activeTaskId: null, rating: 0, completedDeliveries: 0, trackingConsent: true, createdAt: serverTime(), updatedAt: serverTime(), version: 1 });
     batch.create(db.collection("driverAdministrationEvents").doc(), { driverId: driverRef.id, type: "driver_added", actorUid: auth.uid, reason, createdAt: serverTime() });
     batch.create(db.collection("platformAudit").doc(), auditEvent({ actor: auth, action: "driver_added", targetType: "driver", targetId: driverRef.id, reason, visibility: "operations", timestamp: serverTime() }));
     await batch.commit();
@@ -893,7 +893,7 @@ export const ownerUpdateBrandSettings = onCall({ region: REGION, enforceAppCheck
     const brand = { publicWebsite, social };
     tx.set(ref, { brand, updatedAt: serverTime() }, { merge: true });
     tx.set(db.doc("publicBrand/current"), { ...brand, updatedAt: serverTime() }, { merge: true });
-    tx.create(db.collection("platformAudit").doc(), auditEvent({ actor: auth, action: "brand_settings_updated", targetType: "platform_brand", targetId: "goodkota", reason, visibility: "owner", metadata: { before, after: brand }, timestamp: serverTime() }));
+    tx.create(db.collection("platformAudit").doc(), auditEvent({ actor: auth, action: "brand_settings_updated", targetType: "platform_brand", targetId: "yagoya", reason, visibility: "owner", metadata: { before, after: brand }, timestamp: serverTime() }));
   });
   return { publicWebsite, social };
 });

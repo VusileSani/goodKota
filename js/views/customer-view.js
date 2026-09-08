@@ -2,6 +2,7 @@ import { escapeHtml, formatDateTime, money, uid } from "../core/utils.js";
 import { calculateOrderPricing } from "../services/pricing-service.js";
 import { qualityBadge, isEligibleForProximityRecommendation } from "../services/quality-service.js";
 import { deliveryProgress, deliveryStatusLabel } from "../services/delivery-service.js";
+import { directionsUrl } from "../services/location-service.js";
 
 function cartSubtotal(app) {
   return app.cart.reduce((total, line) => {
@@ -73,11 +74,11 @@ function merchantCard(merchant, index) {
     : "New";
 
   return `
-    <article class="customer-merchant-card ${index === 0 ? "closest" : ""}" data-select-merchant="${merchant.id}" tabindex="0" role="button" aria-label="Open ${escapeHtml(merchant.name)} menu">
+    <article class="customer-merchant-card ${merchant.recommendation?.state === "recommended" ? "recommended" : ""}" data-select-merchant="${merchant.id}" tabindex="0" role="button" aria-label="Open ${escapeHtml(merchant.name)} menu">
       <div class="customer-merchant-main">
         <div class="customer-merchant-heading">
           <h3>${escapeHtml(merchant.name)}</h3>
-          ${index === 0 ? '<span class="badge dark">Closest</span>' : ""}
+          ${merchant.recommendation?.state === "recommended" ? '<span class="badge dark">Yagoya Recommended</span>' : ""}
         </div>
         <div class="customer-merchant-facts">
           <span>${distanceLabel(merchant)}</span>
@@ -178,8 +179,8 @@ function renderHome(app, ranked) {
       <div class="customer-greeting">
         <div class="customer-greeting-copy">
           <span class="eyebrow">Hi ${escapeHtml(customer.name.split(" ")[0] || "there")}</span>
-          <h1>Find good food nearby.</h1>
-          <p>Closest first. Trusted local food with quality visible before you order.</p>
+          <h1>Find the good food nearby.</h1>
+          <p>Recommended using verified quality, consistency and convenience — not distance alone.</p>
         </div>
         <img class="customer-greeting-mark" src="./assets/yagoya-logo.png" alt="" aria-hidden="true" />
       </div>
@@ -191,11 +192,11 @@ function renderHome(app, ranked) {
 
       <div class="customer-home-meta">
         <strong>${ranked.length} nearby</strong>
-        <span class="muted small">${eligible} meeting the Yagoya Standard</span>
+        <span class="muted small">${eligible} meeting the Yagoya quality standard</span>
       </div>
 
       <div class="customer-merchant-list" id="merchantList">
-        ${ranked.map((merchant, index) => merchantCard(merchant, index)).join("") || '<div class="empty">No Yagoya merchants are available near this location yet.</div>'}
+        ${ranked.map((merchant, index) => merchantCard(merchant, index)).join("") || '<div class="empty">No Yagoya food merchants are available near this location yet.</div>'}
       </div>
     </section>`;
 }
@@ -207,7 +208,7 @@ function renderBrowse(app, selectedMerchant, products) {
       <section class="customer-screen">
         <div class="empty customer-empty-state">
           <strong>Choose a merchant first.</strong>
-          <span>Yagoya will show the closest available merchants on Home.</span>
+          <span>Yagoya will show nearby merchants ranked for quality, consistency and convenience.</span>
           <button class="btn primary" data-customer-section="home">Find a merchant</button>
         </div>
       </section>`;
@@ -228,6 +229,10 @@ function renderBrowse(app, selectedMerchant, products) {
             <span>${distanceLabel(selectedMerchant)}</span>
             <span>★ ${selectedMerchant.qualitySummary.overall.toFixed(1)}</span>
             <span>~${selectedMerchant.prepMinutes} min</span>
+          </div>
+          <div class="customer-store-location">
+            <span>${escapeHtml(selectedMerchant.address || selectedMerchant.area || "")}</span>
+            <a class="btn ghost small" data-merchant-directions href="${escapeHtml(directionsUrl({ lat: selectedMerchant.latitude, lng: selectedMerchant.longitude }, { label: selectedMerchant.name }))}" target="_blank" rel="noopener noreferrer">Directions</a>
           </div>
         </div>
       </div>
@@ -299,8 +304,8 @@ function renderAccount(app) {
       </div>
       <div class="card customer-account-card">
         <div>
-          <strong>Nearby quality alerts</strong>
-          <p class="muted small">Optional alerts for nearby merchants meeting the Yagoya Standard.</p>
+          <strong>Good food alerts</strong>
+          <p class="muted small">Optional alerts for nearby merchants meeting the Yagoya quality standard.</p>
         </div>
         <button class="btn ${customer.notificationPreferences.nearbyQualityMerchants ? "dark" : "primary"}" id="notificationButton">${customer.notificationPreferences.nearbyQualityMerchants ? "Turn off" : "Enable alerts"}</button>
       </div>
@@ -441,16 +446,67 @@ function openLocationDialog(app) {
   app.openDialog(`
     <div class="dialog-inner customer-dialog-inner">
       <div class="dialog-head"><h2>Change location</h2><button class="icon-btn" data-close-dialog>✕</button></div>
-      <label class="field">Area<input id="areaSearch" value="${escapeHtml(app.location.label)}" placeholder="Midrand, Tembisa, Soweto..." /></label>
-      <button class="btn primary customer-primary-action" id="searchArea">Use this area</button>
+      <label class="field location-autocomplete-field">Location
+        <input id="areaSearch" value="${escapeHtml(app.location.label)}" placeholder="Suburb, township, town, street or place" autocomplete="off" aria-autocomplete="list" aria-controls="locationSuggestions" />
+        <div class="location-suggestions" id="locationSuggestions" role="listbox" hidden></div>
+      </label>
+      <button class="btn primary customer-primary-action" id="searchArea">Use this location</button>
       <button class="btn ghost customer-primary-action" id="useLocation">◎ Use my current location</button>
-      <div class="muted small" id="locationMessage">Location is used to rank the nearest merchants first.</div>
+      <div class="muted small" id="locationMessage">Used only to find nearby merchants unless you choose a delivery address.</div>
     </div>`);
 
+  const input = app.dialog.querySelector("#areaSearch");
+  const suggestions = app.dialog.querySelector("#locationSuggestions");
+  const message = app.dialog.querySelector("#locationMessage");
+  let timer = null;
+  let controller = null;
+  let latestRequest = 0;
+
+  const clearSuggestions = () => {
+    suggestions.innerHTML = "";
+    suggestions.hidden = true;
+  };
+
+  const chooseSuggestion = item => {
+    input.value = item.label;
+    clearSuggestions();
+    app.setCustomerLocation(item);
+    app.closeDialog();
+  };
+
+  const renderSuggestions = items => {
+    suggestions.innerHTML = items.map((item, index) => `
+      <button type="button" class="location-suggestion" role="option" data-location-index="${index}">
+        <span>${escapeHtml(item.label)}</span><small>${escapeHtml(item.type || "Place")}</small>
+      </button>`).join("");
+    suggestions.hidden = items.length === 0;
+    suggestions.querySelectorAll("[data-location-index]").forEach(button => {
+      button.addEventListener("click", () => chooseSuggestion(items[Number(button.dataset.locationIndex)]));
+    });
+  };
+
+  const requestSuggestions = () => {
+    window.clearTimeout(timer);
+    controller?.abort();
+    const query = input.value.trim();
+    if (query.length < 2) { clearSuggestions(); return; }
+    timer = window.setTimeout(async () => {
+      const requestId = ++latestRequest;
+      controller = new AbortController();
+      try {
+        const items = await app.suggestLocations(query, { limit: 6, signal: controller.signal });
+        if (requestId === latestRequest && input.value.trim() === query) renderSuggestions(items);
+      } catch (error) {
+        if (error?.name !== "AbortError") clearSuggestions();
+      }
+    }, 280);
+  };
+
   const submitArea = async () => {
-    const value = app.dialog.querySelector("#areaSearch")?.value || "";
-    const message = app.dialog.querySelector("#locationMessage");
+    const value = input?.value || "";
     if (!value.trim()) return;
+    controller?.abort();
+    clearSuggestions();
     message.textContent = "Finding that location…";
     try {
       await app.searchArea(value);
@@ -460,12 +516,15 @@ function openLocationDialog(app) {
     }
   };
 
-  app.dialog.querySelector("#searchArea")?.addEventListener("click", submitArea);
-  app.dialog.querySelector("#areaSearch")?.addEventListener("keydown", event => {
-    if (event.key === "Enter") submitArea();
+  input?.addEventListener("input", requestSuggestions);
+  input?.addEventListener("keydown", event => {
+    if (event.key === "Enter") { event.preventDefault(); submitArea(); }
+    if (event.key === "Escape") clearSuggestions();
   });
+  app.dialog.querySelector("#searchArea")?.addEventListener("click", submitArea);
   app.dialog.querySelector("#useLocation")?.addEventListener("click", async () => {
-    const message = app.dialog.querySelector("#locationMessage");
+    controller?.abort();
+    clearSuggestions();
     message.textContent = "Requesting your location…";
     try {
       await app.useCurrentLocation();
@@ -604,7 +663,7 @@ function openCheckout(app) {
       if (app.dialog.querySelector("#checkoutTiming").value === "scheduled" && !scheduled) throw new Error("Choose a scheduled order time.");
 
       const fulfilment = app.deliveryMode === "Home Delivery"
-        ? { type: "delivery", provider: merchant.delivery?.providerPreference || "goodkota_fleet", destination: { address: deliveryAddress, latitude: app.location.lat, longitude: app.location.lng } }
+        ? { type: "delivery", provider: merchant.delivery?.providerPreference || "yagoya_fleet", destination: { address: deliveryAddress, latitude: app.location.lat, longitude: app.location.lng } }
         : { type: "pickup" };
 
       const result = await app.commands.checkout({

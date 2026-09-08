@@ -25,7 +25,7 @@ export function renderDriverView(app) {
     <section class="actor-hero driver-hero">
       <div><span class="eyebrow">Driver workspace</span><h2>${escapeHtml(driver.name)}</h2><p>Current job, handover and support.</p></div>
       <select id="driverSwitcher" class="btn hero-switcher">
-        ${drivers.map(item => `<option value="${item.id}" ${item.id === driver.id ? "selected" : ""}>${escapeHtml(item.name)} · ${item.operatorType === "goodkota" ? "Yagoya" : "Merchant"}</option>`).join("")}
+        ${drivers.map(item => `<option value="${item.id}" ${item.id === driver.id ? "selected" : ""}>${escapeHtml(item.name)} · ${escapeHtml(item.operatorType)}</option>`).join("")}
       </select>
     </section>
 
@@ -40,7 +40,7 @@ export function renderDriverView(app) {
       <div class="card">
         <span class="eyebrow">Driver & vehicle</span>
         <h3 style="margin:8px 0">${escapeHtml(driver.name)}</h3>
-        <div class="summary-line"><span>Operator</span><strong>${driver.operatorType === "goodkota" ? "Yagoya fleet" : "Merchant fleet"}</strong></div>
+        <div class="summary-line"><span>Operator</span><strong>${driver.operatorType === "yagoya" ? "Yagoya fleet" : "Merchant fleet"}</strong></div>
         <div class="summary-line"><span>Vehicle</span><strong>${escapeHtml(vehicle?.type || "—")}</strong></div>
         <div class="summary-line"><span>Registration</span><strong>${escapeHtml(vehicle?.registration || "—")}</strong></div>
         <div class="summary-line"><span>Last location</span><strong>${location ? formatDateTime(location.recordedAt) : "No snapshot"}</strong></div>

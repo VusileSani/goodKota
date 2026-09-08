@@ -56,7 +56,7 @@ export function renderMerchantView(app) {
         <button class="btn ghost small" id="bankingButton">${merchant.settlement?.status === "verified" ? "Update" : "Set up"}</button>
       </div>
       <div class="card">
-        <strong>Yagoya Standard</strong>
+        <strong>Yagoya quality standard</strong>
         <div class="summary-line"><span>Verified ratings</span><strong>${merchant.qualitySummary.count}</strong></div>
         <div class="summary-line"><span>Overall</span><strong>${merchant.qualitySummary.overall.toFixed(1)}</strong></div>
         <div class="summary-line"><span>Status</span><span class="badge ${quality.tone}">${quality.label}</span></div>

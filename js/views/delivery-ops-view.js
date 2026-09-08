@@ -85,7 +85,7 @@ function driverTable(app, drivers) {
     const order = task ? app.repos.orders.get(task.orderId) : null;
     return `<tr>
       <td><strong>${escapeHtml(driver.name)}</strong><div class="muted small">⭐ ${Number(driver.rating || 0).toFixed(1)} · ${driver.completedDeliveries} completed</div></td>
-      <td>${driver.operatorType === "goodkota" ? "Yagoya" : escapeHtml(app.repos.merchants.get(driver.operatorId)?.name || "Merchant")}</td>
+      <td>${driver.operatorType === "yagoya" ? "Yagoya" : escapeHtml(app.repos.merchants.get(driver.operatorId)?.name || "Merchant")}</td>
       <td>${escapeHtml(vehicle?.type || "—")}<div class="muted small">${escapeHtml(vehicle?.registration || "")}</div></td>
       <td><span class="badge ${driver.shiftStatus === "online" ? "ok" : ""}">${escapeHtml(driver.shiftStatus)}</span></td>
       <td>${escapeHtml(driver.availability)}</td>

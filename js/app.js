@@ -42,6 +42,8 @@ class YagoyaApp {
     this.commands = new YagoyaCommandService({ store: this.store, paymentService: this.paymentService, telemetry: this.telemetry });
     this.retention = new RetentionService(this.store);
     this.jobs = new JobService(this.store, this.telemetry);
+    this.merchantSection = "overview";
+    this.merchantOrderFilter = "active";
     this.adminSection = "overview";
     this.adminMerchantQuery = "";
     this.adminOrderQuery = "";
@@ -191,7 +193,7 @@ class YagoyaApp {
     if (!host) return;
     const contexts = {
       customer: ["Customer", "Nearby discovery, ordering and delivery"],
-      merchant: ["Merchant", "Orders, menu, storefront QR and support"],
+      merchant: ["Merchant", "Overview, orders, menu, quality, brand materials and store settings"],
       driver: ["Driver", "Current delivery, handover and support"],
       delivery: ["Delivery Ops", "Dispatch and live delivery control"],
       admin: ["Yagoya Admin", "Platform operations and stakeholder support"],
@@ -377,19 +379,19 @@ class YagoyaApp {
     }
   }
 
-  toast(message) {
+  toast(message, options = {}) {
     const existing = document.querySelector("#appToast");
     existing?.remove();
     const toast = document.createElement("div");
+    const tone = options.tone || "success";
+    const title = options.title || "";
     toast.id = "appToast";
-    toast.textContent = message;
-    Object.assign(toast.style, {
-      position: "fixed", right: "18px", bottom: "18px", zIndex: 200, maxWidth: "min(420px, calc(100vw - 28px))",
-      background: "#2b211e", color: "white", padding: "13px 16px", borderRadius: "12px",
-      boxShadow: "0 12px 30px rgba(0,0,0,.24)"
-    });
+    toast.className = `app-toast ${tone}`;
+    toast.setAttribute("role", tone === "warning" ? "alert" : "status");
+    toast.setAttribute("aria-live", tone === "warning" ? "assertive" : "polite");
+    toast.innerHTML = `<span class="app-toast-mark" aria-hidden="true">${tone === "warning" ? "!" : "✓"}</span><span><strong>${title || message}</strong>${title ? `<small>${message}</small>` : ""}</span>`;
     document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3800);
+    setTimeout(() => toast.remove(), Number(options.duration || 4200));
   }
 
   async enableNearbyNotifications() {
@@ -406,6 +408,7 @@ class YagoyaApp {
       await showLocalNotification("Yagoya alerts are ready", {
         body: "Future proximity recommendations will be limited to merchants meeting the Yagoya quality standard."
       });
+      this.toast("Nearby quality alerts are now enabled.", { title: "Notification preference saved" });
       this.render();
     } catch (error) {
       alert(error.message);

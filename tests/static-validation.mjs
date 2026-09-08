@@ -39,10 +39,10 @@ test("views do not read global store collections directly", () => {
   }
 });
 
-test("package/config/index files identify v6.7.0 and parse cleanly", () => {
+test("package/config/index files identify v6.8.0 and parse cleanly", () => {
   const pkg = JSON.parse(read("package.json"));
-  assert.equal(pkg.version, "6.7.0");
-  assert.equal(pkg.name, "yagoya-v6-7-trust-access");
+  assert.equal(pkg.version, "6.8.0");
+  assert.equal(pkg.name, "yagoya-v6-8-merchant-workspaces");
   JSON.parse(read("firestore.indexes.json"));
   JSON.parse(read("firebase.json"));
   JSON.parse(read("config/production.json"));
@@ -78,9 +78,10 @@ test("scale foundation includes production enforcement artefacts", () => {
   assert.match(read("functions/src/index.js"), /runTransaction/);
   assert.match(read("functions/src/index.js"), /idempotencyRecords/);
   assert.match(read("functions/src/index.js"), /deliveryCredentials/);
-  for (const command of ["submitMerchantApplication", "submitDriverApplication", "joinPublicWaitlist", "updateMerchantCatalogueItem", "adminManageDriver", "adminManagePromotion", "adminUpdateApplication", "ownerUpdateBrandSettings"]) assert.match(read("functions/src/index.js"), new RegExp(`export const ${command}`), `Missing production command ${command}`);
+  for (const command of ["submitMerchantApplication", "submitDriverApplication", "joinPublicWaitlist", "updateMerchantCatalogueItem", "submitBrandMaterialOrder", "adminManageDriver", "adminManagePromotion", "adminUpdateApplication", "ownerUpdateBrandSettings"]) assert.match(read("functions/src/index.js"), new RegExp(`export const ${command}`), `Missing production command ${command}`);
   assert.match(read("firestore.rules"), /merchantApplications/);
   assert.match(read("firestore.rules"), /promos/);
+  assert.match(read("firestore.rules"), /brandMaterialOrders/);
 });
 
 

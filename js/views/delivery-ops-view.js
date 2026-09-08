@@ -42,7 +42,7 @@ export function renderDeliveryOpsView(app) {
       if (!recommendations.length) return alert("No eligible available driver is currently online for this delivery provider.");
       try {
         app.commands.assignDriver({ taskId: task.id, driverId: recommendations[0].driver.id, actorId: "delivery_ops" });
-        app.toast(`${recommendations[0].driver.name} assigned to ${app.repos.orders.get(task.orderId)?.orderNumber || task.orderId}.`);
+        app.toast(`${recommendations[0].driver.name} is now assigned to ${app.repos.orders.get(task.orderId)?.orderNumber || task.orderId}.`, { title: "Driver assigned" });
         app.render();
       } catch (error) { alert(error.message); }
     });

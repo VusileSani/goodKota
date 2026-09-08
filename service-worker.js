@@ -1,4 +1,4 @@
-const CACHE = "yagoya-v6-6-premium-graphite-shell";
+const CACHE = "yagoya-v6-8-merchant-workspaces-shell";
 const SHELL = [
   "./",
   "./index.html",

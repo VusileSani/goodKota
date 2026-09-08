@@ -343,3 +343,19 @@ test("Yagoya Admin all-order oversight stays bounded and searchable", () => {
   assert.equal(page.hasMore, true);
   assert.ok(page.items.every(order => String(order.customer).includes("Needle")));
 });
+
+
+test("merchant brand material orders are tenant-scoped, durable and bounded", () => {
+  const { store, repos, commands } = fresh();
+  const actor = { id: "m1", role: "merchant", name: "Kasi Bites Midrand" };
+  const before = store.state.brandMaterialOrders.length;
+  const order = commands.orderBrandMaterial({
+    merchantId: "m1", itemCode: "banner-counter", itemName: "Counter banner", variant: "Countertop", quantity: 2,
+    fulfilment: "deliver", deliveryAddress: "Kasi Bites Midrand, Midrand", note: "Front counter"
+  }, actor);
+  assert.equal(store.state.brandMaterialOrders.length, before + 1);
+  assert.equal(order.status, "submitted");
+  assert.equal(order.quantity, 2);
+  assert.equal(repos.brandMaterials.listOrdersForMerchant("m1", { limit: 10 }).items[0].id, order.id);
+  assert.throws(() => commands.orderBrandMaterial({ merchantId: "m2", itemCode: "banner-counter", itemName: "Counter banner", quantity: 1, fulfilment: "collect" }, actor), /outside this merchant scope/);
+});

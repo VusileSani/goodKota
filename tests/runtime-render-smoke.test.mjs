@@ -84,6 +84,16 @@ test("Customer secondary sections render without runtime exceptions", () => {
   }
 });
 
+test("Merchant sections render without runtime exceptions", () => {
+  for (const section of ["overview", "orders", "menu", "quality", "brand", "settings", "support"]) {
+    const app = buildApp();
+    app.merchantSection = section;
+    app.merchantOrderFilter = "active";
+    assert.doesNotThrow(() => renderMerchantView(app), `Merchant ${section} failed`);
+    assert.ok(app.root.innerHTML.length > 50);
+  }
+});
+
 test("Yagoya Admin sections render without runtime exceptions", () => {
   for (const section of ["overview", "merchants", "applications", "drivers", "orders", "promotions", "support", "communications", "activity"]) {
     const app = buildApp();

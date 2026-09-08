@@ -287,6 +287,7 @@ export const seed = {
   waitlistEntries: [
     { id: "waitlist_seed_1", name: "Naledi", email: "naledi@example.com", area: "Pretoria", createdAt: ago(60 * 24 * 2) }
   ],
+  brandMaterialOrders: [],
   promotionEvents: [],
   driverAdministrationEvents: []
 };

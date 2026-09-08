@@ -400,3 +400,28 @@ publicBrand/current
 Public applications and waitlist entries are created through App Check protected Cloud Functions; direct Firestore writes are denied. Admin reads/reviews applications through bounded queries. Promotion and driver administration changes are written through Admin commands with event/audit records.
 
 Merchant catalogue changes remain in `products/{productId}` and are performed through a tenant-scoped Cloud Function that verifies active `merchantMemberships` before create/update. `publicBrand/current` is a read-only public projection of Owner-controlled brand links so the public website does not need access to protected platform controls.
+
+
+## Brand material order
+
+Merchant-initiated Yagoya company-merchandise orders are stored separately from customer food orders. This prevents banners, stickers and other brand materials from contaminating the food-order domain.
+
+```json
+{
+  "merchantId": "merchantId",
+  "itemCode": "banner-counter",
+  "itemName": "Counter banner",
+  "variant": "Countertop",
+  "quantity": 2,
+  "fulfilment": "deliver",
+  "deliveryAddress": "Merchant physical address",
+  "note": "Front counter",
+  "status": "submitted",
+  "createdByUid": "authenticatedMerchantUid",
+  "createdAt": "server timestamp",
+  "updatedAt": "server timestamp",
+  "version": 1
+}
+```
+
+Production writes go through `submitBrandMaterialOrder`, which verifies active merchant membership and re-checks Yagoya Verified eligibility server-side for verification-specific materials. Merchants may read only their own material orders; Yagoya Admin/Owner may read them operationally.

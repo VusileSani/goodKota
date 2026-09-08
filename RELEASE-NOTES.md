@@ -1,3 +1,17 @@
+# Yagoya v6.8 — Merchant Workspaces & Action Confirmation
+
+- Replaced the long Merchant page with focused workspace navigation: **Overview, Orders, Menu, Quality, Brand Materials, Store Settings, Support**.
+- Merchant Overview now shows exceptions and direct task entry points rather than full operational tables.
+- Orders, Menu, Quality, Store Settings and Support each own their page and actions.
+- Brand Materials is now a real task workspace, not an informational dialog. Merchants can place banner, sticker, serviette, table-material and eligible Verified-kit orders.
+- Added persistent Brand Material order records, order history and Reorder.
+- Added a production `submitBrandMaterialOrder` callable contract, tenant-scoped reads and Firestore indexing for material-order history.
+- Yagoya Verified material eligibility follows current compliance and quality state; physical materials never override the live Yagoya app status.
+- Added explicit action confirmations after merchant saves, order state changes, settlement submission, support submission, material orders, driver state changes, dispatch assignment and application-review actions.
+- Retained anonymous browsing + authenticated checkout with cart-resume behavior.
+- Retained the repaired visible Sign in / Account control and inline Account & Security authentication flow.
+- Premium Graphite remains the visual baseline.
+
 # Yagoya v6.7 — Trust, Access & Merchant Brand Materials
 
 - Anonymous browsing remains open; checkout now requires Firebase authentication and resumes with the cart preserved after sign-in.

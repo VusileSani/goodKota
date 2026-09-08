@@ -81,6 +81,10 @@ service cloud.firestore {
       allow read: if true;
       allow write: if false; // Tenant-scoped catalogue Cloud Function only.
     }
+    match /brandMaterialOrders/{brandOrderId} {
+      allow read: if signedIn() && (admin() || merchantMember(resource.data.merchantId));
+      allow write: if false; // Merchant-scoped Cloud Function only.
+    }
     match /promos/{promoId} {
       allow read: if admin() || resource.data.status == 'active';
       allow write: if false;

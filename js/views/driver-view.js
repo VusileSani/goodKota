@@ -62,7 +62,9 @@ export function renderDriverView(app) {
   });
 
   app.root.querySelector("#shiftButton")?.addEventListener("click", () => {
-    app.commands.setDriverShift({ driverId: driver.id, shiftStatus: driver.shiftStatus === "online" ? "offline" : "online" });
+    const next = driver.shiftStatus === "online" ? "offline" : "online";
+    app.commands.setDriverShift({ driverId: driver.id, shiftStatus: next });
+    app.toast(`Driver is now ${next}.`, { title: "Shift status saved" });
     app.render();
   });
 
@@ -71,7 +73,7 @@ export function renderDriverView(app) {
     try {
       app.commands.advanceDriver({ driverId: driver.id });
       nudgeDriverLocation(app, driver.id);
-      app.toast("Delivery status updated. Customer tracking now sees the new event.");
+      app.toast("Customer tracking now sees the new delivery event.", { title: "Delivery status updated" });
       app.render();
     } catch (error) { alert(error.message); }
   });
@@ -80,7 +82,7 @@ export function renderDriverView(app) {
   app.root.querySelector("#driverSupportButton")?.addEventListener("click", () => openDriverSupport(app, driver));
   app.root.querySelector("#nudgeLocation")?.addEventListener("click", () => {
     nudgeDriverLocation(app, driver.id);
-    app.toast("Location snapshot updated.");
+    app.toast("The latest driver location snapshot has been saved.", { title: "Location updated" });
     app.render();
   });
 }
@@ -143,7 +145,7 @@ function openDriverSupport(app, driver) {
     event.preventDefault();
     app.commands.createSupportCase({ source: "driver", sourceId: driver.id, sourceName: driver.name, subject: app.dialog.querySelector("#driverSupportSubject").value, message: app.dialog.querySelector("#driverSupportMessage").value, priority: "normal" });
     app.closeDialog();
-    app.toast("Support request sent to Yagoya.");
+    app.toast("The driver support request is now visible to Yagoya operations.", { title: "Support request sent" });
     app.render();
   });
 }
@@ -165,7 +167,7 @@ function openPinDialog(app, driver) {
     try {
       app.commands.confirmDelivery({ driverId: driver.id, pin: app.dialog.querySelector("#deliveryPin").value });
       app.closeDialog();
-      app.toast("Delivery verified, order completed and driver released.");
+      app.toast("The order is complete and the driver has been released.", { title: "Delivery verified" });
       app.render();
     } catch (error) { alert(error.message); }
   });

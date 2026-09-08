@@ -1,25 +1,9 @@
-# Yagoya v6.7 Trust, Access & Merchant Brand Materials
+# Yagoya v6.8 Merchant Workspaces & Action Confirmation
 
-Anonymous browsing is open. Checkout requires Firebase customer authentication and resumes with the existing cart. Merchant quality notices use privacy-safe aggregated verified feedback. Optional Yagoya company merchandise and store materials are available from the Merchant workspace.
+Yagoya v6.8 restructures the Merchant actor into focused menu workspaces rather than one long operational page. The Merchant navigation is now **Overview · Orders · Menu · Quality · Brand Materials · Store Settings · Support**. Each section owns its task and deeper actions remain inside that section.
 
-# Yagoya v6.6.0 — Premium Graphite
+Brand Materials is now actionable: merchants can order banners, stickers, serviettes, customer-experience materials and eligible Yagoya Verified kits from the Merchant workspace, with persistent order history and reorder. Verified-material eligibility follows the live Yagoya quality/compliance state; physical branding never overrides the app.
 
-This release moves the Yagoya application from a bright white canvas to a premium graphite interface while preserving the established orange Yagoya identity.
+Authentication repair from v6.6.1/v6.7 is retained: anonymous browsing stays open, checkout requires Firebase customer authentication, the header Sign in / Account control remains visible, and checkout resumes with the cart preserved after authentication.
 
-## Visual direction
-- graphite application canvas rather than white
-- elevated charcoal cards and work surfaces
-- off-white typography and restrained muted copy
-- orange reserved for brand identity, emphasis and primary actions
-- darker glass-like sticky navigation and location surfaces
-- dark dialogs, forms, tables and account settings for visual continuity
-- QR artwork intentionally retains a white field for scanner contrast
-
-## Product continuity
-The v6.5 Firebase Email/Password authentication and compact progressive-disclosure customer Account tab remain intact, together with the v6.3 recommendation/location foundation and existing merchant, delivery, admin and governance workflows.
-
-## Firebase Console prerequisite
-Enable **Authentication → Sign-in method → Email/Password**. The Firebase web configuration in the browser is project identification, not a service-account secret. Never place Admin SDK/service-account private keys in this build.
-
-## Authentication boundary
-Customer self-registration creates authentication identity only. Merchant memberships and Yagoya Admin/Owner authority remain separately assigned and must be enforced by Firestore Security Rules, custom claims and Cloud Functions in production. The header actor selector remains a prototype preview control, not an authorization mechanism.
+Routine state-changing actions now use explicit post-action confirmations; higher-impact flows retain review/reason steps before submission where already applicable.

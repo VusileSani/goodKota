@@ -100,6 +100,14 @@ export class RepositoryHub {
       recommendDrivers: (task, options = {}) => this.recommendDrivers(task, options)
     };
 
+    this.brandMaterials = {
+      listOrdersForMerchant: (merchantId, options = {}) => pageResult(
+        this.store.brandMaterialOrdersForMerchant(merchantId),
+        { limit: options.limit || 25, cursor: options.cursor, sortBy: "createdAt", direction: "desc" }
+      ),
+      order: id => byId(this.store.state.brandMaterialOrders, id)
+    };
+
     this.promotions = {
       get: id => byId(this.store.state.promos, id),
       byCode: code => this.store.state.promos.find(item => item.code === String(code || "").trim().toUpperCase()) || null,

@@ -774,6 +774,77 @@ export const updateMerchantCatalogueItem = onCall({ region: REGION, enforceAppCh
   return { productId, created: false };
 });
 
+
+export const submitBrandMaterialOrder = onCall({ region: REGION, enforceAppCheck: true }, async request => {
+  const auth = requireAuth(request);
+  const data = request.data || {};
+  const merchantId = text(data.merchantId);
+  if (!merchantId || !(await merchantMembership(auth.uid, merchantId))) {
+    throw new HttpsError("permission-denied", "Active merchant membership is required.");
+  }
+
+  const catalogue = {
+    "banner-counter": "Counter banner",
+    "banner-pullup": "Pull-up banner",
+    "sticker-order-seal": "Order & packaging stickers",
+    "serviettes": "Yagoya serviettes",
+    "table-materials": "Table & counter materials",
+    "verified-kit": "Yagoya Verified kit"
+  };
+  const itemCode = text(data.itemCode);
+  const itemName = catalogue[itemCode];
+  if (!itemName) throw new HttpsError("invalid-argument", "Unknown Yagoya brand material.");
+
+  const quantity = Number(data.quantity || 1);
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) {
+    throw new HttpsError("invalid-argument", "Quantity must be between 1 and 100.");
+  }
+  const fulfilment = ["deliver", "collect"].includes(data.fulfilment) ? data.fulfilment : "deliver";
+  const deliveryAddress = fulfilment === "deliver" ? text(data.deliveryAddress).slice(0, 500) : "Yagoya collection";
+  if (fulfilment === "deliver" && !deliveryAddress) throw new HttpsError("invalid-argument", "Delivery address is required.");
+
+  const merchantRef = db.doc(`merchants/${merchantId}`);
+  const merchantSnap = await merchantRef.get();
+  if (!merchantSnap.exists) throw new HttpsError("not-found", "Merchant not found.");
+  const merchant = merchantSnap.data();
+  if (itemCode === "verified-kit") {
+    const eligible = merchant.compliance?.status === "compliant"
+      && merchant.qualitySummary?.signal === "healthy"
+      && merchant.qualityWorkflow?.status === "healthy";
+    if (!eligible) throw new HttpsError("failed-precondition", "This merchant is not currently eligible for Yagoya Verified materials.");
+  }
+
+  const ref = db.collection("brandMaterialOrders").doc();
+  await db.runTransaction(async tx => {
+    tx.create(ref, {
+      merchantId,
+      itemCode,
+      itemName,
+      variant: text(data.variant).slice(0, 160),
+      quantity,
+      fulfilment,
+      deliveryAddress,
+      note: text(data.note).slice(0, 1000),
+      status: "submitted",
+      createdByUid: auth.uid,
+      createdAt: serverTime(),
+      updatedAt: serverTime(),
+      version: 1
+    });
+    tx.create(db.collection("platformAudit").doc(), auditEvent({
+      actor: auth,
+      action: "brand_material_order_submitted",
+      targetType: "merchant",
+      targetId: merchantId,
+      reason: `${itemName} x ${quantity}`,
+      visibility: "operations",
+      metadata: { brandOrderId: ref.id, itemCode, quantity },
+      timestamp: serverTime()
+    }));
+  });
+  return { brandOrderId: ref.id, status: "submitted" };
+});
+
 export const adminManagePromotion = onCall({ region: REGION, enforceAppCheck: true }, async request => {
   const auth = requireRole(request, "admin");
   const data = request.data || {};

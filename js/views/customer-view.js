@@ -566,17 +566,18 @@ function bindCustomerEvents(app) {
     const form = new FormData(event.currentTarget);
     app.customerAuthError = "";
     try {
-      if (app.customerAuthMode === "register") await app.auth.registerCustomer(form.get("name"), form.get("email"), form.get("password"));
+      const registering = app.customerAuthMode === "register";
+      if (registering) await app.auth.registerCustomer(form.get("name"), form.get("email"), form.get("password"));
       else await app.auth.signIn(form.get("email"), form.get("password"));
       app.customerAuthMode = "account";
-      app.toast(app.authUser ? "Signed in to Yagoya." : "Yagoya account updated.");
+      app.toast(registering ? "Your customer account is ready to use." : "You can continue with your Yagoya session.", { title: registering ? "Yagoya account created" : "Signed in to Yagoya" });
       app.render();
     } catch (error) {
       app.customerAuthError = friendlyAuthError(error);
       app.render();
     }
   });
-  app.root.querySelector("[data-account-logout]")?.addEventListener("click", async () => { await app.auth.signOut(); app.customerAuthMode = "signin"; app.customerAuthError = ""; app.toast("Signed out of Yagoya."); app.render(); });
+  app.root.querySelector("[data-account-logout]")?.addEventListener("click", async () => { await app.auth.signOut(); app.customerAuthMode = "signin"; app.customerAuthError = ""; app.toast("Your authenticated session has ended.", { title: "Signed out of Yagoya" }); app.render(); });
   app.root.querySelectorAll("[data-rate-order]").forEach(button => button.addEventListener("click", () => openRating(app, button.dataset.rateOrder)));
   app.root.querySelectorAll("[data-track-order]").forEach(button => button.addEventListener("click", () => openTracking(app, button.dataset.trackOrder)));
 }
@@ -707,7 +708,7 @@ function openCustomerSupport(app) {
     event.preventDefault();
     app.commands.createSupportCase({ source: "customer", sourceId: customer.id, sourceName: customer.name, subject: app.dialog.querySelector("#customerSupportSubject").value, message: app.dialog.querySelector("#customerSupportMessage").value, priority: "normal" });
     app.closeDialog();
-    app.toast("Support request sent to Yagoya.");
+    app.toast("Your request is now visible to Yagoya Support.", { title: "Support request sent" });
     app.render();
   });
 }
@@ -852,8 +853,8 @@ function openCheckout(app) {
       app.customerSection = "orders";
       app.closeDialog();
       app.toast(app.deliveryMode === "Home Delivery"
-        ? `Payment verified. Order ${result.orderNumber} sent to ${merchant.name}; delivery task created.`
-        : `Payment verified. Order ${result.orderNumber} sent to ${merchant.name}.`);
+        ? `Order ${result.orderNumber} was sent to ${merchant.name} and the delivery task was created.`
+        : `Order ${result.orderNumber} was sent to ${merchant.name}.`, { title: "Payment verified and order placed" });
       app.render();
     } catch (error) {
       button.disabled = false;
@@ -939,7 +940,7 @@ function openRating(app, orderId) {
     if (!values.overall || !values.food || !values.service) return alert("Please rate the overall experience, food and service.");
     app.commands.submitRating({ orderId, ...values, comment: app.dialog.querySelector("#ratingComment").value });
     app.closeDialog();
-    app.toast("Thanks. Your verified rating was recorded.");
+    app.toast("Your verified-order feedback has been recorded.", { title: "Rating submitted" });
     app.render();
   });
 }

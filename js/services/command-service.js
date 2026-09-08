@@ -117,6 +117,18 @@ export class YagoyaCommandService {
   applyDriver(data) { this.assertRateLimit(`driver-application:${data.email || data.phone || "anon"}`, 4, 60_000); return this.store.transaction(() => this.store.addDriverApplication(data)); }
   joinWaitlist(data) { this.assertRateLimit(`waitlist:${data.email || "anon"}`, 4, 60_000); return this.store.transaction(() => this.store.addWaitlistEntry(data)); }
   saveSettlement(merchantId, settlement, gatewayAccount, actor, reason) { return this.store.transaction(() => this.store.saveMerchantSettlement(merchantId, settlement, gatewayAccount, actor, reason)); }
+  merchantUpdateStore(merchantId, changes, actor) {
+    if (actor?.role !== "merchant" || actor.id !== merchantId) throw new Error("Store settings are outside this merchant scope.");
+    return this.store.transaction(() => {
+      const item = this.store.updateMerchant(merchantId, changes);
+      this.store.logAudit({ actor, action: "merchant_store_settings_updated", targetType: "merchant", targetId: merchantId, reason: "Merchant saved store settings", visibility: "operations" });
+      return item;
+    });
+  }
+  orderBrandMaterial(data, actor) {
+    if (actor?.role !== "merchant" || actor.id !== data.merchantId) throw new Error("Brand material order is outside this merchant scope.");
+    return this.store.transaction(() => this.store.addBrandMaterialOrder(data, actor));
+  }
   createSupportCase(data, actor = null) { this.assertRateLimit(`support:${data.source}:${data.sourceId || data.merchantId || "anon"}`, 8, 60_000); return this.store.transaction(() => this.store.addSupportCase(data, actor)); }
 
   adminAddMerchant(merchant, actor) { requireRole(actor, ["admin", "owner"]); if (!this.store.state.platform.controls.merchantOnboardingEnabled) throw new Error("Merchant onboarding is paused by the Yagoya Owner."); return this.store.transaction(() => { const item = this.store.addMerchant(merchant); this.store.logAudit({ actor, action: "merchant_added", targetType: "merchant", targetId: item.id, reason: "Merchant onboarding", visibility: "operations" }); return item; }); }

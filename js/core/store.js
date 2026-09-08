@@ -16,7 +16,8 @@ const ARRAY_COLLECTIONS = [
   "platformStaff", "merchantMemberships", "supportCases", "supportCaseEvents", "announcements", "auditTrail",
   "orderEvents", "merchantComplianceEvents", "commercialStatusEvents", "idempotencyRecords", "jobs",
   "telemetryEvents", "operationalAlerts", "analyticsEvents", "promos",
-  "merchantApplications", "driverApplications", "waitlistEntries", "promotionEvents", "driverAdministrationEvents"
+  "merchantApplications", "driverApplications", "waitlistEntries", "promotionEvents", "driverAdministrationEvents",
+  "brandMaterialOrders"
 ];
 
 function normaliseDeliveryStatus(status) {
@@ -641,6 +642,28 @@ export class AppStore {
     };
     if (Number.isFinite(Number(item.latitude)) && Number.isFinite(Number(item.longitude))) item.geohash = encodeGeohash(item.latitude, item.longitude);
     this.state.merchants.push(item); this.refreshQualitySummary(item.id, false); this.syncMerchantMaterialized(item, null, true); return item;
+  }
+
+
+  addBrandMaterialOrder({ merchantId, itemCode, itemName, variant = "", quantity = 1, fulfilment = "deliver", deliveryAddress = "", note = "" }, actor = null) {
+    const merchant = this.merchant(merchantId);
+    if (!merchant) throw new Error("Merchant not found.");
+    if (actor?.role === "merchant" && actor.id !== merchantId) throw new Error("Brand material order is outside this merchant scope.");
+    const qty = Math.max(1, Math.min(100, Number(quantity || 1)));
+    const order = {
+      id: uid("brand_order"), merchantId, itemCode: String(itemCode || "").trim(), itemName: String(itemName || "").trim(),
+      variant: String(variant || "").trim(), quantity: qty, fulfilment, deliveryAddress: String(deliveryAddress || "").trim(),
+      note: String(note || "").trim(), status: "submitted", paymentStatus: "not_required_yet", createdAt: Date.now(), updatedAt: Date.now(), version: 1
+    };
+    if (!order.itemCode || !order.itemName) throw new Error("Brand material item is required.");
+    if (fulfilment === "deliver" && !order.deliveryAddress) throw new Error("Delivery address is required.");
+    this.state.brandMaterialOrders.unshift(order);
+    this.logAudit({ actor: actor || { id: merchantId, role: "merchant", name: merchant.name }, action: "brand_material_order_submitted", targetType: "merchant", targetId: merchantId, reason: `${order.itemName} × ${order.quantity}`, visibility: "operations", metadata: { brandOrderId: order.id, itemCode: order.itemCode, quantity: order.quantity } });
+    return order;
+  }
+
+  brandMaterialOrdersForMerchant(merchantId) {
+    return this.state.brandMaterialOrders.filter(item => item.merchantId === merchantId).sort((a,b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
   }
 
   addProduct(product) {

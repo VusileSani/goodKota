@@ -1,3 +1,13 @@
+# Yagoya v6.10 Report Generation & Print — Validation
+
+## Result
+
+**Full automated regression suite passed.**
+
+Validation includes report-calculation tests, explicit no-inferred-payout behavior, printable report markup, CSV report data, Merchant/Admin/Owner report navigation, service-worker inclusion, JavaScript syntax/import checks, repository-boundary checks, authentication continuity, merchant workspace behavior, scale/integrity tests, UI rollup tests, runtime rendering of all report sections, location tests, recommendation tests and brand-continuity tests.
+
+The report print action uses a standalone browser print document so normal application navigation and controls are not included in the printout. Production high-volume reporting remains documented as a server/query-service responsibility rather than an unbounded client collection scan.
+
 # Yagoya v6.1.2 Logo Restoration — Validation
 
 This point release fixes the responsive header regression that could hide the official Yagoya logo on narrow viewports. The logo is now explicitly preserved at every breakpoint while the wordmark alone may collapse for space. A regression test rejects any blanket `.brand span { display:none }` rule.

@@ -39,10 +39,10 @@ test("views do not read global store collections directly", () => {
   }
 });
 
-test("package/config/index files identify v6.9.0 and parse cleanly", () => {
+test("package/config/index files identify v6.10.0 and parse cleanly", () => {
   const pkg = JSON.parse(read("package.json"));
-  assert.equal(pkg.version, "6.9.0");
-  assert.equal(pkg.name, "yagoya-v6-9-auth-account-continuity");
+  assert.equal(pkg.version, "6.10.0");
+  assert.equal(pkg.name, "yagoya-v6-10-report-generation-print");
   JSON.parse(read("firestore.indexes.json"));
   JSON.parse(read("firebase.json"));
   JSON.parse(read("config/production.json"));

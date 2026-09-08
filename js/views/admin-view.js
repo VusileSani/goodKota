@@ -1,6 +1,7 @@
 import { escapeHtml, formatDateTime, fromCents, money, toCents, uid } from "../core/utils.js";
 import { qualityBadge } from "../services/quality-service.js";
 import { geocodeSouthAfricanAddress } from "../services/geocoding-service.js";
+import { buildPlatformOperationsQualityReport, defaultReportRange, downloadReportCsv, printReport, reportPeriodBounds, reportSheetMarkup } from "../services/report-service.js";
 
 const COMPLIANCE_STATUSES = [
   { value: "pending_review", label: "Pending review" },
@@ -51,6 +52,7 @@ export function renderAdminView(app) {
       ${adminTab("applications", "Applications", section, merchantApplications.length + driverApplications.length)}
       ${adminTab("drivers", "Drivers", section)}
       ${adminTab("orders", "Orders", section)}
+      ${adminTab("reports", "Reports", section)}
       ${adminTab("promotions", "Promotions", section)}
       ${adminTab("support", "Support", section, openCases.length)}
       ${adminTab("communications", "Announcements", section)}
@@ -61,6 +63,7 @@ export function renderAdminView(app) {
     ${section === "applications" ? applicationsSection(app, merchantApplications, driverApplications) : ""}
     ${section === "drivers" ? driversSection(app) : ""}
     ${section === "orders" ? ordersSection(app) : ""}
+    ${section === "reports" ? reportsSection(app, snapshot) : ""}
     ${section === "promotions" ? promotionsSection(app) : ""}
     ${section === "support" ? supportSection(app, openCases) : ""}
     ${section === "communications" ? communicationsSection(app) : ""}
@@ -70,6 +73,7 @@ export function renderAdminView(app) {
 
   bindSectionTabs(app);
   bindCommonAdminActions(app, actor);
+  if (section === "reports") bindAdminReportActions(app, snapshot);
 }
 
 function adminTab(value, label, current, count = null) {
@@ -148,6 +152,58 @@ function supportSection(app, openCases) {
       <div class="stat"><span class="muted">High priority</span><b>${openCases.filter(c => c.priority === "high").length}</b></div>
     </div>
     <section class="section"><div class="table-wrap">${supportTable(app, cases)}</div></section>`;
+}
+
+function reportsSection(app, snapshot) {
+  const defaults = defaultReportRange(7);
+  const from = app.adminReportFrom || defaults.from;
+  const to = app.adminReportTo || defaults.to;
+  const selectedMerchantId = app.adminReportMerchantId || "";
+  const merchants = app.repos.merchants.list({ limit: 100, sortBy: "createdAt", direction: "asc" }).items;
+  return `
+    <section class="section-head"><div><h2>Reports</h2><p>Generate decision-focused operating reports without dumping the full platform dataset.</p></div></section>
+    <section class="section card report-generator-card">
+      <div class="report-filter-grid admin-report-filter-grid">
+        <label class="field">Scope<select id="adminReportMerchant"><option value="">All merchants</option>${merchants.map(merchant => `<option value="${merchant.id}" ${selectedMerchantId === merchant.id ? "selected" : ""}>${escapeHtml(merchant.name)}</option>`).join("")}</select></label>
+        <label class="field">From<input id="adminReportFrom" type="date" value="${escapeHtml(from)}" /></label>
+        <label class="field">To<input id="adminReportTo" type="date" value="${escapeHtml(to)}" /></label>
+        <button class="btn primary report-generate-button" id="generateAdminReport">Generate report</button>
+      </div>
+      <div class="muted small" style="margin-top:10px">Operations & Quality reports prioritise current exceptions, paid-order activity and merchant operating status.</div>
+    </section>
+    ${app.adminGeneratedReport ? `<section class="section report-preview-shell"><div class="report-toolbar"><div><strong>Operations & Quality</strong><span class="muted small">Generated from the current bounded operating snapshot.</span></div><div class="inline-actions"><button class="btn ghost small" id="exportAdminReport">Export CSV</button><button class="btn primary small" id="printAdminReport">Print / Save PDF</button></div></div>${reportSheetMarkup(app.adminGeneratedReport)}</section>` : '<section class="section"><div class="empty">Set the scope and period, then generate the report.</div></section>'}
+  `;
+}
+
+function bindAdminReportActions(app, snapshot) {
+  app.root.querySelector("#generateAdminReport")?.addEventListener("click", () => {
+    const merchantId = app.root.querySelector("#adminReportMerchant")?.value || "";
+    const from = app.root.querySelector("#adminReportFrom")?.value || "";
+    const to = app.root.querySelector("#adminReportTo")?.value || "";
+    try {
+      reportPeriodBounds(from, to);
+      app.adminReportMerchantId = merchantId;
+      app.adminReportFrom = from;
+      app.adminReportTo = to;
+      const selected = merchantId ? app.repos.merchants.get(merchantId) : null;
+      const merchants = selected ? [selected] : app.repos.merchants.list({ limit: 100, sortBy: "createdAt", direction: "asc" }).items;
+      const qualityAlerts = snapshot.qualityAlerts.filter(merchant => !merchantId || merchant.id === merchantId);
+      const settlementAttention = snapshot.settlementAttention.filter(merchant => !merchantId || merchant.id === merchantId);
+      const dispatchAttention = snapshot.dispatchAttention.filter(task => !merchantId || task.merchantId === merchantId);
+      const openCases = app.repos.governance.supportCases({ status: ["open", "in_progress"], merchantId: merchantId || undefined, limit: 100 }).items;
+      const orders = app.repos.orders.listAll({ merchantId: merchantId || undefined, limit: 100 }).items;
+      app.adminGeneratedReport = buildPlatformOperationsQualityReport({ merchants, orders, openCases, qualityAlerts, settlementAttention, dispatchAttention, from, to, scopeName: selected ? selected.name : "Yagoya network" });
+      app.render();
+      window.setTimeout(() => document.querySelector(".report-preview-shell")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+    } catch (error) {
+      app.toast(error.message || "Could not generate the report.", { title: "Report not generated", tone: "warning" });
+    }
+  });
+  app.root.querySelector("#printAdminReport")?.addEventListener("click", () => {
+    try { printReport(app.adminGeneratedReport); }
+    catch (error) { app.toast(error.message, { title: "Print unavailable", tone: "warning" }); }
+  });
+  app.root.querySelector("#exportAdminReport")?.addEventListener("click", () => downloadReportCsv(app.adminGeneratedReport));
 }
 
 function communicationsSection(app) {

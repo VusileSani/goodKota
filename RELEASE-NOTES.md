@@ -1,3 +1,14 @@
+# Yagoya v6.10 — Report Generation & Print
+
+- Added Merchant **Reports & Statements** workspace using the same compact progressive-disclosure navigation as the rest of Yagoya.
+- Added generated Merchant Sales Report with period filters, order activity, food sales, delivery fees and top products.
+- Added generated Sales & Settlement Statement using only recorded paid-order, refund and payout events; missing payout records are stated explicitly rather than estimated.
+- Added Yagoya Admin **Operations & Quality Report** with date range and optional merchant scope. The default report surfaces operating exceptions instead of dumping raw platform data.
+- Added Owner-accessible Business Reports using the same bounded Operations & Quality report contract. Privileged audit remains a separate governance record and is not silently included in printable business reports.
+- Added report preview, CSV export and **Print / Save PDF** via a clean standalone browser print document.
+- Report queries remain bounded in the browser prototype; production Firestore reporting should use server-side/query-service contracts for complete high-volume periods.
+- Preserved v6.9 Firebase authentication continuity, v6.8 Merchant workspaces, Premium Graphite, Yagoya recommendation/quality logic, delivery architecture and authority separation.
+
 # Yagoya v6.9 — Authentication Behaviour & Account Continuity
 
 - Restored explicit, visible authentication behaviour on top of v6.8 without removing the newer Merchant workspaces.

@@ -85,7 +85,7 @@ test("Customer secondary sections render without runtime exceptions", () => {
 });
 
 test("Merchant sections render without runtime exceptions", () => {
-  for (const section of ["overview", "orders", "menu", "quality", "brand", "settings", "support"]) {
+  for (const section of ["overview", "orders", "reports", "menu", "quality", "brand", "settings", "support"]) {
     const app = buildApp();
     app.merchantSection = section;
     app.merchantOrderFilter = "active";
@@ -95,7 +95,7 @@ test("Merchant sections render without runtime exceptions", () => {
 });
 
 test("Yagoya Admin sections render without runtime exceptions", () => {
-  for (const section of ["overview", "merchants", "applications", "drivers", "orders", "promotions", "support", "communications", "activity"]) {
+  for (const section of ["overview", "merchants", "applications", "drivers", "orders", "reports", "promotions", "support", "communications", "activity"]) {
     const app = buildApp();
     app.adminSection = section;
     assert.doesNotThrow(() => renderAdminView(app), `Admin ${section} failed`);
@@ -104,7 +104,7 @@ test("Yagoya Admin sections render without runtime exceptions", () => {
 });
 
 test("Yagoya Owner sections render without runtime exceptions", () => {
-  for (const section of ["control", "authority", "brand", "integrity", "audit"]) {
+  for (const section of ["control", "authority", "brand", "integrity", "reports", "audit"]) {
     const app = buildApp();
     app.ownerSection = section;
     assert.doesNotThrow(() => renderOwnerView(app), `Owner ${section} failed`);

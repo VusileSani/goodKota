@@ -1,3 +1,11 @@
+# Yagoya v6.10 Report Generation & Print
+
+Yagoya v6.10 builds directly on v6.9 and retains Firebase authentication continuity, Premium Graphite, merchant workspaces, recommendation/quality logic, delivery and governance.
+
+This release adds compact, role-based report generation without turning the operational screens into long dashboards. Merchants can generate **Sales Reports** and **Sales & Settlement Statements**. Yagoya Admin and Owner can generate **Operations & Quality Reports** across the network or a selected merchant. Generated reports have an in-app preview, **Print / Save PDF** through the browser print flow, and **CSV export** for the underlying report rows.
+
+Settlement reporting is evidence-based: Yagoya reports recorded paid-order, refund and payout events and explicitly does not infer a bank payout that has not been recorded. Production report generation should move behind bounded server-side reporting/query contracts as Firestore replaces the browser-local prototype repository.
+
 # Yagoya v6.9 Authentication Behaviour & Account Continuity
 
 Yagoya v6.9 builds directly on v6.8. The Merchant workspaces, Premium Graphite visual system, recommendation foundation, delivery architecture and governance work remain intact.

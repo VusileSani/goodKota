@@ -1,4 +1,4 @@
-const CACHE = "yagoya-v6-9-auth-account-continuity-shell";
+const CACHE = "yagoya-v6-10-report-generation-shell";
 const SHELL = [
   "./",
   "./index.html",
@@ -28,6 +28,7 @@ const SHELL = [
   "./js/services/pricing-service.js",
   "./js/services/quality-service.js",
   "./js/services/recommendation-service.js",
+  "./js/services/report-service.js",
   "./js/services/retention-service.js",
   "./js/services/search-service.js",
   "./js/services/storefront-service.js",

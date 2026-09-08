@@ -72,6 +72,17 @@ export class RepositoryHub {
       )
     };
 
+    this.finance = {
+      payoutsForMerchant: (merchantId, options = {}) => pageResult(
+        this.store.state.merchantPayouts.filter(item => item.merchantId === merchantId),
+        { limit: options.limit || 100, cursor: options.cursor, sortBy: "createdAt", direction: "desc" }
+      ),
+      refundsForMerchant: (merchantId, options = {}) => pageResult(
+        this.store.state.refunds.filter(item => item.merchantId === merchantId),
+        { limit: options.limit || 100, cursor: options.cursor, sortBy: "createdAt", direction: "desc" }
+      )
+    };
+
     this.delivery = {
       task: id => byId(this.store.state.deliveryTasks, id),
       taskForOrder: orderId => this.store.state.deliveryTasks.find(task => task.orderId === orderId) || null,

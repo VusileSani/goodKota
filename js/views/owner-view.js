@@ -1,4 +1,5 @@
 import { escapeHtml, formatDateTime } from "../core/utils.js";
+import { buildPlatformOperationsQualityReport, defaultReportRange, downloadReportCsv, printReport, reportPeriodBounds, reportSheetMarkup } from "../services/report-service.js";
 
 const CONTROL_LABELS = {
   maintenanceMode: ["Maintenance mode", "Pause normal actor access while Yagoya resolves a platform incident."],
@@ -48,18 +49,21 @@ export function renderOwnerView(app) {
       ${ownerTab("authority", "Authority", section)}
       ${ownerTab("brand", "Brand", section)}
       ${ownerTab("integrity", "Integrity", section)}
+      ${ownerTab("reports", "Reports", section)}
       ${ownerTab("audit", "Audit", section)}
     </nav>
 
     ${section === "authority" ? authoritySection(app.repos.governance.staff({ limit: 50 }).items) : ""}
     ${section === "brand" ? brandSection(app.repos.platform.brand()) : ""}
     ${section === "integrity" ? integritySection(snapshot) : ""}
+    ${section === "reports" ? reportsSection(app, snapshot) : ""}
     ${section === "audit" ? auditSection(app) : ""}
     ${section === "control" ? controlSection(platform, controls) : ""}
   `;
 
   bindOwnerTabs(app);
   bindOwnerActions(app, actor);
+  if (section === "reports") bindOwnerReportActions(app, snapshot);
 }
 
 function ownerTab(value, label, current) {
@@ -142,6 +146,57 @@ function integritySection(data) {
 
 function integrityCard(title, count, items, detail) {
   return `<div class="card integrity-card"><div class="integrity-count ${count ? "attention" : ""}">${count}</div><div><strong>${title}</strong><p class="muted small">${detail}</p>${items.length ? `<div class="integrity-items">${items.slice(0, 4).map(item => `<span>${escapeHtml(item)}</span>`).join("")}</div>` : '<span class="badge ok">Clear</span>'}</div></div>`;
+}
+
+function reportsSection(app, snapshot) {
+  const defaults = defaultReportRange(7);
+  const from = app.ownerReportFrom || defaults.from;
+  const to = app.ownerReportTo || defaults.to;
+  const selectedMerchantId = app.ownerReportMerchantId || "";
+  const merchants = app.repos.merchants.list({ limit: 100, sortBy: "createdAt", direction: "asc" }).items;
+  return `
+    <section class="section-head"><div><h2>Business Reports</h2><p>Generate a printable operating and quality view without exposing the privileged audit as a raw report.</p></div></section>
+    <section class="section card report-generator-card">
+      <div class="report-filter-grid admin-report-filter-grid">
+        <label class="field">Scope<select id="ownerReportMerchant"><option value="">All merchants</option>${merchants.map(merchant => `<option value="${merchant.id}" ${selectedMerchantId === merchant.id ? "selected" : ""}>${escapeHtml(merchant.name)}</option>`).join("")}</select></label>
+        <label class="field">From<input id="ownerReportFrom" type="date" value="${escapeHtml(from)}" /></label>
+        <label class="field">To<input id="ownerReportTo" type="date" value="${escapeHtml(to)}" /></label>
+        <button class="btn primary report-generate-button" id="generateOwnerReport">Generate report</button>
+      </div>
+    </section>
+    ${app.ownerGeneratedReport ? `<section class="section report-preview-shell"><div class="report-toolbar"><div><strong>Operations & Quality</strong><span class="muted small">Owner-accessible business report.</span></div><div class="inline-actions"><button class="btn ghost small" id="exportOwnerReport">Export CSV</button><button class="btn primary small" id="printOwnerReport">Print / Save PDF</button></div></div>${reportSheetMarkup(app.ownerGeneratedReport)}</section>` : '<section class="section"><div class="empty">Set the scope and period, then generate the report.</div></section>'}
+  `;
+}
+
+function bindOwnerReportActions(app, snapshot) {
+  app.root.querySelector("#generateOwnerReport")?.addEventListener("click", () => {
+    const merchantId = app.root.querySelector("#ownerReportMerchant")?.value || "";
+    const from = app.root.querySelector("#ownerReportFrom")?.value || "";
+    const to = app.root.querySelector("#ownerReportTo")?.value || "";
+    try {
+      reportPeriodBounds(from, to);
+      app.ownerReportMerchantId = merchantId;
+      app.ownerReportFrom = from;
+      app.ownerReportTo = to;
+      const selected = merchantId ? app.repos.merchants.get(merchantId) : null;
+      const merchants = selected ? [selected] : app.repos.merchants.list({ limit: 100, sortBy: "createdAt", direction: "asc" }).items;
+      const qualityAlerts = snapshot.qualityAttention.filter(merchant => !merchantId || merchant.id === merchantId);
+      const settlementAttention = snapshot.settlementAttention.filter(merchant => !merchantId || merchant.id === merchantId);
+      const dispatchAttention = snapshot.activeDeliveries.filter(task => task.status === "ready_for_dispatch" && !task.assignedDriverId && (!merchantId || task.merchantId === merchantId));
+      const openCases = app.repos.governance.supportCases({ status: ["open", "in_progress"], merchantId: merchantId || undefined, limit: 100 }).items;
+      const orders = app.repos.orders.listAll({ merchantId: merchantId || undefined, limit: 100 }).items;
+      app.ownerGeneratedReport = buildPlatformOperationsQualityReport({ merchants, orders, openCases, qualityAlerts, settlementAttention, dispatchAttention, from, to, scopeName: selected ? selected.name : "Yagoya network" });
+      app.render();
+      window.setTimeout(() => document.querySelector(".report-preview-shell")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+    } catch (error) {
+      app.toast(error.message || "Could not generate the report.", { title: "Report not generated", tone: "warning" });
+    }
+  });
+  app.root.querySelector("#printOwnerReport")?.addEventListener("click", () => {
+    try { printReport(app.ownerGeneratedReport); }
+    catch (error) { app.toast(error.message, { title: "Print unavailable", tone: "warning" }); }
+  });
+  app.root.querySelector("#exportOwnerReport")?.addEventListener("click", () => downloadReportCsv(app.ownerGeneratedReport));
 }
 
 function auditSection(app) {

@@ -3,6 +3,7 @@ import { merchantQualityNotice, qualityBadge } from "../services/quality-service
 import { deliveryStatusLabel } from "../services/delivery-service.js";
 import { maskBankAccount } from "../services/payment-service.js";
 import { merchantStorefrontUrl, qrImageUrl } from "../services/storefront-service.js";
+import { buildMerchantSalesReport, buildMerchantSettlementReport, defaultReportRange, downloadReportCsv, printReport, reportPeriodBounds, reportSheetMarkup } from "../services/report-service.js";
 
 const BRAND_MATERIALS = [
   { code: "banner-counter", group: "Banners", name: "Counter banner", variants: ["Countertop", "Compact storefront"], description: "A compact Yagoya banner for the ordering counter or collection area." },
@@ -50,6 +51,7 @@ export function renderMerchantView(app) {
     <nav class="section-tabs merchant-section-tabs" aria-label="Merchant workspace sections">
       ${merchantTab("overview", "Overview", section, needsAction || null)}
       ${merchantTab("orders", "Orders", section, needsAction || null)}
+      ${merchantTab("reports", "Reports", section)}
       ${merchantTab("menu", "Menu", section)}
       ${merchantTab("quality", "Quality", section, showQualityNotice ? 1 : null)}
       ${merchantTab("brand", "Brand Materials", section, materialOrders.filter(item => item.status !== "completed").length || null)}
@@ -59,6 +61,7 @@ export function renderMerchantView(app) {
 
     ${section === "overview" ? overviewSection(app, merchant, { orders, products, needsAction, activeDeliveries, quality, qualityNotice, showQualityNotice, openSupport, materialOrders }) : ""}
     ${section === "orders" ? ordersSection(app, merchant, orders) : ""}
+    ${section === "reports" ? reportsSection(app, merchant) : ""}
     ${section === "menu" ? menuSection(products) : ""}
     ${section === "quality" ? qualitySection(merchant, quality, qualityNotice, showQualityNotice) : ""}
     ${section === "brand" ? brandMaterialsSection(merchant, materialOrders) : ""}
@@ -69,11 +72,13 @@ export function renderMerchantView(app) {
   bindMerchantNavigation(app);
   app.root.querySelector("#merchantSwitcher").addEventListener("change", event => {
     app.currentMerchantId = event.currentTarget.value;
+    app.merchantGeneratedReport = null;
     app.merchantSection = "overview";
     app.render();
   });
 
   if (section === "orders") bindOrdersSection(app, merchant);
+  if (section === "reports") bindReportsSection(app, merchant);
   if (section === "menu") bindMenuSection(app, merchant);
   if (section === "brand") bindBrandSection(app, merchant);
   if (section === "settings") bindSettingsSection(app, merchant);
@@ -128,6 +133,7 @@ function overviewSection(app, merchant, data) {
         <h3>Go straight to the work.</h3>
         <div class="compact-action-list">
           <button class="settings-row" data-jump-merchant="orders"><span><strong>Manage orders</strong><small>Accept, prepare and complete customer orders.</small></span><b>›</b></button>
+          <button class="settings-row" data-jump-merchant="reports"><span><strong>Reports & statements</strong><small>Generate sales and settlement records for print or CSV.</small></span><b>›</b></button>
           <button class="settings-row" data-jump-merchant="menu"><span><strong>Manage menu</strong><small>Add items, prices, availability and photos.</small></span><b>›</b></button>
           <button class="settings-row" data-jump-merchant="brand"><span><strong>Order Yagoya materials</strong><small>Banners, stickers, serviettes and verified materials.</small></span><b>›</b></button>
           <button class="settings-row" data-jump-merchant="settings"><span><strong>Store settings</strong><small>Preparation, delivery, settlement and storefront tools.</small></span><b>›</b></button>
@@ -170,6 +176,57 @@ function bindOrdersSection(app) {
   }));
   bindOrderActions(app, app.root);
   app.root.querySelectorAll("[data-open-order]").forEach(button => button.addEventListener("click", () => openOrderDetails(app, button.dataset.openOrder)));
+}
+
+function reportsSection(app, merchant) {
+  const defaults = defaultReportRange(app.merchantReportType === "settlement" ? 30 : 7);
+  const from = app.merchantReportFrom || defaults.from;
+  const to = app.merchantReportTo || defaults.to;
+  const type = app.merchantReportType || "sales";
+  return `
+    <section class="section-head"><div><h2>Reports & Statements</h2><p>Generate a focused record, then print / save as PDF or export the report data to CSV.</p></div></section>
+    <section class="section card report-generator-card">
+      <div class="report-filter-grid">
+        <label class="field">Report<select id="merchantReportType"><option value="sales" ${type === "sales" ? "selected" : ""}>Daily / period sales</option><option value="settlement" ${type === "settlement" ? "selected" : ""}>Sales & settlement statement</option></select></label>
+        <label class="field">From<input id="merchantReportFrom" type="date" value="${escapeHtml(from)}" /></label>
+        <label class="field">To<input id="merchantReportTo" type="date" value="${escapeHtml(to)}" /></label>
+        <button class="btn primary report-generate-button" id="generateMerchantReport">Generate report</button>
+      </div>
+      <div class="muted small" style="margin-top:10px">Settlement statements use only recorded Yagoya payout/refund events; they never estimate a bank payout.</div>
+    </section>
+    ${app.merchantGeneratedReport ? `<section class="section report-preview-shell"><div class="report-toolbar"><div><strong>Generated report</strong><span class="muted small">Review before printing.</span></div><div class="inline-actions"><button class="btn ghost small" id="exportMerchantReport">Export CSV</button><button class="btn primary small" id="printMerchantReport">Print / Save PDF</button></div></div>${reportSheetMarkup(app.merchantGeneratedReport)}</section>` : '<section class="section"><div class="empty">Choose a report and date range, then generate it.</div></section>'}
+  `;
+}
+
+function bindReportsSection(app, merchant) {
+  app.root.querySelector("#merchantReportType")?.addEventListener("change", event => {
+    app.merchantReportType = event.currentTarget.value;
+    app.merchantGeneratedReport = null;
+  });
+  app.root.querySelector("#generateMerchantReport")?.addEventListener("click", () => {
+    const type = app.root.querySelector("#merchantReportType")?.value || "sales";
+    const from = app.root.querySelector("#merchantReportFrom")?.value || "";
+    const to = app.root.querySelector("#merchantReportTo")?.value || "";
+    try {
+      reportPeriodBounds(from, to);
+      app.merchantReportType = type;
+      app.merchantReportFrom = from;
+      app.merchantReportTo = to;
+      const orders = app.repos.orders.listForMerchant(merchant.id, { limit: 100 }).items;
+      app.merchantGeneratedReport = type === "settlement"
+        ? buildMerchantSettlementReport({ merchant, orders, payouts: app.repos.finance.payoutsForMerchant(merchant.id, { limit: 100 }).items, refunds: app.repos.finance.refundsForMerchant(merchant.id, { limit: 100 }).items, from, to })
+        : buildMerchantSalesReport({ merchant, orders, from, to });
+      app.render();
+      window.setTimeout(() => document.querySelector(".report-preview-shell")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+    } catch (error) {
+      app.toast(error.message || "Could not generate the report.", { title: "Report not generated", tone: "warning" });
+    }
+  });
+  app.root.querySelector("#printMerchantReport")?.addEventListener("click", () => {
+    try { printReport(app.merchantGeneratedReport); }
+    catch (error) { app.toast(error.message, { title: "Print unavailable", tone: "warning" }); }
+  });
+  app.root.querySelector("#exportMerchantReport")?.addEventListener("click", () => downloadReportCsv(app.merchantGeneratedReport));
 }
 
 function menuSection(products) {

@@ -3,6 +3,7 @@ import { calculateOrderPricing } from "../services/pricing-service.js";
 import { qualityBadge, isEligibleForProximityRecommendation } from "../services/quality-service.js";
 import { deliveryProgress, deliveryStatusLabel } from "../services/delivery-service.js";
 import { directionsUrl } from "../services/location-service.js";
+import { friendlyAuthError } from "../services/auth-error-service.js";
 
 function cartSubtotal(app) {
   return app.cart.reduce((total, line) => {
@@ -376,19 +377,36 @@ function renderAccountPanel(app, customer, panel) {
   }
 
   if (panel === "security") {
-    return `
-      ${accountPanelHeader("Account & Security", "Authentication and access to your Yagoya customer account.")}
-      ${authUser ? `
+    if (authUser) {
+      return `
+        ${accountPanelHeader("Account & Security", "Authentication and access to your Yagoya customer account.")}
         <div class="card customer-account-card">
           <div class="customer-account-row"><span>Status</span><strong>Signed in</strong></div>
+          <div class="customer-account-row"><span>Name</span><strong>${escapeHtml(authUser.displayName || "Yagoya customer")}</strong></div>
           <div class="customer-account-row"><span>Email</span><strong>${escapeHtml(authUser.email || "Authenticated account")}</strong></div>
           <div class="customer-account-row"><span>Email verified</span><strong>${authUser.emailVerified ? "Yes" : "Not yet"}</strong></div>
         </div>
-        <button class="btn ghost customer-primary-action" data-open-auth-account>Open account controls</button>
-      ` : `
-        <div class="empty customer-account-empty"><strong>You are browsing without signing in.</strong><span>Sign in to keep your Yagoya account available across devices.</span></div>
-        <div class="customer-account-auth-actions"><button class="btn primary" data-auth-mode="signin">Sign in</button><button class="btn ghost" data-auth-mode="register">Create account</button></div>
-      `}`;
+        <button type="button" class="btn ghost customer-primary-action" data-account-logout>Log Out</button>`;
+    }
+
+    const register = app.customerAuthMode === "register";
+    return `
+      ${accountPanelHeader("Account & Security", "Sign in or create your Yagoya customer account.")}
+      <div class="customer-auth-inline card">
+        <div class="customer-auth-inline-head">
+          <span class="eyebrow">Yagoya account</span>
+          <h3>${register ? "Create account" : "Sign in"}</h3>
+          <p class="muted small">${register ? "Create your customer account with email and password." : "Use your Yagoya email and password."}</p>
+        </div>
+        <form id="customerAuthForm" class="customer-auth-inline-form">
+          ${register ? '<label>Name<input name="name" autocomplete="name" required /></label>' : ''}
+          <label>Email<input name="email" type="email" autocomplete="email" required /></label>
+          <label>Password<input name="password" type="password" autocomplete="${register ? 'new-password' : 'current-password'}" minlength="6" required /></label>
+          <div class="auth-error" id="customerAuthError" role="alert">${escapeHtml(app.customerAuthError || "")}</div>
+          <button class="btn primary" type="submit">${register ? "Create account" : "Sign in"}</button>
+          <button class="btn ghost" type="button" data-inline-auth-switch="${register ? "signin" : "register"}">${register ? "I already have an account" : "Create customer account"}</button>
+        </form>
+      </div>`;
   }
 
   return "";
@@ -531,9 +549,34 @@ function bindCustomerEvents(app) {
   app.root.querySelector("#customerSupportButton")?.addEventListener("click", () => openCustomerSupport(app));
   app.root.querySelectorAll("[data-account-target]").forEach(button => button.addEventListener("click", () => { app.customerAccountPanel = button.dataset.accountTarget; app.render(); window.scrollTo(0, 0); }));
   app.root.querySelector("[data-account-back]")?.addEventListener("click", () => { app.customerAccountPanel = null; app.render(); window.scrollTo(0, 0); });
-  app.root.querySelectorAll("[data-auth-mode]").forEach(button => button.addEventListener("click", () => app.openAuthDialog(button.dataset.authMode)));
-  app.root.querySelector("[data-open-auth-account]")?.addEventListener("click", () => app.openAccountDialog());
-  app.root.querySelector("[data-account-logout]")?.addEventListener("click", async () => { await app.auth.signOut(); app.customerAccountPanel = null; app.toast("Signed out of Yagoya."); app.render(); });
+  app.root.querySelectorAll("[data-auth-mode]").forEach(button => button.addEventListener("click", () => {
+    app.customerAccountPanel = "security";
+    app.customerAuthMode = button.dataset.authMode || "signin";
+    app.customerAuthError = "";
+    app.render();
+    window.scrollTo(0, 0);
+  }));
+  app.root.querySelectorAll("[data-inline-auth-switch]").forEach(button => button.addEventListener("click", () => {
+    app.customerAuthMode = button.dataset.inlineAuthSwitch || "signin";
+    app.customerAuthError = "";
+    app.render();
+  }));
+  app.root.querySelector("#customerAuthForm")?.addEventListener("submit", async event => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    app.customerAuthError = "";
+    try {
+      if (app.customerAuthMode === "register") await app.auth.registerCustomer(form.get("name"), form.get("email"), form.get("password"));
+      else await app.auth.signIn(form.get("email"), form.get("password"));
+      app.customerAuthMode = "account";
+      app.toast(app.authUser ? "Signed in to Yagoya." : "Yagoya account updated.");
+      app.render();
+    } catch (error) {
+      app.customerAuthError = friendlyAuthError(error);
+      app.render();
+    }
+  });
+  app.root.querySelector("[data-account-logout]")?.addEventListener("click", async () => { await app.auth.signOut(); app.customerAuthMode = "signin"; app.customerAuthError = ""; app.toast("Signed out of Yagoya."); app.render(); });
   app.root.querySelectorAll("[data-rate-order]").forEach(button => button.addEventListener("click", () => openRating(app, button.dataset.rateOrder)));
   app.root.querySelectorAll("[data-track-order]").forEach(button => button.addEventListener("click", () => openTracking(app, button.dataset.trackOrder)));
 }
@@ -691,21 +734,33 @@ function openProduct(app, productId) {
 }
 
 function openCheckout(app) {
+  if (!app.authUser) {
+    app.pendingCustomerAction = "checkout";
+    app.customerSection = "account";
+    app.customerAccountPanel = "security";
+    app.customerAuthMode = "signin";
+    app.customerAuthError = "Sign in or create an account to continue checkout. Your cart is saved.";
+    app.render();
+    window.scrollTo(0, 0);
+    return;
+  }
   const controls = app.repos.platform.controls();
   if (!controls.orderingEnabled) return alert("Yagoya ordering is temporarily paused.");
   if (!controls.paymentsEnabled) return alert("Yagoya payments are temporarily unavailable.");
   const merchant = app.repos.merchants.get(app.selectedMerchantId);
   if (!merchant || !app.cart.length) return;
   const customer = app.repos.users.customer();
+  const authenticatedName = app.authUser?.displayName || customer.name || "";
+  const authenticatedEmail = app.authUser?.email || customer.email || "";
   const checkoutLines = () => app.cart.map(line => ({ productId: line.productId, qty: line.qty }));
 
   app.openDialog(`
     <div class="dialog-inner customer-dialog-inner">
       <div class="dialog-head"><h2>Checkout</h2><button class="icon-btn" data-close-dialog>✕</button></div>
       <div class="form-grid">
-        <label class="field">Name<input id="checkoutName" value="${escapeHtml(customer.name)}" /></label>
+        <label class="field">Name<input id="checkoutName" value="${escapeHtml(authenticatedName)}" /></label>
         <label class="field">Phone<input id="checkoutPhone" value="${escapeHtml(customer.phone)}" /></label>
-        <label class="field">Email<input id="checkoutEmail" type="email" value="${escapeHtml(customer.email)}" /></label>
+        <label class="field">Email<input id="checkoutEmail" type="email" value="${escapeHtml(authenticatedEmail)}" /></label>
         ${app.deliveryMode === "Home Delivery" ? '<label class="field">Delivery address<input id="checkoutAddress" placeholder="Street / complex / suburb" required /></label>' : ""}
         <label class="field">When<select id="checkoutTiming"><option value="asap">As soon as possible</option><option value="scheduled">Schedule</option></select></label>
         <label class="field" id="scheduledField" hidden>Scheduled time<input id="checkoutSchedule" type="datetime-local" /></label>

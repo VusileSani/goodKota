@@ -1,3 +1,7 @@
+# Yagoya v6.7 Trust, Access & Merchant Brand Materials
+
+Anonymous browsing is open. Checkout requires Firebase customer authentication and resumes with the existing cart. Merchant quality notices use privacy-safe aggregated verified feedback. Optional Yagoya company merchandise and store materials are available from the Merchant workspace.
+
 # Yagoya v6.6.0 — Premium Graphite
 
 This release moves the Yagoya application from a bright white canvas to a premium graphite interface while preserving the established orange Yagoya identity.

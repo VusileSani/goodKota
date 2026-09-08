@@ -332,9 +332,8 @@ export class AppStore {
   }
 
   ensureQualitySummaries() {
-    this.state.merchants.forEach(merchant => {
-      if (!merchant.qualitySummary || merchant.qualitySummary.updatedAt === undefined) this.refreshQualitySummary(merchant.id, false, false);
-    });
+    // Prototype migration: re-evaluate summaries on startup so updated Yagoya quality criteria apply to existing local data.
+    this.state.merchants.forEach(merchant => this.refreshQualitySummary(merchant.id, false, false));
   }
 
   refreshAllQualitySummaries(persist = true) {

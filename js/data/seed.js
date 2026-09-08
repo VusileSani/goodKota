@@ -257,7 +257,12 @@ export const seed = {
     {id:"r18",merchantId:"m4",orderId:"hist18",verified:true,overall:2,food:2,service:3,comment:"Cold chips again.",createdAt:ago(1600)},
     {id:"r19",merchantId:"m4",orderId:"hist19",verified:true,overall:3,food:2,service:4,comment:"Service good, food inconsistent.",createdAt:ago(1200)},
     {id:"r20",merchantId:"m4",orderId:"hist20",verified:true,overall:2,food:2,service:4,comment:"",createdAt:ago(900)},
-    {id:"r21",merchantId:"m4",orderId:"hist21",verified:true,overall:4,food:4,service:4,comment:"Much better.",createdAt:ago(600)}
+    {id:"r21",merchantId:"m4",orderId:"hist21",verified:true,overall:4,food:4,service:4,comment:"Much better.",createdAt:ago(600)},
+    {id:"r22",merchantId:"m4",orderId:"hist22",verified:true,overall:2,food:2,service:4,comment:"Food arrived cold.",createdAt:ago(500)},
+    {id:"r23",merchantId:"m4",orderId:"hist23",verified:true,overall:2,food:2,service:3,comment:"Long wait and cold chips.",createdAt:ago(400)},
+    {id:"r24",merchantId:"m4",orderId:"hist24",verified:true,overall:4,food:4,service:4,comment:"Better today.",createdAt:ago(300)},
+    {id:"r25",merchantId:"m4",orderId:"hist25",verified:true,overall:2,food:2,service:4,comment:"Food quality inconsistent.",createdAt:ago(200)},
+    {id:"r26",merchantId:"m4",orderId:"hist26",verified:true,overall:4,food:4,service:4,comment:"Good service.",createdAt:ago(100)}
   ],
   platformStaff: [
     { id: "staff_owner_1", name: "Yagoya Owner", email: "owner@yagoya.co.za", role: "owner", active: true, createdAt: ago(60 * 24 * 30) },

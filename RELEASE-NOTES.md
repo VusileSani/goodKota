@@ -1,3 +1,22 @@
+# Yagoya v6.7 — Trust, Access & Merchant Brand Materials
+
+- Anonymous browsing remains open; checkout now requires Firebase authentication and resumes with the cart preserved after sign-in.
+- Header Sign in / Account control is forced visible across phone widths and routes directly to Account & Security.
+- Formal quality intervention baseline starts at 10 verified ratings.
+- Quality attention can trigger when average falls below 3.5 or 3 of the last 5 verified reviews are poor.
+- Merchants receive privacy-safe, aggregated early warnings without reviewer identity, order number, or exact review timestamp.
+- Added optional Brand & Store Materials in the Merchant workspace for stickers, serviettes, banners and customer-experience materials.
+- Yagoya Verified materials are eligibility-gated; the app remains the source of truth for current quality status.
+- Premium Graphite remains the visual baseline.
+
+# Yagoya v6.6.1 — Authentication Repair
+
+- Authentication entry remains visible in the application header.
+- Header Account/Sign in now routes to Customer > Account > Account & Security.
+- Sign in and Create account use an inline, reviewable form rather than relying on a dialog popup.
+- Firebase Email/Password authentication remains the underlying identity provider.
+- Premium Graphite visual baseline is preserved.
+
 # Yagoya v6.6 — Premium Graphite
 
 - Replaced the bright white application background with dark graphite.

@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import { QUALITY_THRESHOLDS, summariseRatings, assessQuality, merchantQualityNotice } from "../js/services/quality-service.js";
+const customer = fs.readFileSync(new URL("../js/views/customer-view.js", import.meta.url), "utf8");
+const merchant = fs.readFileSync(new URL("../js/views/merchant-view.js", import.meta.url), "utf8");
+const css = fs.readFileSync(new URL("../css/styles.css", import.meta.url), "utf8");
+assert.equal(QUALITY_THRESHOLDS.minimumRatings, 10);
+const ratings = Array.from({length:10}, (_,i)=>({verified:true,overall:i>=5&&i<=7?2:4,food:i>=5&&i<=7?2:4,service:4,createdAt:i}));
+const summary = summariseRatings(ratings);
+assert.equal(summary.count,10);
+assert.ok(["alert","watch"].includes(assessQuality(summary).signal));
+assert.equal(merchantQualityNotice(ratings,{...summary,signal:"alert"}).concern,true);
+assert.ok(customer.includes('pendingCustomerAction = "checkout"'));
+assert.ok(merchant.includes("Brand & Store Materials"));
+assert.ok(merchant.includes("Private merchant quality notice"));
+assert.ok(css.includes("auth-button { display:inline-flex !important"));
+console.log("trust/access/materials checks passed");

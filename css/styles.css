@@ -2095,3 +2095,41 @@ body {
 @media (max-width: 700px) {
   .app-header { background: rgba(18,18,18,.98); }
 }
+
+/* v6.6.1 authentication repair: keep authentication visible and inline. */
+.customer-auth-inline { max-width: 560px; margin: 0 auto; padding: 20px; }
+.customer-auth-inline-head h3 { margin: 5px 0 6px; font-size: 1.45rem; }
+.customer-auth-inline-form { display: grid; gap: 12px; margin-top: 16px; }
+.customer-auth-inline-form label { display: grid; gap: 6px; color: var(--muted); font-size: .84rem; font-weight: 800; }
+.customer-auth-inline-form input { width: 100%; }
+.customer-auth-inline-form .auth-error { min-height: 1.2rem; color: #ff9d8a; }
+@media (max-width: 700px) {
+  .brand-links { display:none; }
+  .header-actions { flex: 1; justify-content: flex-end; }
+  .auth-controls { order: 1; }
+  .actor-switcher { order: 2; }
+  .auth-button { display:inline-flex; max-width: 94px; background:#2a1d18; color:#ffc0aa; border-color:#68402f; }
+}
+
+
+/* v6.7 Trust, Access & Merchant Brand Materials */
+.merchant-quality-warning { border-color:#7f5b2b; background:linear-gradient(180deg,#282017,#211b16); }
+.quality-warning-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.quality-warning-head h3 { margin:4px 0 0; }
+.quality-warning-metrics { display:flex; flex-wrap:wrap; gap:10px; margin:12px 0; }
+.quality-warning-metrics span { border:1px solid #4b4035; background:#1c1916; border-radius:12px; padding:9px 11px; font-size:.84rem; }
+.quality-warning-themes { display:flex; flex-wrap:wrap; gap:7px; margin:10px 0 12px; }
+.quality-theme { padding:7px 9px; border-radius:999px; border:1px solid #68402f; background:#241b18; color:#ffc0aa; font-size:.78rem; font-weight:800; }
+.brand-materials-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:14px; }
+.merchant-brand-materials-dialog { width:min(720px,100%); }
+.auth-button { display:inline-flex !important; visibility:visible !important; opacity:1 !important; align-items:center; justify-content:center; flex:0 0 auto; }
+@media (max-width:700px) {
+  .header-actions { width:100%; display:grid; grid-template-columns:auto 1fr; align-items:center; }
+  .brand-links { display:none; }
+  .auth-controls { min-width:max-content; }
+  .auth-button { max-width:132px; min-height:38px; }
+  .actor-switcher { width:auto; min-width:0; }
+  .actor-switcher span { display:none; }
+  .actor-switcher select { width:100%; min-width:0; }
+  .brand-materials-grid { grid-template-columns:1fr; }
+}

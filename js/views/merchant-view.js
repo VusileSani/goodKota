@@ -1,5 +1,5 @@
 import { escapeHtml, formatDateTime, money, toCents, uid } from "../core/utils.js";
-import { qualityBadge } from "../services/quality-service.js";
+import { merchantQualityNotice, qualityBadge } from "../services/quality-service.js";
 import { deliveryStatusLabel } from "../services/delivery-service.js";
 import { maskBankAccount } from "../services/payment-service.js";
 import { merchantStorefrontUrl, qrImageUrl } from "../services/storefront-service.js";
@@ -21,6 +21,10 @@ export function renderMerchantView(app) {
     return task && !["delivered", "cancelled"].includes(task.status);
   }).length;
   const quality = qualityBadge(merchant.qualityWorkflow.status, merchant.qualitySummary.signal);
+  const merchantRatings = app.store.ratingsForMerchant(merchant.id);
+  const qualityNotice = merchantQualityNotice(merchantRatings, merchant.qualitySummary);
+  const qualityWorkflowNeedsAttention = ["watch", "intervention", "probation"].includes(merchant.qualityWorkflow?.status);
+  const showQualityNotice = qualityNotice.concern || qualityWorkflowNeedsAttention;
 
   app.root.innerHTML = `
     <section class="actor-hero merchant-hero">
@@ -36,6 +40,8 @@ export function renderMerchantView(app) {
       <div class="stat"><span class="muted">Quality</span><b style="font-size:1rem"><span class="badge ${quality.tone}">${quality.label}</span></b></div>
     </div>
 
+    ${showQualityNotice ? `<section class="section"><div class="card merchant-quality-warning"><div class="quality-warning-head"><div><span class="eyebrow">Private merchant quality notice</span><h3>${qualityNotice.baselineReached ? "Recent verified feedback needs attention" : "Yagoya quality attention"}</h3></div><span class="badge warn">Attention</span></div><p>${qualityNotice.baselineReached ? "This is an early warning so your team can correct a trend before a formal Yagoya quality review." : "Your merchant is currently on a Yagoya quality watch or intervention. Formal automated review criteria begin after 10 verified customer ratings."}</p><div class="quality-warning-metrics">${qualityNotice.baselineReached ? `<span><strong>${qualityNotice.recentPoorCount}</strong> poor ratings in the last ${qualityNotice.recentWindow}</span>` : ""}<span><strong>${merchant.qualitySummary.count}</strong> verified ratings total</span></div>${qualityNotice.themes.length ? `<div class="quality-warning-themes">${qualityNotice.themes.map(theme => `<span class="quality-theme">${escapeHtml(theme)}</span>`).join("")}</div>` : ""}<p class="muted small">${escapeHtml(qualityNotice.privacyNote)}</p></div></section>` : ""}
+
     <section class="section">
       <div class="section-head"><div><h3>Orders</h3><p>Open an order when you need the full detail.</p></div></div>
       <div class="table-wrap">${ordersTable(app, orders)}</div>
@@ -50,6 +56,10 @@ export function renderMerchantView(app) {
       <div class="card action-card">
         <div><strong>Storefront QR</strong><div class="muted small">Print a code that opens this merchant directly.</div></div>
         <button class="btn primary small" id="merchantQrButton">View QR</button>
+      </div>
+      <div class="card action-card brand-materials-card">
+        <div><strong>Brand & Store Materials</strong><div class="muted small">Optional Yagoya stickers, serviettes, banners and customer-experience materials.</div></div>
+        <button class="btn ghost small" id="merchantMerchButton">Company merchandise</button>
       </div>
       <div class="card action-card">
         <div><strong>Settlement</strong><div class="muted small">${escapeHtml(merchant.settlement?.status || "not configured")}</div></div>
@@ -75,10 +85,34 @@ export function renderMerchantView(app) {
   app.root.querySelector("#addProductButton").addEventListener("click", () => openProduct(app, merchant));
   app.root.querySelector("#merchantSupportButton").addEventListener("click", () => openMerchantSupport(app, merchant));
   app.root.querySelector("#merchantQrButton").addEventListener("click", () => openMerchantQr(app, merchant));
+  app.root.querySelector("#merchantMerchButton")?.addEventListener("click", () => openBrandMaterials(app, merchant));
   app.root.querySelectorAll("[data-edit-product]").forEach(button => button.addEventListener("click", () => openProduct(app, merchant, button.dataset.editProduct)));
 
   bindOrderActions(app, app.root);
   app.root.querySelectorAll("[data-open-order]").forEach(button => button.addEventListener("click", () => openOrderDetails(app, button.dataset.openOrder)));
+}
+
+function openBrandMaterials(app, merchant) {
+  const verified = merchant.compliance?.status === "compliant" && merchant.qualitySummary?.signal === "healthy" && merchant.qualityWorkflow?.status === "healthy";
+  app.openDialog(`
+    <div class="dialog-inner merchant-brand-materials-dialog">
+      <div class="dialog-head"><div><span class="eyebrow">Yagoya physical brand</span><h2>Brand & Store Materials</h2></div><button class="icon-btn" data-close-dialog aria-label="Close">✕</button></div>
+      <p class="muted">Optional materials for merchants who want a stronger Yagoya presence in-store and on customer orders.</p>
+      <div class="brand-materials-grid">
+        <div class="card"><strong>Order & packaging stickers</strong><p class="muted small">Yagoya seals and branded stickers for takeaway orders.</p><span class="badge info">Available</span></div>
+        <div class="card"><strong>Serviettes & table materials</strong><p class="muted small">Optional branded customer-experience materials.</p><span class="badge info">Available</span></div>
+        <div class="card"><strong>Banners & signage</strong><p class="muted small">Storefront and promotional Yagoya signage.</p><span class="badge info">Available</span></div>
+        <div class="card"><strong>Yagoya Verified kit</strong><p class="muted small">Verification-specific window and order materials. Digital status in the Yagoya app always remains the source of truth.</p><span class="badge ${verified ? "ok" : "warn"}">${verified ? "Eligible" : "Not currently eligible"}</span></div>
+      </div>
+      <div class="notice" style="margin-top:14px"><strong>Important:</strong> Physical materials never override the current quality status shown to customers in Yagoya.</div>
+      <div class="inline-actions" style="margin-top:14px"><button class="btn primary" id="requestBrandMaterialsButton">Request materials</button><button class="btn ghost" data-close-dialog>Close</button></div>
+      <div id="brandMaterialsStatus" class="muted small" style="margin-top:8px"></div>
+    </div>`);
+  app.dialog.querySelector("#requestBrandMaterialsButton")?.addEventListener("click", () => {
+    const host = app.dialog.querySelector("#brandMaterialsStatus");
+    host.textContent = "Material request captured. Yagoya merchant fulfilment will process the request when ordering is connected.";
+    app.toast("Brand materials request captured.");
+  });
 }
 
 function ordersTable(app, orders) {

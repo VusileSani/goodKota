@@ -1,3 +1,11 @@
+# Yagoya v6.11 Navigation App Choice
+
+Yagoya v6.11 builds directly on v6.10. The customer merchant page keeps the existing **Directions** control beside the merchant address, but makes it more visible and replaces automatic Apple Maps routing with an explicit navigation-app chooser.
+
+Customers can choose **Waze**, **Google Maps**, or **Apple Maps**. Yagoya passes the merchant’s stored coordinates to the selected provider and does not require a maps API key. A customer may remember a preferred provider; Yagoya highlights that choice on future visits while still asking which navigation app to open. This keeps provider choice explicit and avoids silently forcing Apple Maps on iPhone.
+
+The Premium Graphite visual baseline, Firebase authentication continuity, merchant workspaces, location-first discovery, recommendation/quality logic, reporting and governance are retained.
+
 # Yagoya v6.10 Report Generation & Print
 
 Yagoya v6.10 builds directly on v6.9 and retains Firebase authentication continuity, Premium Graphite, merchant workspaces, recommendation/quality logic, delivery and governance.

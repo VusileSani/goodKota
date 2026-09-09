@@ -1,3 +1,14 @@
+# Yagoya v6.11 — Navigation App Choice
+
+- Kept the customer **Directions** button in its existing position beside the merchant address.
+- Increased Directions visibility using the existing Yagoya orange primary-action treatment and a clearer navigation glyph.
+- Replaced platform-detected automatic routing with a compact **Waze / Google Maps / Apple Maps** chooser.
+- Added Waze universal-link handoff using the merchant’s stored latitude/longitude.
+- Added provider-independent URL generation for Waze, Google Maps and Apple Maps without introducing a client-side secret key.
+- Added an optional remembered navigation preference. The preferred provider is highlighted next time, but Yagoya still asks before opening navigation.
+- Bumped the service-worker cache so installed/PWA sessions receive the corrected navigation behavior instead of retaining the previous Apple Maps handoff.
+- Preserved v6.10 reporting/print, v6.9 authentication continuity, Premium Graphite, merchant workspaces, quality/recommendation logic, delivery architecture and authority separation.
+
 # Yagoya v6.10 — Report Generation & Print
 
 - Added Merchant **Reports & Statements** workspace using the same compact progressive-disclosure navigation as the rest of Yagoya.

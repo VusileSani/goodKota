@@ -2,7 +2,7 @@ import { escapeHtml, formatDateTime, money, uid } from "../core/utils.js";
 import { calculateOrderPricing } from "../services/pricing-service.js";
 import { qualityBadge, isEligibleForProximityRecommendation } from "../services/quality-service.js";
 import { deliveryProgress, deliveryStatusLabel } from "../services/delivery-service.js";
-import { directionsUrl } from "../services/location-service.js";
+import { directionsUrl, navigationProviders, getPreferredNavigationProvider, setPreferredNavigationProvider, clearPreferredNavigationProvider } from "../services/location-service.js";
 import { friendlyAuthError } from "../services/auth-error-service.js";
 
 function cartSubtotal(app) {
@@ -235,7 +235,7 @@ function renderBrowse(app, selectedMerchant, products) {
           </div>
           <div class="customer-store-location">
             <span>${escapeHtml(selectedMerchant.address || selectedMerchant.area || "")}</span>
-            <a class="btn ghost small" data-merchant-directions href="${escapeHtml(directionsUrl({ lat: selectedMerchant.latitude, lng: selectedMerchant.longitude }, { label: selectedMerchant.name }))}" target="_blank" rel="noopener noreferrer">Directions</a>
+            <button type="button" class="btn primary small customer-directions-button" data-merchant-directions data-merchant-id="${escapeHtml(selectedMerchant.id)}" aria-label="Choose a navigation app for directions to ${escapeHtml(selectedMerchant.name)}"><span aria-hidden="true">➜</span> Directions</button>
           </div>
         </div>
       </div>
@@ -491,6 +491,14 @@ function bindCustomerEvents(app) {
     button.addEventListener("click", () => openLocationDialog(app));
   });
 
+  app.root.querySelectorAll("[data-merchant-directions]").forEach(button => {
+    button.addEventListener("click", () => {
+      const merchantId = button.dataset.merchantId || app.selectedMerchantId;
+      const merchant = merchantId ? app.repos.merchants.get(merchantId) : null;
+      if (merchant) openNavigationChooser(app, merchant);
+    });
+  });
+
   app.root.querySelectorAll("[data-select-merchant]").forEach(card => {
     const open = () => app.selectMerchant(card.dataset.selectMerchant);
     card.addEventListener("click", open);
@@ -618,6 +626,64 @@ function bindCustomerEvents(app) {
   });
   app.root.querySelectorAll("[data-rate-order]").forEach(button => button.addEventListener("click", () => openRating(app, button.dataset.rateOrder)));
   app.root.querySelectorAll("[data-track-order]").forEach(button => button.addEventListener("click", () => openTracking(app, button.dataset.trackOrder)));
+}
+
+function openNavigationChooser(app, merchant) {
+  const providers = navigationProviders();
+  const preferred = getPreferredNavigationProvider();
+  const destination = {
+    lat: merchant.latitude,
+    lng: merchant.longitude
+  };
+
+  app.openDialog(`
+    <div class="dialog-inner customer-navigation-dialog">
+      <div class="dialog-head">
+        <div>
+          <span class="eyebrow">Navigation</span>
+          <h2>Open directions with</h2>
+        </div>
+        <button class="icon-btn" data-close-dialog aria-label="Close navigation choices">✕</button>
+      </div>
+
+      <div class="navigation-destination">
+        <strong>${escapeHtml(merchant.name)}</strong>
+        <span>${escapeHtml(merchant.address || merchant.area || "Merchant location")}</span>
+      </div>
+
+      <div class="navigation-provider-list" role="list" aria-label="Navigation applications">
+        ${providers.map(provider => `
+          <button type="button" class="navigation-provider ${preferred === provider.id ? "preferred" : ""}" data-navigation-provider="${provider.id}" role="listitem">
+            <span class="navigation-provider-mark" aria-hidden="true">${provider.id === "waze" ? "W" : provider.id === "google" ? "G" : "A"}</span>
+            <span class="navigation-provider-copy">
+              <strong>${escapeHtml(provider.label)}</strong>
+              <small>${escapeHtml(provider.description)}</small>
+            </span>
+            ${preferred === provider.id ? '<span class="badge navigation-preferred-badge">Preferred</span>' : '<span class="customer-account-chevron" aria-hidden="true">›</span>'}
+          </button>`).join("")}
+      </div>
+
+      <label class="navigation-remember-choice">
+        <input type="checkbox" id="rememberNavigationChoice" ${preferred ? "checked" : ""} />
+        <span>
+          <strong>Remember my choice</strong>
+          <small>Yagoya will highlight it next time, but will still ask which navigation app to open.</small>
+        </span>
+      </label>
+    </div>`);
+
+  app.dialog.querySelectorAll("[data-navigation-provider]").forEach(button => {
+    button.addEventListener("click", () => {
+      const provider = button.dataset.navigationProvider;
+      const remember = app.dialog.querySelector("#rememberNavigationChoice")?.checked;
+      if (remember) setPreferredNavigationProvider(provider);
+      else clearPreferredNavigationProvider();
+
+      const url = directionsUrl(destination, { label: merchant.name, provider });
+      app.closeDialog();
+      window.location.assign(url);
+    });
+  });
 }
 
 function applyMenuFilter(app) {

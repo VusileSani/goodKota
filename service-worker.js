@@ -1,4 +1,4 @@
-const CACHE = "yagoya-v6-10-report-generation-shell";
+const CACHE = "yagoya-v6-11-navigation-app-choice-shell";
 const SHELL = [
   "./",
   "./index.html",

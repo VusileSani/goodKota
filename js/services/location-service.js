@@ -80,12 +80,66 @@ export function localAreaSuggestions(query, limit = 6) {
     .map(item => normalizeLocation({ ...item, source: "local_gazetteer" }));
 }
 
-export function directionsUrl(destination, { label = "" } = {}) {
+const NAVIGATION_PROVIDERS = Object.freeze([
+  { id: "waze", label: "Waze", description: "Open turn-by-turn navigation in Waze." },
+  { id: "google", label: "Google Maps", description: "Open driving directions in Google Maps." },
+  { id: "apple", label: "Apple Maps", description: "Open driving directions in Apple Maps." }
+]);
+
+export const NAVIGATION_PREFERENCE_KEY = "yagoya_navigation_provider";
+
+export function navigationProviders() {
+  return NAVIGATION_PROVIDERS.map(provider => ({ ...provider }));
+}
+
+export function normalizeNavigationProvider(provider) {
+  const id = String(provider || "").trim().toLowerCase();
+  return NAVIGATION_PROVIDERS.some(item => item.id === id) ? id : null;
+}
+
+export function getPreferredNavigationProvider(storage = typeof localStorage !== "undefined" ? localStorage : null) {
+  if (!storage?.getItem) return null;
+  try {
+    return normalizeNavigationProvider(storage.getItem(NAVIGATION_PREFERENCE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+export function setPreferredNavigationProvider(provider, storage = typeof localStorage !== "undefined" ? localStorage : null) {
+  const id = normalizeNavigationProvider(provider);
+  if (!storage?.setItem || !id) return false;
+  try {
+    storage.setItem(NAVIGATION_PREFERENCE_KEY, id);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function clearPreferredNavigationProvider(storage = typeof localStorage !== "undefined" ? localStorage : null) {
+  if (!storage?.removeItem) return false;
+  try {
+    storage.removeItem(NAVIGATION_PREFERENCE_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function directionsUrl(destination, { label = "", provider = "google" } = {}) {
   const location = normalizeLocation(destination, label || "Merchant");
   const coords = `${location.lat},${location.lng}`;
-  const ua = typeof navigator !== "undefined" ? navigator.userAgent || "" : "";
-  const isApple = /iPhone|iPad|iPod|Macintosh/i.test(ua);
-  if (isApple) return `https://maps.apple.com/?daddr=${encodeURIComponent(coords)}&dirflg=d`;
+  const providerId = normalizeNavigationProvider(provider) || "google";
+
+  if (providerId === "waze") {
+    return `https://www.waze.com/ul?ll=${encodeURIComponent(coords)}&navigate=yes&utm_source=yagoya`;
+  }
+
+  if (providerId === "apple") {
+    return `https://maps.apple.com/?daddr=${encodeURIComponent(coords)}&dirflg=d`;
+  }
+
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(coords)}&travelmode=driving`;
 }
 

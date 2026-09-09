@@ -1,3 +1,16 @@
+# Yagoya v6.11 Navigation App Choice — Validation
+
+Validated in this build:
+
+- Directions remains beside the merchant address on the customer merchant screen.
+- Directions is visually promoted without changing screen placement or layout hierarchy.
+- Waze, Google Maps and Apple Maps URLs use the merchant’s exact stored coordinates.
+- Navigation links require no secret/client API key.
+- Remembered provider state is bounded to a single local preference key and fails safely when browser storage is unavailable.
+- The chooser remains explicit on every Directions tap; preference only highlights the prior choice.
+- Service-worker cache name is bumped for update continuity.
+- Full automated regression suite passes.
+
 # Yagoya v6.10 Report Generation & Print — Validation
 
 ## Result

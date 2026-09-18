@@ -1,66 +1,8 @@
-const CACHE = "yagoya-v6-11-navigation-app-choice-shell";
-const SHELL = [
-  "./",
-  "./index.html",
-  "./css/styles.css",
-  "./css/website.css",
-  "./website.html",
-  "./manifest.webmanifest",
-  "./assets/yagoya-logo.png",
-  "./assets/yagoya-splash.jpg",
-  "./js/app.js",
-  "./js/core/store.js",
-  "./js/core/utils.js",
-  "./js/data/seed.js",
-  "./js/infrastructure/local-database.js",
-  "./js/repositories/repository-hub.js",
-  "./js/services/authorization-service.js",
-  "./js/services/command-service.js",
-  "./js/services/delivery-service.js",
-  "./js/services/feature-flag-service.js",
-  "./js/services/financial-ledger-service.js",
-  "./js/services/geocoding-service.js",
-  "./js/services/geohash-service.js",
-  "./js/services/job-service.js",
-  "./js/services/location-service.js",
-  "./js/services/notification-service.js",
-  "./js/services/payment-service.js",
-  "./js/services/pricing-service.js",
-  "./js/services/quality-service.js",
-  "./js/services/recommendation-service.js",
-  "./js/services/report-service.js",
-  "./js/services/retention-service.js",
-  "./js/services/search-service.js",
-  "./js/services/storefront-service.js",
-  "./js/services/telemetry-service.js",
-  "./js/public-portal.js",
-  "./js/views/customer-view.js",
-  "./js/views/merchant-view.js",
-  "./js/views/driver-view.js",
-  "./js/views/delivery-ops-view.js",
-  "./js/views/admin-view.js",
-  "./js/views/owner-view.js"
-];
-
-self.addEventListener("install", event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)));
-  self.skipWaiting();
-});
-
-self.addEventListener("activate", event => {
-  event.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key))))
-      .then(() => self.clients.claim())
-  );
-});
-
+const CACHE = "goodkota-mvp-v7";
+const ASSETS = ["./", "./index.html", "./css/styles.css", "./js/app.js", "./js/core/store.js", "./js/data/seed.js", "./assets/goodkota-logo.png"];
+self.addEventListener("install", event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS))));
+self.addEventListener("activate", event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key))))));
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
-  event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
-});
-
-self.addEventListener("notificationclick", event => {
-  event.notification.close();
-  event.waitUntil(self.clients.openWindow("./"));
+  event.respondWith(caches.match(event.request).then(hit => hit || fetch(event.request)));
 });

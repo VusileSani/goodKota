@@ -1,453 +1,411 @@
-import { AppStore } from "./core/store.js";
-import { RepositoryHub } from "./repositories/repository-hub.js";
-import { TelemetryService } from "./services/telemetry-service.js";
-import { YagoyaCommandService } from "./services/command-service.js";
-import { defaultLocation, getCurrentPosition, normalizeLocation, resolveArea } from "./services/location-service.js";
-import { geocodeSouthAfricanAddress, suggestSouthAfricanLocations } from "./services/geocoding-service.js";
-import { LocalMarketplacePaymentAdapter } from "./services/payment-service.js";
-import { RetentionService } from "./services/retention-service.js";
-import { JobService } from "./services/job-service.js";
-import { isFeatureEnabled } from "./services/feature-flag-service.js";
-import { registerServiceWorker, requestNotificationPermission, showLocalNotification } from "./services/notification-service.js";
-import { renderCustomerView } from "./views/customer-view.js";
-import { renderMerchantView } from "./views/merchant-view.js";
-import { renderDriverView } from "./views/driver-view.js";
-import { renderDeliveryOpsView } from "./views/delivery-ops-view.js";
-import { renderAdminView } from "./views/admin-view.js";
-import { renderOwnerView } from "./views/owner-view.js";
-import { FirebaseAuthService } from "./infrastructure/firebase-auth-service.js";
-import { friendlyAuthError } from "./services/auth-error-service.js";
+import { Store } from "./core/store.js";
+import { STANDARD } from "./data/seed.js";
 
-class YagoyaApp {
-  constructor() {
-    this.root = document.querySelector("#app");
-    this.dialog = document.querySelector("#appDialog");
-    this.store = new AppStore();
-    this.repos = new RepositoryHub(this.store);
-    this.telemetry = new TelemetryService(this.store);
-    this.route = "customer";
-    this.location = defaultLocation();
-    this.selectedMerchantId = null;
-    this.currentMerchantId = this.repos.merchants.first()?.id || null;
-    this.currentDriverId = this.repos.delivery.listDrivers({ limit: 1 }).items[0]?.id || null;
-    this.cart = [];
-    this.deliveryMode = "Takeaway";
-    this.customerSection = "home";
-    this.customerMenuQuery = "";
-    this.customerCategory = "All";
-    this.customerAccountPanel = null;
-    this.customerAuthMode = "signin";
-    this.customerAuthError = "";
-    this.customerAuthPrompt = "";
-    this.paymentService = new LocalMarketplacePaymentAdapter(this.repos.platform.paymentGateway());
-    this.commands = new YagoyaCommandService({ store: this.store, paymentService: this.paymentService, telemetry: this.telemetry });
-    this.retention = new RetentionService(this.store);
-    this.jobs = new JobService(this.store, this.telemetry);
-    this.merchantSection = "overview";
-    this.merchantOrderFilter = "active";
-    this.adminSection = "overview";
-    this.adminMerchantQuery = "";
-    this.adminOrderQuery = "";
-    this.adminDriverQuery = "";
-    this.ownerSection = "control";
-    this.auth = new FirebaseAuthService();
-    this.authUser = null;
-    this.authResolved = false;
-    this.pendingCustomerAction = null;
-  }
+const store = new Store();
+const app = document.querySelector("#app");
+const modal = document.querySelector("#modal");
+const toast = document.querySelector("#toast");
+const roleSelect = document.querySelector("#roleSelect");
+const locationLabel = document.querySelector("#locationLabel");
 
-  start() {
-    this.bindShell();
-    this.bindAuthentication();
-    this.applyDeepLink();
-    this.renderBrandLinks();
-    this.retention.enforce();
-    this.processLocalBackgroundJobs();
-    registerServiceWorker();
-    this.render();
+const money = cents => new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR", maximumFractionDigits: 0 }).format(cents / 100);
+const esc = value => String(value ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[ch]));
+const standardPass = merchant => Object.values(merchant.standard).every(Boolean);
+const firstLetter = text => esc(String(text).trim().slice(0,1).toUpperCase());
 
-    const splash = document.querySelector("#brandSplash");
-    window.setTimeout(() => splash?.classList.add("is-hidden"), 650);
-    window.setTimeout(() => splash?.remove(), 1100);
-  }
-
-
-  bindAuthentication() {
-    const authButton = document.querySelector("#authButton");
-    authButton?.removeAttribute("hidden");
-    this.renderAuthControls();
-    authButton?.addEventListener("click", () => {
-      this.route = "customer";
-      this.customerSection = "account";
-      this.customerAccountPanel = "security";
-      this.customerAuthMode = this.authUser ? "account" : "signin";
-      this.customerAuthError = "";
-      this.customerAuthPrompt = "";
-      const roleSelect = document.querySelector("#roleSelect");
-      if (roleSelect) roleSelect.value = "customer";
-      this.render();
-      window.scrollTo(0, 0);
-    });
-    this.auth.onChange(user => {
-      this.authUser = user;
-      this.authResolved = true;
-      this.renderAuthControls();
-
-      if (!user) {
-        this.customerAuthMode = "signin";
-        if (this.route === "customer" && this.customerSection === "account" && this.customerAccountPanel && this.customerAccountPanel !== "security" && this.customerAccountPanel !== "support") {
-          this.customerAccountPanel = "security";
-          this.customerAuthPrompt = "Sign in to open your private Yagoya account information.";
-        }
-      }
-
-      if (user && this.pendingCustomerAction) {
-        const action = this.pendingCustomerAction;
-        this.pendingCustomerAction = null;
-        this.customerAuthPrompt = "";
-        if (action === "checkout") {
-          this.customerSection = "cart";
-          this.render();
-          window.setTimeout(() => document.querySelector("#checkoutButton")?.click(), 0);
-          return;
-        }
-        if (action.startsWith("account:")) {
-          this.customerSection = "account";
-          this.customerAccountPanel = action.slice("account:".length);
-        }
-      }
-
-      if (this.route === "customer" && this.customerSection === "account") this.render();
-    });
-  }
-
-  renderAuthControls() {
-    const button = document.querySelector("#authButton");
-    if (!button) return;
-    button.hidden = false;
-    if (!this.authResolved) {
-      button.disabled = true;
-      button.textContent = "Checking…";
-      button.setAttribute("aria-busy", "true");
-      button.setAttribute("aria-label", "Checking Yagoya sign-in status");
-      return;
-    }
-    button.disabled = false;
-    button.removeAttribute("aria-busy");
-    if (!this.authUser) {
-      button.textContent = "Sign in";
-      button.setAttribute("aria-label", "Sign in to Yagoya");
-      return;
-    }
-    button.textContent = "Account";
-    button.setAttribute("title", this.authUser.email || this.authUser.displayName || "Signed in");
-    button.setAttribute("aria-label", "Open Yagoya account. Signed in.");
-  }
-
-  openAuthDialog(mode = "signin") {
-    const register = mode === "register";
-    this.openDialog(`
-      <div class="dialog-inner auth-dialog">
-        <div class="dialog-head"><div><span class="eyebrow">Yagoya account</span><h2>${register ? "Create account" : "Sign in"}</h2></div><button class="icon-btn" data-close-dialog aria-label="Close">✕</button></div>
-        <p class="muted">${register ? "Create a customer account. Merchant and platform authority are assigned separately." : "Use your Yagoya email and password."}</p>
-        <form id="yagoyaAuthForm" class="form-grid">
-          ${register ? '<label class="field full">Name<input name="name" autocomplete="name" required /></label>' : ''}
-          <label class="field full">Email<input name="email" type="email" autocomplete="email" required /></label>
-          <label class="field full">Password<input name="password" type="password" autocomplete="${register ? 'new-password' : 'current-password'}" minlength="6" required /></label>
-          <div id="authError" class="auth-error field full" role="alert"></div>
-          <div class="inline-actions field full"><button class="primary" type="submit">${register ? "Create account" : "Sign in"}</button><button class="secondary" type="button" id="authModeSwitch">${register ? "I already have an account" : "Create customer account"}</button></div>
-        </form>
-      </div>`);
-    this.dialog.querySelector("#authModeSwitch")?.addEventListener("click", () => this.openAuthDialog(register ? "signin" : "register"));
-    this.dialog.querySelector("#yagoyaAuthForm")?.addEventListener("submit", async event => {
-      event.preventDefault();
-      const form = new FormData(event.currentTarget);
-      const errorHost = this.dialog.querySelector("#authError");
-      errorHost.textContent = "";
-      try {
-        if (register) await this.auth.registerCustomer(form.get("name"), form.get("email"), form.get("password"));
-        else await this.auth.signIn(form.get("email"), form.get("password"));
-        this.closeDialog();
-        this.toast(register ? "Yagoya account created." : "Signed in to Yagoya.");
-      } catch (error) {
-        errorHost.textContent = friendlyAuthError(error);
-      }
-    });
-  }
-
-  openAccountDialog() {
-    const user = this.authUser;
-    if (!user) return this.openAuthDialog("signin");
-    this.openDialog(`
-      <div class="dialog-inner auth-dialog">
-        <div class="dialog-head"><div><span class="eyebrow">Yagoya account</span><h2>${user.displayName || "Signed in"}</h2></div><button class="icon-btn" data-close-dialog aria-label="Close">✕</button></div>
-        <p class="muted">${user.email || "Authenticated account"}</p>
-        <div class="inline-actions"><button class="secondary" type="button" id="signOutButton">Sign out</button></div>
-      </div>`);
-    this.dialog.querySelector("#signOutButton")?.addEventListener("click", async () => {
-      await this.auth.signOut();
-      this.closeDialog();
-      this.toast("Signed out of Yagoya.");
-    });
-  }
-
-  processLocalBackgroundJobs() {
-    // The browser adapter preserves the asynchronous command boundary while testing.
-    // Production workers execute these jobs from Cloud Tasks / scheduled Functions.
-    const handlers = {
-      order_notifications: payload => ({ accepted: true, orderId: payload.orderId }),
-      order_status_notification: payload => ({ accepted: true, orderId: payload.orderId, status: payload.status }),
-      driver_assignment_notification: payload => ({ accepted: true, taskId: payload.taskId, driverId: payload.driverId })
-    };
-    this.jobs.processBatch(handlers, 20);
-  }
-
-  applyDeepLink() {
-    const params = new URLSearchParams(window.location.search);
-    const merchantId = params.get("merchant");
-    if (merchantId && this.repos.merchants.get(merchantId)) {
-      this.route = "customer";
-      this.selectedMerchantId = merchantId;
-      this.customerSection = "browse";
-    }
-  }
-
-  renderBrandLinks() {
-    const host = document.querySelector("#brandLinks");
-    if (!host) return;
-    const brand = this.repos.platform.brand();
-    const social = brand.social || {};
-    const links = [["Instagram", social.instagram], ["Facebook", social.facebook], ["TikTok", social.tiktok]].filter(([, url]) => /^https?:\/\//i.test(String(url || "")));
-    host.innerHTML = `<a class="brand-link explore-link" href="${brand.publicWebsite || "./website.html"}">Explore Yagoya</a>${links.map(([label, url]) => `<a class="brand-link social-link" href="${url}" target="_blank" rel="noopener noreferrer" aria-label="Yagoya on ${label}">${label}</a>`).join("")}`;
-  }
-
-  renderActorContext() {
-    const host = document.querySelector("#actorContext");
-    if (!host) return;
-    const contexts = {
-      customer: ["Customer", "Nearby discovery, ordering and delivery"],
-      merchant: ["Merchant", "Overview, orders, menu, quality, brand materials and store settings"],
-      driver: ["Driver", "Current delivery, handover and support"],
-      delivery: ["Delivery Ops", "Dispatch and live delivery control"],
-      admin: ["Yagoya Admin", "Platform operations and stakeholder support"],
-      owner: ["Yagoya Owner", "Company authority and protected controls"]
-    };
-    const [label, hint] = contexts[this.route] || contexts.customer;
-    host.dataset.actor = this.route;
-    host.innerHTML = `<div class="actor-context-inner"><span class="actor-context-label">${label}</span><span class="actor-context-hint">${hint}</span></div>`;
-  }
-
-  bindShell() {
-    document.querySelector("#brandHome").addEventListener("click", () => this.navigate("customer"));
-    document.querySelector("#roleSelect")?.addEventListener("change", event => this.navigate(event.currentTarget.value));
-
-    this.dialog.addEventListener("click", event => {
-      if (event.target === this.dialog) this.closeDialog();
-      if (event.target.closest("[data-close-dialog]")) this.closeDialog();
-    });
-    this.dialog.addEventListener("cancel", event => {
-      event.preventDefault();
-      this.closeDialog();
-    });
-  }
-
-  navigate(route) {
-    this.route = route;
-    const roleSelect = document.querySelector("#roleSelect");
-    if (roleSelect) roleSelect.value = route;
-    this.render();
-    window.scrollTo(0, 0);
-  }
-
-  render() {
-    document.body.classList.toggle("customer-route", this.route === "customer");
-    document.body.dataset.route = this.route;
-    this.renderActorContext();
-    const controls = this.repos.platform.controls();
-    if (controls.maintenanceMode && !["owner", "admin"].includes(this.route)) {
-      this.root.innerHTML = `
-        <section class="governance-hero compact">
-          <div><span class="eyebrow">Yagoya</span><h2>Platform maintenance</h2><p>Yagoya is temporarily paused while the platform team completes an operational intervention.</p></div>
-          <span class="status-pulse danger">Maintenance</span>
-        </section>
-        <section class="section"><div class="card"><strong>No action is required from you.</strong><p class="muted">Your existing records remain preserved. Normal service will return when the Owner releases maintenance mode.</p></div></section>`;
-    } else if (this.route === "merchant") renderMerchantView(this);
-    else if (this.route === "driver") renderDriverView(this);
-    else if (this.route === "delivery") renderDeliveryOpsView(this);
-    else if (this.route === "admin") renderAdminView(this);
-    else if (this.route === "owner") renderOwnerView(this);
-    else renderCustomerView(this);
-
-    this.renderAnnouncementBanner();
-    this.enhanceResponsiveTables(this.root);
-  }
-
-  platformActor(role = this.route) {
-    return this.repos.governance.actor(role === "owner" ? "owner" : "admin");
-  }
-
-  renderAnnouncementBanner() {
-    const routeAudience = { customer: "customers", merchant: "merchants", driver: "drivers", delivery: "operations", admin: "internal", owner: "internal" };
-    const audience = routeAudience[this.route];
-    const item = this.repos.governance.latestAnnouncement(audience);
-    if (!item || this.root.querySelector(".platform-announcement")) return;
-    const banner = document.createElement("div");
-    banner.className = `platform-announcement ${item.severity || "info"}`;
-    const copy = document.createElement("div");
-    const title = document.createElement("strong");
-    const message = document.createElement("span");
-    title.textContent = item.title;
-    message.textContent = item.message;
-    copy.append(title, message);
-    banner.append(copy);
-    this.root.prepend(banner);
-  }
-
-  enhanceResponsiveTables(scope = document) {
-    scope.querySelectorAll("table").forEach(table => {
-      const headers = [...table.querySelectorAll("thead th")].map(header => header.textContent.trim());
-      table.querySelectorAll("tbody tr").forEach(row => {
-        [...row.children].forEach((cell, index) => {
-          if (!cell.dataset.label) cell.dataset.label = headers[index] || "";
-        });
-      });
-    });
-  }
-
-  getRankedMerchants() {
-    const customerId = this.repos.users.customer()?.id || "anonymous";
-    const enabled = isFeatureEnabled(this.repos.platform.get(), "customerSearchV2", customerId);
-    return this.repos.merchants.nearby(this.location, { radiusKm: enabled ? 35 : 20, limit: 30 }).items;
-  }
-
-  async useCurrentLocation() {
-    return this.setCustomerLocation(await getCurrentPosition());
-  }
-
-  async searchArea(query) {
-    const known = resolveArea(query);
-    let result = known;
-    if (!result) {
-      const match = await geocodeSouthAfricanAddress(query);
-      result = normalizeLocation({ lat: match.latitude, lng: match.longitude, label: match.address || match.area || String(query).trim(), type: match.placeType || "location", source: "geocoded", providerRef: match.providerRef });
-    }
-    return this.setCustomerLocation(result);
-  }
-
-  async suggestLocations(query, options = {}) {
-    return suggestSouthAfricanLocations(query, options);
-  }
-
-  setCustomerLocation(location) {
-    // Customer discovery location is session state only. We deliberately do not append
-    // foreground search/GPS positions to operational history.
-    this.location = normalizeLocation(location);
-    this.selectedMerchantId = null;
-    this.cart = [];
-    this.customerSection = "home";
-    this.render();
-    return true;
-  }
-
-  selectMerchant(merchantId) {
-    if (this.selectedMerchantId !== merchantId) {
-      this.cart = [];
-      this.customerMenuQuery = "";
-      this.customerCategory = "All";
-    this.customerAccountPanel = null;
-    }
-    this.selectedMerchantId = merchantId;
-    this.customerSection = "browse";
-    this.render();
-    window.scrollTo(0, 0);
-  }
-
-  navigateCustomerSection(section) {
-    this.customerSection = section;
-    if (section !== "account") this.customerAccountPanel = null;
-    this.render();
-    window.scrollTo(0, 0);
-  }
-
-  addToCart(productId) {
-    const existing = this.cart.find(line => line.productId === productId);
-    if (existing) existing.qty += 1;
-    else this.cart.push({ productId, qty: 1 });
-    this.render();
-  }
-
-  changeQuantity(productId, delta) {
-    const line = this.cart.find(item => item.productId === productId);
-    if (!line) return;
-    line.qty += delta;
-    if (line.qty <= 0) this.cart = this.cart.filter(item => item.productId !== productId);
-    this.render();
-  }
-
-  openDialog(markup) {
-    this.dialog.innerHTML = markup;
-
-    if (!this.dialog.open) {
-      this.dialogScrollY = window.scrollY;
-      document.documentElement.classList.add("dialog-open");
-      document.body.classList.add("dialog-open");
-      document.body.style.top = `-${this.dialogScrollY}px`;
-      this.dialog.showModal();
-    }
-
-    this.enhanceResponsiveTables(this.dialog);
-  }
-
-  closeDialog() {
-    if (this.dialog.open) this.dialog.close();
-    this.dialog.innerHTML = "";
-
-    if (document.body.classList.contains("dialog-open")) {
-      const scrollY = Number(this.dialogScrollY || 0);
-      document.documentElement.classList.remove("dialog-open");
-      document.body.classList.remove("dialog-open");
-      document.body.style.top = "";
-      this.dialogScrollY = 0;
-      window.scrollTo(0, scrollY);
-    }
-  }
-
-  toast(message, options = {}) {
-    const existing = document.querySelector("#appToast");
-    existing?.remove();
-    const toast = document.createElement("div");
-    const tone = options.tone || "success";
-    const title = options.title || "";
-    toast.id = "appToast";
-    toast.className = `app-toast ${tone}`;
-    toast.setAttribute("role", tone === "warning" ? "alert" : "status");
-    toast.setAttribute("aria-live", tone === "warning" ? "assertive" : "polite");
-    toast.innerHTML = `<span class="app-toast-mark" aria-hidden="true">${tone === "warning" ? "!" : "✓"}</span><span><strong>${title || message}</strong>${title ? `<small>${message}</small>` : ""}</span>`;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), Number(options.duration || 4200));
-  }
-
-  async enableNearbyNotifications() {
-    if (this.store.customer.notificationPreferences.nearbyQualityMerchants) {
-      this.commands.setNearbyNotifications(false);
-      this.toast("Nearby Yagoya alerts disabled.");
-      this.render();
-      return;
-    }
-
-    try {
-      await requestNotificationPermission();
-      this.commands.setNearbyNotifications(true);
-      await showLocalNotification("Yagoya alerts are ready", {
-        body: "Future proximity recommendations will be limited to merchants meeting the Yagoya quality standard."
-      });
-      this.toast("Nearby quality alerts are now enabled.", { title: "Notification preference saved" });
-      this.render();
-    } catch (error) {
-      alert(error.message);
-    }
-  }
+function showToast(message) {
+  toast.textContent = message;
+  toast.classList.add("show");
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => toast.classList.remove("show"), 1800);
 }
 
-const app = new YagoyaApp();
-app.start();
+function render() {
+  roleSelect.value = store.state.role;
+  locationLabel.textContent = store.state.location;
+  if (store.state.role === "merchant") renderMerchant();
+  else if (store.state.role === "admin") renderAdmin();
+  else renderCustomer();
+  bindCommon();
+}
+
+function bindCommon() {
+  app.querySelectorAll("[data-open-merchant]").forEach(button => button.addEventListener("click", () => {
+    store.state.selectedMerchantId = button.dataset.openMerchant;
+    store.log("merchant_open", { merchantId: button.dataset.openMerchant });
+    render();
+  }));
+
+  app.querySelectorAll("[data-favourite]").forEach(button => button.addEventListener("click", event => {
+    event.stopPropagation();
+    const id = button.dataset.favourite;
+    const set = new Set(store.state.favourites);
+    set.has(id) ? set.delete(id) : set.add(id);
+    store.state.favourites = [...set];
+    store.log("favourite_toggle", { merchantId: id, active: set.has(id) });
+    render();
+  }));
+
+  app.querySelectorAll("[data-add]").forEach(button => button.addEventListener("click", () => addToCart(button.dataset.add)));
+  app.querySelectorAll("[data-cart]").forEach(button => button.addEventListener("click", openCart));
+}
+
+function renderCustomer() {
+  if (store.state.selectedMerchantId) {
+    app.innerHTML = merchantDetail(store.merchant(store.state.selectedMerchantId));
+    return;
+  }
+
+  const tab = store.state.customerTab;
+  app.innerHTML = tab === "saved" ? savedView() : tab === "orders" ? ordersView() : tab === "account" ? accountView() : discoverView();
+  app.insertAdjacentHTML("beforeend", customerNav());
+
+  app.querySelectorAll("[data-customer-tab]").forEach(button => button.addEventListener("click", () => {
+    store.state.customerTab = button.dataset.customerTab;
+    store.save();
+    render();
+  }));
+
+  const search = app.querySelector("#discoverSearch");
+  if (search) {
+    search.value = store.state.search;
+    search.addEventListener("input", () => {
+      store.state.search = search.value;
+      store.save();
+      updateMerchantGrid();
+    });
+  }
+
+  app.querySelectorAll("[data-filter]").forEach(button => button.addEventListener("click", () => {
+    store.state.filter = button.dataset.filter;
+    store.save();
+    render();
+  }));
+}
+
+function discoverView() {
+  return `
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="eyebrow">The kota authority</div>
+        <h1>Good kota.<br>Near you.</h1>
+        <p>GoodKota tells you where the good food is. Nearby first, quality made visible, no endless directory.</p>
+        <label class="searchbar">
+          <input id="discoverSearch" type="search" placeholder="Search a kota spot or area" autocomplete="off" />
+          <button class="btn primary" type="button">Find kota</button>
+        </label>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="authority-strip">
+        <div class="authority-cell"><strong>Not every listing gets the badge.</strong><span>GoodKota is curated around a clear standard.</span></div>
+        <div class="authority-cell"><strong>5</strong><span>checks in the GoodKota Standard</span></div>
+        <div class="authority-cell"><strong>3</strong><span>verified picks near ${esc(store.state.location)}</span></div>
+        <div class="authority-cell"><strong>Nearby</strong><span>distance leads, quality decides</span></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div><h2>Where the good kota is</h2><p>Closest GoodKota picks first.</p></div>
+        <div class="filter-row">
+          ${["All","Verified","Best value","Chicken"].map(filter => `<button class="chip ${store.state.filter === filter ? "active" : ""}" data-filter="${filter}">${filter}</button>`).join("")}
+        </div>
+      </div>
+      <div class="merchant-grid" id="merchantGrid">${merchantCards(filteredMerchants())}</div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><div><h2>The GoodKota Standard</h2><p>A simple reason to trust the badge.</p></div></div>
+      <div class="criteria-grid">
+        ${STANDARD.map((item, index) => `<article class="criteria-card"><div class="criteria-number">0${index + 1}</div><strong>${esc(item.name)}</strong><p>${esc(item.description)}</p></article>`).join("")}
+      </div>
+    </section>`;
+}
+
+function filteredMerchants() {
+  const q = store.state.search.trim().toLowerCase();
+  const filter = store.state.filter;
+  return store.state.merchants
+    .filter(m => m.online)
+    .filter(m => !q || `${m.name} ${m.area} ${m.tags.join(" ")}`.toLowerCase().includes(q))
+    .filter(m => filter === "All" || (filter === "Verified" && standardPass(m)) || m.tags.includes(filter))
+    .sort((a,b) => a.distanceKm - b.distanceKm);
+}
+
+function updateMerchantGrid() {
+  const grid = app.querySelector("#merchantGrid");
+  if (!grid) return;
+  grid.innerHTML = merchantCards(filteredMerchants());
+  bindCommon();
+}
+
+function merchantCards(merchants) {
+  if (!merchants.length) return `<div class="empty">No kota spots match that search yet.</div>`;
+  return merchants.map((m, index) => `
+    <article class="merchant-card" data-open-merchant="${m.id}">
+      <div class="merchant-card-top">
+        <div class="merchant-monogram">${firstLetter(m.name)}</div>
+        <button class="link-button" data-favourite="${m.id}" aria-label="${store.state.favourites.includes(m.id) ? "Remove favourite" : "Save favourite"}">${store.state.favourites.includes(m.id) ? "♥" : "♡"}</button>
+      </div>
+      <h3>${esc(m.name)}</h3>
+      <div class="address">${esc(m.area)}</div>
+      <div class="merchant-facts">
+        <span><strong>${m.distanceKm.toFixed(1)} km</strong></span>
+        <span>★ ${m.rating.toFixed(1)}</span>
+        <span>~${m.prepMinutes} min</span>
+        <span>${esc(m.priceBand)}</span>
+      </div>
+      <div class="card-bottom">
+        ${standardPass(m) ? `<span class="badge orange">✓ GoodKota Pick</span>` : `<span class="badge amber">Under review</span>`}
+        <button class="link-button" data-open-merchant="${m.id}">${index === 0 ? "Closest · " : ""}See why →</button>
+      </div>
+    </article>`).join("");
+}
+
+function merchantDetail(merchant) {
+  if (!merchant) return `<div class="empty">Merchant not found.</div>`;
+  const checks = STANDARD.map(item => {
+    const passed = Boolean(merchant.standard[item.id]);
+    return `<div class="standard-row"><div class="standard-icon">${passed ? "✓" : "!"}</div><div><strong>${esc(item.name)}</strong><small>${esc(item.description)}</small></div><span class="badge ${passed ? "green" : "amber"}">${passed ? "Pass" : "Review"}</span></div>`;
+  }).join("");
+
+  return `
+    <section class="detail-hero">
+      <button class="link-button back" id="backDiscover">← Back to nearby</button>
+      <div class="eyebrow">${standardPass(merchant) ? "GoodKota Pick" : "Quality review"}</div>
+      <h1>${esc(merchant.name)}</h1>
+      <p>${esc(merchant.area)} · ${merchant.distanceKm.toFixed(1)} km away · ★ ${merchant.rating.toFixed(1)} from ${merchant.verifiedRatings} verified ratings</p>
+      <div class="detail-actions">
+        <button class="btn primary" id="directionsButton">Get directions</button>
+        <button class="btn light" data-favourite="${merchant.id}">${store.state.favourites.includes(merchant.id) ? "♥ Saved" : "♡ Save"}</button>
+        <button class="btn light" data-cart>Cart · ${cartCount()}</button>
+      </div>
+    </section>
+
+    <div class="detail-layout">
+      <section class="panel">
+        <div class="section-head"><div><h2>Order for pickup</h2><p>Keep the MVP simple: discover, choose, collect.</p></div></div>
+        <div class="menu-list">
+          ${merchant.menu.map(item => `<article class="menu-item"><div><h4>${esc(item.name)}</h4><p>${esc(item.desc)}</p></div><div class="menu-actions"><span class="price">${money(item.price)}</span><button class="btn dark small" data-add="${item.id}" ${item.available ? "" : "disabled"}>Add</button></div></article>`).join("")}
+        </div>
+      </section>
+      <aside class="panel">
+        <h2>Why it is here</h2>
+        <p style="color:var(--muted);line-height:1.55">${esc(merchant.note)}</p>
+        <div class="standard-list">${checks}</div>
+      </aside>
+    </div>`;
+}
+
+function savedView() {
+  const merchants = store.state.merchants.filter(m => store.state.favourites.includes(m.id));
+  return `<div class="page-title"><div class="eyebrow">Your shortcuts</div><h1>Saved kota spots</h1><p>Good places you want to find again.</p></div><div class="merchant-grid">${merchantCards(merchants)}</div>`;
+}
+
+function ordersView() {
+  const orders = store.state.orders.filter(order => order.customer === "Sani");
+  return `<div class="page-title"><div class="eyebrow">Pickup</div><h1>Your orders</h1><p>No delivery machinery in this MVP. Order, collect, eat.</p></div><section class="panel stack">${orders.map(orderRow).join("") || `<div class="empty">No orders yet.</div>`}</section>`;
+}
+
+function orderRow(order) {
+  const merchant = store.merchant(order.merchantId);
+  const tone = order.status === "completed" ? "green" : order.status === "ready" ? "orange" : "dark";
+  return `<div class="list-row"><div><strong>${esc(merchant?.name || "GoodKota")}</strong><p>${esc(order.id)} · ${esc(order.createdAt)}</p></div><div class="list-row-actions"><span class="badge ${tone}">${esc(order.status)}</span><strong>${money(order.total)}</strong></div></div>`;
+}
+
+function accountView() {
+  return `<div class="page-title"><div class="eyebrow">GoodKota account</div><h1>Keep it light.</h1><p>Only the account tools a customer needs for the MVP.</p></div><section class="panel"><div class="stack">${["My Orders","My Favourites","My Details","Help & Support","Account & Security"].map(label => `<div class="list-row"><strong>${label}</strong><span>›</span></div>`).join("")}</div></section>`;
+}
+
+function customerNav() {
+  const tabs = [["discover","⌂","Discover"],["saved","♡","Saved"],["orders","≡","Orders"],["account","●","Account"]];
+  return `<nav class="bottom-nav" aria-label="Customer navigation">${tabs.map(([id,icon,label]) => `<button class="${store.state.customerTab === id ? "active" : ""}" data-customer-tab="${id}"><span>${icon}</span>${label}</button>`).join("")}</nav>`;
+}
+
+function addToCart(productId) {
+  const product = store.product(productId);
+  if (!product) return;
+  const existingMerchant = store.state.cart[0] ? store.product(store.state.cart[0].productId)?.merchantId : null;
+  if (existingMerchant && existingMerchant !== product.merchantId) store.state.cart = [];
+  const line = store.state.cart.find(item => item.productId === productId);
+  line ? line.qty += 1 : store.state.cart.push({ productId, qty: 1 });
+  store.log("cart_add", { productId, merchantId: product.merchantId });
+  showToast(`${product.name} added`);
+  render();
+}
+
+function cartCount() { return store.state.cart.reduce((sum, line) => sum + line.qty, 0); }
+function cartTotal() { return store.state.cart.reduce((sum, line) => sum + (store.product(line.productId)?.price || 0) * line.qty, 0); }
+
+function openCart() {
+  const lines = store.state.cart.map(line => {
+    const product = store.product(line.productId);
+    return product ? `<div class="cart-line"><div><strong>${esc(product.name)}</strong><div style="color:var(--muted);font-size:12px">${money(product.price)}</div></div><div class="qty"><button data-qty="-1" data-product="${product.id}">−</button><strong>${line.qty}</strong><button data-qty="1" data-product="${product.id}">+</button></div><strong>${money(product.price * line.qty)}</strong></div>` : "";
+  }).join("");
+
+  modal.innerHTML = `<div class="modal-body"><div class="modal-head"><div><div class="eyebrow">Pickup order</div><h2>Your kota</h2></div><button class="modal-close" data-close>×</button></div><div style="margin-top:16px">${lines || `<div class="empty">Your cart is empty.</div>`}</div>${store.state.cart.length ? `<div class="cart-total"><span>Total</span><span>${money(cartTotal())}</span></div><button class="btn primary" style="width:100%;margin-top:16px" id="placeOrder">Place pickup order</button>` : ""}</div>`;
+  modal.showModal();
+  modal.querySelector("[data-close]").addEventListener("click", () => modal.close());
+  modal.querySelectorAll("[data-qty]").forEach(button => button.addEventListener("click", () => {
+    const line = store.state.cart.find(item => item.productId === button.dataset.product);
+    if (!line) return;
+    line.qty += Number(button.dataset.qty);
+    if (line.qty <= 0) store.state.cart = store.state.cart.filter(item => item !== line);
+    store.save();
+    modal.close();
+    openCart();
+  }));
+  modal.querySelector("#placeOrder")?.addEventListener("click", placeOrder);
+}
+
+function placeOrder() {
+  if (!store.state.cart.length) return;
+  const product = store.product(store.state.cart[0].productId);
+  const id = `GK-${Math.floor(1100 + Math.random() * 800)}`;
+  store.state.orders.unshift({
+    id,
+    merchantId: product.merchantId,
+    customer: "Sani",
+    status: "new",
+    total: cartTotal(),
+    items: store.state.cart.map(item => ({...item})),
+    createdAt: "Just now"
+  });
+  store.state.cart = [];
+  store.state.customerTab = "orders";
+  store.state.selectedMerchantId = null;
+  store.log("pickup_order_created", { orderId: id, merchantId: product.merchantId });
+  modal.close();
+  showToast(`Order ${id} sent`);
+  render();
+}
+
+function renderMerchant() {
+  const merchant = store.merchant(store.state.merchantId);
+  const orders = store.state.orders.filter(o => o.merchantId === merchant.id && o.status !== "completed");
+  const groups = ["new","accepted","ready"];
+  app.innerHTML = `
+    <div class="page-title"><div class="eyebrow">Merchant</div><h1>${esc(merchant.name)}</h1><p>The merchant MVP is deliberately operationally light.</p></div>
+    <div class="metric-grid">
+      <div class="metric"><div class="value">${merchant.online ? "Open" : "Closed"}</div><div class="label">Listing status</div></div>
+      <div class="metric"><div class="value">${orders.length}</div><div class="label">Active pickup orders</div></div>
+      <div class="metric"><div class="value">${merchant.rating.toFixed(1)}</div><div class="label">Verified rating</div></div>
+      <div class="metric"><div class="value">${standardPass(merchant) ? "5/5" : "4/5"}</div><div class="label">GoodKota Standard</div></div>
+    </div>
+
+    <section class="section">
+      <div class="section-head"><div><h2>Pickup queue</h2><p>Accept → ready → collected. Nothing more.</p></div><button class="btn ${merchant.online ? "ghost" : "primary"}" id="toggleOnline">${merchant.online ? "Close listing" : "Open listing"}</button></div>
+      <div class="queue-grid">
+        ${groups.map(status => `<div class="queue-column"><h3>${status === "new" ? "New" : status === "accepted" ? "Preparing" : "Ready"}</h3>${orders.filter(o => o.status === status).map(merchantOrderCard).join("") || `<div class="empty">Nothing here.</div>`}</div>`).join("")}
+      </div>
+    </section>
+
+    <section class="section detail-layout">
+      <div class="panel"><h2>Menu availability</h2>${merchant.menu.map(item => `<div class="list-row"><div><strong>${esc(item.name)}</strong><p>${money(item.price)}</p></div><button class="btn ${item.available ? "ghost" : "dark"} small" data-toggle-item="${item.id}">${item.available ? "Available" : "Unavailable"}</button></div>`).join("")}</div>
+      <div class="panel"><h2>Your GoodKota listing</h2><p style="color:var(--muted);line-height:1.55">The badge is controlled by GoodKota. The merchant keeps operational information current.</p><div class="standard-list">${STANDARD.map(item => `<div class="standard-row"><div class="standard-icon">${merchant.standard[item.id] ? "✓" : "!"}</div><div><strong>${esc(item.name)}</strong></div><span class="badge ${merchant.standard[item.id] ? "green" : "amber"}">${merchant.standard[item.id] ? "Pass" : "Review"}</span></div>`).join("")}</div></div>
+    </section>`;
+
+  app.querySelector("#toggleOnline").addEventListener("click", () => { merchant.online = !merchant.online; store.save(); render(); });
+  app.querySelectorAll("[data-order-next]").forEach(button => button.addEventListener("click", () => {
+    const order = store.state.orders.find(o => o.id === button.dataset.orderNext);
+    if (!order) return;
+    order.status = order.status === "new" ? "accepted" : order.status === "accepted" ? "ready" : "completed";
+    store.log("merchant_order_transition", { orderId: order.id, status: order.status });
+    render();
+  }));
+  app.querySelectorAll("[data-toggle-item]").forEach(button => button.addEventListener("click", () => {
+    const item = merchant.menu.find(i => i.id === button.dataset.toggleItem);
+    item.available = !item.available;
+    store.save();
+    render();
+  }));
+}
+
+function merchantOrderCard(order) {
+  const labels = { new: "Accept", accepted: "Mark ready", ready: "Collected" };
+  return `<article class="order-card"><h4>${esc(order.id)}</h4><p>${esc(order.customer)} · ${order.items.reduce((n,i) => n + i.qty, 0)} item(s)</p><div class="order-footer"><strong>${money(order.total)}</strong><button class="btn primary small" data-order-next="${order.id}">${labels[order.status]}</button></div></article>`;
+}
+
+function renderAdmin() {
+  const metrics = store.state.metrics;
+  app.innerHTML = `
+    <div class="page-title"><div class="eyebrow">GoodKota control</div><h1>Own the kota category.</h1><p>The office view is focused on quality, hyperlocal coverage and repeat behaviour.</p></div>
+
+    <div class="metric-grid">
+      <article class="metric north-star"><div class="eyebrow">North star</div><div class="value">${metrics.repeatFinderRate}%</div><div class="label">30-day Repeat Finder Rate <strong style="color:white">↑ ${metrics.repeatFinderRate - metrics.repeatFinderPrevious} pts</strong></div><div class="definition">Users who complete a qualified GoodKota action on 2+ different days within 30 days ÷ users with at least one qualified action. Qualified = merchant open, save, directions or pickup order.</div></article>
+      <article class="metric"><div class="value">${metrics.verifiedOutlets}</div><div class="label">Verified outlets in the launch cluster</div></article>
+      <article class="metric"><div class="value">${metrics.pendingReview}</div><div class="label">Listings needing a decision</div></article>
+    </div>
+
+    <section class="section">
+      <div class="section-head"><div><h2>GoodKota Standard</h2><p>One badge, five clear checks.</p></div></div>
+      <div class="criteria-grid">${STANDARD.map((item,index) => `<article class="criteria-card"><div class="criteria-number">0${index+1}</div><strong>${esc(item.name)}</strong><p>${esc(item.description)}</p></article>`).join("")}</div>
+    </section>
+
+    <section class="section detail-layout">
+      <div class="panel"><h2>Verification queue</h2>${store.state.candidates.map(candidate => candidateRow(candidate)).join("") || `<div class="empty">Queue clear.</div>`}</div>
+      <div class="panel"><h2>Launch cluster</h2>${store.state.merchants.map(m => `<div class="list-row"><div><strong>${esc(m.name)}</strong><p>${esc(m.area)} · ${m.distanceKm.toFixed(1)} km</p></div><span class="badge ${standardPass(m) ? "green" : "amber"}">${standardPass(m) ? "Verified" : "Review"}</span></div>`).join("")}</div>
+    </section>
+
+    <section class="section panel"><div class="section-head"><div><h2>What we are not building yet</h2><p>The feature ceasefire is visible in the product.</p></div></div><div class="filter-row"><span class="chip">No driver fleet</span><span class="chip">No dispatch console</span><span class="chip">No subscriptions</span><span class="chip">No promotions engine</span><span class="chip">No social feed</span><span class="chip">No complex loyalty</span></div></section>`;
+
+  app.querySelectorAll("[data-verify-candidate]").forEach(button => button.addEventListener("click", () => {
+    const candidate = store.state.candidates.find(c => c.id === button.dataset.verifyCandidate);
+    if (!candidate) return;
+    if (!Object.values(candidate.checks).every(Boolean)) { showToast("All five checks must pass first"); return; }
+    store.state.candidates = store.state.candidates.filter(c => c.id !== candidate.id);
+    store.state.metrics.pendingReview = Math.max(0, store.state.metrics.pendingReview - 1);
+    store.log("candidate_verified", { candidateId: candidate.id });
+    showToast(`${candidate.name} verified`);
+    render();
+  }));
+}
+
+function candidateRow(candidate) {
+  const count = Object.values(candidate.checks).filter(Boolean).length;
+  return `<div class="list-row"><div><strong>${esc(candidate.name)}</strong><p>${esc(candidate.area)} · ${count}/5 checks passed</p></div><div class="list-row-actions"><span class="badge ${count === 5 ? "green" : "amber"}">${count}/5</span><button class="btn dark small" data-verify-candidate="${candidate.id}" ${count === 5 ? "" : "disabled"}>Verify</button></div></div>`;
+}
+
+roleSelect.addEventListener("change", () => {
+  store.state.role = roleSelect.value;
+  store.state.selectedMerchantId = null;
+  store.save();
+  render();
+});
+
+document.querySelector("#brandHome").addEventListener("click", () => {
+  store.state.selectedMerchantId = null;
+  store.state.customerTab = "discover";
+  store.save();
+  render();
+});
+
+document.querySelector("#locationButton").addEventListener("click", () => {
+  const current = store.state.locations.indexOf(store.state.location);
+  store.state.location = store.state.locations[(current + 1) % store.state.locations.length];
+  store.log("location_change", { location: store.state.location });
+  render();
+});
+
+app.addEventListener("click", event => {
+  if (event.target.id === "backDiscover") {
+    store.state.selectedMerchantId = null;
+    store.save();
+    render();
+  }
+  if (event.target.id === "directionsButton") {
+    const merchant = store.merchant(store.state.selectedMerchantId);
+    store.log("directions_intent", { merchantId: merchant?.id });
+    showToast(`Directions intent recorded for ${merchant?.name}`);
+  }
+});
+
+modal.addEventListener("click", event => {
+  if (event.target === modal) modal.close();
+});
+
+if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(() => {}));
+
+render();

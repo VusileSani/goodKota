@@ -1,25 +1,84 @@
-# Yagoya v6.11 Navigation App Choice
+# GoodKota MVP v7 — Kota Authority Build
 
-Yagoya v6.11 builds directly on v6.10. The customer merchant page keeps the existing **Directions** control beside the merchant address, but makes it more visible and replaces automatic Apple Maps routing with an explicit navigation-app chooser.
+This build deliberately trims the previous broad platform into the smallest product that can prove the GoodKota thesis:
 
-Customers can choose **Waze**, **Google Maps**, or **Apple Maps**. Yagoya passes the merchant’s stored coordinates to the selected provider and does not require a maps API key. A customer may remember a preferred provider; Yagoya highlights that choice on future visits while still asking which navigation app to open. This keeps provider choice explicit and avoids silently forcing Apple Maps on iPhone.
+> **GoodKota tells you where the good kota is.**
 
-The Premium Graphite visual baseline, Firebase authentication continuity, merchant workspaces, location-first discovery, recommendation/quality logic, reporting and governance are retained.
+## MVP loop
 
-# Yagoya v6.10 Report Generation & Print
+1. Customer opens GoodKota.
+2. Nearby kota spots are ranked by proximity.
+3. GoodKota makes the quality standard visible.
+4. Customer opens, saves, gets directions, or places a pickup order.
+5. GoodKota measures whether the customer comes back and repeats a qualified action on another day.
 
-Yagoya v6.10 builds directly on v6.9 and retains Firebase authentication continuity, Premium Graphite, merchant workspaces, recommendation/quality logic, delivery and governance.
+## North-star metric
 
-This release adds compact, role-based report generation without turning the operational screens into long dashboards. Merchants can generate **Sales Reports** and **Sales & Settlement Statements**. Yagoya Admin and Owner can generate **Operations & Quality Reports** across the network or a selected merchant. Generated reports have an in-app preview, **Print / Save PDF** through the browser print flow, and **CSV export** for the underlying report rows.
+**30-day Repeat Finder Rate**
 
-Settlement reporting is evidence-based: Yagoya reports recorded paid-order, refund and payout events and explicitly does not infer a bank payout that has not been recorded. Production report generation should move behind bounded server-side reporting/query contracts as Firestore replaces the browser-local prototype repository.
+`users with qualified GoodKota actions on 2+ different days in 30 days / users with at least 1 qualified action in 30 days`
 
-# Yagoya v6.9 Authentication Behaviour & Account Continuity
+Qualified actions in this prototype:
+- merchant open
+- favourite/save
+- directions intent
+- pickup order
 
-Yagoya v6.9 builds directly on v6.8. The Merchant workspaces, Premium Graphite visual system, recommendation foundation, delivery architecture and governance work remain intact.
+This keeps the metric tied to repeat GoodKota use rather than vanity traffic.
 
-This release makes customer authentication unmistakable and durable: anonymous discovery remains open, private customer information and checkout require Firebase authentication, Firebase explicitly uses local browser persistence so a signed-in session is restored after refresh/reopen, and logout returns the customer to a signed-out state.
+## GoodKota Standard
 
-Customer → Account retains the compact progressive-disclosure structure: **My Orders · My Favourites · My Addresses · My Details · Payments · Preferences · Help & Support · Account & Security**, with **Log Out** separate at the bottom when authenticated. Signed-out customers can see the Account structure, but private sections route through Account & Security before their data is shown.
+A listing becomes a GoodKota Pick only when all five checks pass:
 
-The **Preview as** actor switcher remains a prototype screen switcher only. It does not create or change Firebase identity, claims, or authenticated authority. Production authorization remains server-enforced.
+1. Local & independent
+2. Kota is core
+3. Consistent food
+4. Fair value
+5. Ready to serve
+
+## Included now
+
+- customer discovery, search and simple filters
+- proximity-led merchant cards
+- visible GoodKota Standard
+- merchant detail and menu
+- saved merchants
+- lightweight pickup ordering
+- customer order history
+- merchant pickup queue
+- menu availability and open/closed status
+- GoodKota verification queue
+- repeat-behaviour dashboard
+- PWA manifest + service worker
+
+## Deliberately removed from the MVP
+
+- driver application
+- delivery operations/dispatch
+- live GPS tracking
+- complex settlement operations
+- subscriptions
+- promotions engine
+- social/community feed
+- complex loyalty programme
+- broad multi-category discovery
+
+Those are expansion options, not launch dependencies.
+
+## Run locally
+
+Because the app uses ES modules, serve the folder over HTTP:
+
+```bash
+python -m http.server 8080
+```
+
+Then open `http://localhost:8080`.
+
+## GitHub Pages
+
+The build uses relative paths and can be hosted directly from the repository root on GitHub Pages.
+
+## Prototype note
+
+The role selector is a demo control only. Production should use real authentication and server-side role enforcement. Prototype state is stored in `localStorage`; this is not a production data layer.

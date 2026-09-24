@@ -12,6 +12,10 @@ python3 -m http.server 8080
 
 Open `http://localhost:8080`. The app uses relative paths and can be hosted as a static site.
 
+## GitHub Pages update
+
+Extract the ZIP first. Copy its **contents** (including `index.html`, `css/`, `js/`, `assets/`, the manifest and service worker) to the branch and folder configured as the Pages publishing source. Commit and push those files. GitHub Pages cannot serve the new site from an uploaded ZIP. After deployment, refresh the page; an older service worker may require a hard refresh or clearing site data once.
+
 ## Scope and limitations
 
 - Product tiles intentionally use visual placeholders until merchants upload real food photos.

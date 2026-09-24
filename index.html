@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#181818" />
+  <meta name="theme-color" content="#f15a29" />
   <meta name="description" content="GoodKota — the trusted guide to good kota near you." />
   <title>GoodKota — Good kota near you</title>
   <link rel="manifest" href="./manifest.webmanifest" />
@@ -18,14 +18,13 @@
         <span>GoodKota</span>
       </button>
       <div class="topbar-actions">
-        <button class="location-pill" id="locationButton" aria-label="Change location">
+        <div class="location-pill" aria-label="Current area">
           <span class="location-dot"></span>
           <span id="locationLabel">Midrand</span>
-          <span aria-hidden="true">⌄</span>
-        </button>
-        <label class="demo-role" title="Prototype only">
-          <span>Demo</span>
-          <select id="roleSelect" aria-label="Switch demo role">
+        </div>
+        <label class="workspace-select">
+          <span>Workspace</span>
+          <select id="roleSelect" aria-label="Choose workspace">
             <option value="customer">Customer</option>
             <option value="merchant">Merchant</option>
             <option value="admin">GoodKota</option>

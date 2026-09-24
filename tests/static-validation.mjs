@@ -12,8 +12,9 @@ for (const file of required) {
 }
 const app = fs.readFileSync(path.join(root, "js/app.js"), "utf8");
 const readme = fs.readFileSync(path.join(root, "README.md"), "utf8");
-for (const phrase of ["30-day Repeat Finder Rate", "GoodKota Standard", "Pickup queue"]) {
+for (const phrase of ["GoodKota Standard", "Pickup queue", "checkoutForm", "directionsUrl", "paymentStatus: \"unpaid\""]) {
   if (!app.includes(phrase)) throw new Error(`App missing ${phrase}`);
 }
-if (!readme.includes("Deliberately removed from the MVP")) throw new Error("MVP scope statement missing");
-console.log("GoodKota MVP v7 static validation passed.");
+if (!readme.includes("PayFast")) throw new Error("Payment boundary missing");
+if (/Keep the MVP simple|What we are not building yet|directions intent recorded/.test(app)) throw new Error("Development copy leaked into UI");
+console.log("GoodKota MVP v8 static validation passed.");

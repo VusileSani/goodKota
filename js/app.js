@@ -12,6 +12,7 @@ const money = cents => new Intl.NumberFormat("en-ZA", { style: "currency", curre
 const esc = value => String(value ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[ch]));
 const standardPass = merchant => Object.values(merchant.standard).every(Boolean);
 const firstLetter = text => esc(String(text).trim().slice(0,1).toUpperCase());
+const directionsUrl = merchant => `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(merchant.address || merchant.area)}`;
 
 function showToast(message) {
   toast.textContent = message;
@@ -26,17 +27,18 @@ function render() {
   if (store.state.role === "merchant") renderMerchant();
   else if (store.state.role === "admin") renderAdmin();
   else renderCustomer();
-  bindCommon();
+  bindCommon(app);
 }
 
-function bindCommon() {
-  app.querySelectorAll("[data-open-merchant]").forEach(button => button.addEventListener("click", () => {
+function bindCommon(root) {
+  root.querySelectorAll("[data-open-merchant]").forEach(button => button.addEventListener("click", event => {
+    event.stopPropagation();
     store.state.selectedMerchantId = button.dataset.openMerchant;
     store.log("merchant_open", { merchantId: button.dataset.openMerchant });
     render();
   }));
 
-  app.querySelectorAll("[data-favourite]").forEach(button => button.addEventListener("click", event => {
+  root.querySelectorAll("[data-favourite]").forEach(button => button.addEventListener("click", event => {
     event.stopPropagation();
     const id = button.dataset.favourite;
     const set = new Set(store.state.favourites);
@@ -46,8 +48,11 @@ function bindCommon() {
     render();
   }));
 
-  app.querySelectorAll("[data-add]").forEach(button => button.addEventListener("click", () => addToCart(button.dataset.add)));
-  app.querySelectorAll("[data-cart]").forEach(button => button.addEventListener("click", openCart));
+  root.querySelectorAll("[data-add]").forEach(button => button.addEventListener("click", () => addToCart(button.dataset.add)));
+  root.querySelectorAll("[data-cart]").forEach(button => button.addEventListener("click", openCart));
+  root.querySelectorAll("[data-directions]").forEach(link => link.addEventListener("click", () => {
+    store.log("directions_open", { merchantId: link.dataset.directions });
+  }));
 }
 
 function renderCustomer() {
@@ -75,6 +80,14 @@ function renderCustomer() {
       updateMerchantGrid();
     });
   }
+  app.querySelector("#findKota")?.addEventListener("click", () => app.querySelector("#merchantGrid")?.scrollIntoView({ behavior: "smooth" }));
+  app.querySelector("#detailsForm")?.addEventListener("submit", event => {
+    event.preventDefault();
+    if (!event.currentTarget.reportValidity()) return;
+    store.state.customerDetails = Object.fromEntries(new FormData(event.currentTarget));
+    store.save();
+    showToast("Details saved");
+  });
 
   app.querySelectorAll("[data-filter]").forEach(button => button.addEventListener("click", () => {
     store.state.filter = button.dataset.filter;
@@ -89,26 +102,26 @@ function discoverView() {
       <div class="hero-copy">
         <div class="eyebrow">The kota authority</div>
         <h1>Good kota.<br>Near you.</h1>
-        <p>GoodKota tells you where the good food is. Nearby first, quality made visible, no endless directory.</p>
+        <p>Find your next favourite kota spot.</p>
         <label class="searchbar">
           <input id="discoverSearch" type="search" placeholder="Search a kota spot or area" autocomplete="off" />
-          <button class="btn primary" type="button">Find kota</button>
+          <button class="btn primary" type="button" id="findKota">Find kota</button>
         </label>
       </div>
     </section>
 
     <section class="section">
       <div class="authority-strip">
-        <div class="authority-cell"><strong>Not every listing gets the badge.</strong><span>GoodKota is curated around a clear standard.</span></div>
-        <div class="authority-cell"><strong>5</strong><span>checks in the GoodKota Standard</span></div>
-        <div class="authority-cell"><strong>3</strong><span>verified picks near ${esc(store.state.location)}</span></div>
-        <div class="authority-cell"><strong>Nearby</strong><span>distance leads, quality decides</span></div>
+        <div class="authority-cell"><strong>GoodKota Picks</strong><span>Local spots we rate highly.</span></div>
+        <div class="authority-cell"><strong>5</strong><span>quality checks</span></div>
+        <div class="authority-cell"><strong>${store.state.merchants.filter(m => standardPass(m) && m.online).length}</strong><span>GoodKota Picks</span></div>
+        <div class="authority-cell"><strong>Nearby</strong><span>Start close to home</span></div>
       </div>
     </section>
 
     <section class="section">
       <div class="section-head">
-        <div><h2>Where the good kota is</h2><p>Closest GoodKota picks first.</p></div>
+        <div><h2>Where the good kota is</h2><p>Explore kota spots near you.</p></div>
         <div class="filter-row">
           ${["All","Verified","Best value","Chicken"].map(filter => `<button class="chip ${store.state.filter === filter ? "active" : ""}" data-filter="${filter}">${filter}</button>`).join("")}
         </div>
@@ -117,7 +130,7 @@ function discoverView() {
     </section>
 
     <section class="section">
-      <div class="section-head"><div><h2>The GoodKota Standard</h2><p>A simple reason to trust the badge.</p></div></div>
+      <div class="section-head"><div><h2>The GoodKota Standard</h2></div></div>
       <div class="criteria-grid">
         ${STANDARD.map((item, index) => `<article class="criteria-card"><div class="criteria-number">0${index + 1}</div><strong>${esc(item.name)}</strong><p>${esc(item.description)}</p></article>`).join("")}
       </div>
@@ -138,7 +151,7 @@ function updateMerchantGrid() {
   const grid = app.querySelector("#merchantGrid");
   if (!grid) return;
   grid.innerHTML = merchantCards(filteredMerchants());
-  bindCommon();
+  bindCommon(grid);
 }
 
 function merchantCards(merchants) {
@@ -150,7 +163,7 @@ function merchantCards(merchants) {
         <button class="link-button" data-favourite="${m.id}" aria-label="${store.state.favourites.includes(m.id) ? "Remove favourite" : "Save favourite"}">${store.state.favourites.includes(m.id) ? "♥" : "♡"}</button>
       </div>
       <h3>${esc(m.name)}</h3>
-      <div class="address">${esc(m.area)}</div>
+      <div class="address">${esc(m.address || m.area)}</div>
       <div class="merchant-facts">
         <span><strong>${m.distanceKm.toFixed(1)} km</strong></span>
         <span>★ ${m.rating.toFixed(1)}</span>
@@ -159,7 +172,7 @@ function merchantCards(merchants) {
       </div>
       <div class="card-bottom">
         ${standardPass(m) ? `<span class="badge orange">✓ GoodKota Pick</span>` : `<span class="badge amber">Under review</span>`}
-        <button class="link-button" data-open-merchant="${m.id}">${index === 0 ? "Closest · " : ""}See why →</button>
+        <button class="link-button" data-open-merchant="${m.id}">${index === 0 ? "Closest · " : ""}View menu →</button>
       </div>
     </article>`).join("");
 }
@@ -176,9 +189,9 @@ function merchantDetail(merchant) {
       <button class="link-button back" id="backDiscover">← Back to nearby</button>
       <div class="eyebrow">${standardPass(merchant) ? "GoodKota Pick" : "Quality review"}</div>
       <h1>${esc(merchant.name)}</h1>
-      <p>${esc(merchant.area)} · ${merchant.distanceKm.toFixed(1)} km away · ★ ${merchant.rating.toFixed(1)} from ${merchant.verifiedRatings} verified ratings</p>
+      <p>${esc(merchant.address || merchant.area)} · ${merchant.distanceKm.toFixed(1)} km away · ★ ${merchant.rating.toFixed(1)}</p>
       <div class="detail-actions">
-        <button class="btn primary" id="directionsButton">Get directions</button>
+        <a class="btn primary" href="${directionsUrl(merchant)}" target="_blank" rel="noopener noreferrer" data-directions="${merchant.id}">Get directions ↗</a>
         <button class="btn light" data-favourite="${merchant.id}">${store.state.favourites.includes(merchant.id) ? "♥ Saved" : "♡ Save"}</button>
         <button class="btn light" data-cart>Cart · ${cartCount()}</button>
       </div>
@@ -186,9 +199,9 @@ function merchantDetail(merchant) {
 
     <div class="detail-layout">
       <section class="panel">
-        <div class="section-head"><div><h2>Order for pickup</h2><p>Keep the MVP simple: discover, choose, collect.</p></div></div>
+        <div class="section-head"><div><h2>Order for pickup</h2></div></div>
         <div class="menu-list">
-          ${merchant.menu.map(item => `<article class="menu-item"><div><h4>${esc(item.name)}</h4><p>${esc(item.desc)}</p></div><div class="menu-actions"><span class="price">${money(item.price)}</span><button class="btn dark small" data-add="${item.id}" ${item.available ? "" : "disabled"}>Add</button></div></article>`).join("")}
+          ${merchant.menu.map(item => `<article class="menu-item"><div class="product-visual" aria-hidden="true">${esc(item.emoji || "🥪")}</div><div class="product-copy"><h4>${esc(item.name)}</h4><p>${esc(item.desc)}</p><strong class="price">${money(item.price)}</strong></div><button class="product-add" data-add="${item.id}" aria-label="Add ${esc(item.name)} to cart" ${item.available && merchant.online ? "" : "disabled"}>${item.available && merchant.online ? "+" : "Sold out"}</button></article>`).join("")}
         </div>
       </section>
       <aside class="panel">
@@ -201,22 +214,29 @@ function merchantDetail(merchant) {
 
 function savedView() {
   const merchants = store.state.merchants.filter(m => store.state.favourites.includes(m.id));
-  return `<div class="page-title"><div class="eyebrow">Your shortcuts</div><h1>Saved kota spots</h1><p>Good places you want to find again.</p></div><div class="merchant-grid">${merchantCards(merchants)}</div>`;
+  return `<div class="page-title"><div class="eyebrow">Favourites</div><h1>Saved kota spots</h1></div><div class="merchant-grid">${merchantCards(merchants)}</div>`;
 }
 
 function ordersView() {
-  const orders = store.state.orders.filter(order => order.customer === "Sani");
-  return `<div class="page-title"><div class="eyebrow">Pickup</div><h1>Your orders</h1><p>No delivery machinery in this MVP. Order, collect, eat.</p></div><section class="panel stack">${orders.map(orderRow).join("") || `<div class="empty">No orders yet.</div>`}</section>`;
+  const orders = store.state.orders;
+  return `<div class="page-title"><div class="eyebrow">Pickup</div><h1>Your orders</h1></div><section class="panel stack">${orders.map(orderRow).join("") || `<div class="empty">No orders yet.</div>`}</section>`;
 }
 
 function orderRow(order) {
   const merchant = store.merchant(order.merchantId);
   const tone = order.status === "completed" ? "green" : order.status === "ready" ? "orange" : "dark";
-  return `<div class="list-row"><div><strong>${esc(merchant?.name || "GoodKota")}</strong><p>${esc(order.id)} · ${esc(order.createdAt)}</p></div><div class="list-row-actions"><span class="badge ${tone}">${esc(order.status)}</span><strong>${money(order.total)}</strong></div></div>`;
+  return `<div class="list-row"><div><strong>${esc(merchant?.name || "GoodKota")}</strong><p>${esc(order.id)} · ${esc(order.createdAt)} · ${esc(order.paymentMethod === "pay_on_collection" ? "Pay on collection" : "Pickup")}</p>${merchant ? `<a class="text-link" href="${directionsUrl(merchant)}" target="_blank" rel="noopener noreferrer" data-directions="${merchant.id}">Get directions ↗</a>` : ""}</div><div class="list-row-actions"><span class="badge ${tone}">${esc(order.status)}</span><strong>${money(order.total)}</strong></div></div>`;
 }
 
 function accountView() {
-  return `<div class="page-title"><div class="eyebrow">GoodKota account</div><h1>Keep it light.</h1><p>Only the account tools a customer needs for the MVP.</p></div><section class="panel"><div class="stack">${["My Orders","My Favourites","My Details","Help & Support","Account & Security"].map(label => `<div class="list-row"><strong>${label}</strong><span>›</span></div>`).join("")}</div></section>`;
+  const details = store.state.customerDetails;
+  return `<div class="page-title"><div class="eyebrow">Account</div><h1>Your details</h1></div><section class="panel account-panel"><form id="detailsForm" class="checkout-fields">
+    <label>First name<input name="firstName" autocomplete="given-name" required value="${esc(details.firstName)}"></label>
+    <label>Last name<input name="lastName" autocomplete="family-name" value="${esc(details.lastName)}"></label>
+    <label>Mobile number<input name="phone" type="tel" inputmode="tel" autocomplete="tel" required value="${esc(details.phone)}"></label>
+    <label>Email address<input name="email" type="email" autocomplete="email" required value="${esc(details.email)}"></label>
+    <button class="btn primary" type="submit">Save details</button>
+  </form></section>`;
 }
 
 function customerNav() {
@@ -226,9 +246,12 @@ function customerNav() {
 
 function addToCart(productId) {
   const product = store.product(productId);
-  if (!product) return;
+  if (!product || !product.available || !store.merchant(product.merchantId)?.online) return;
   const existingMerchant = store.state.cart[0] ? store.product(store.state.cart[0].productId)?.merchantId : null;
-  if (existingMerchant && existingMerchant !== product.merchantId) store.state.cart = [];
+  if (existingMerchant && existingMerchant !== product.merchantId) {
+    if (!window.confirm("Your cart has food from another spot. Clear it and start a new order?")) return;
+    store.state.cart = [];
+  }
   const line = store.state.cart.find(item => item.productId === productId);
   line ? line.qty += 1 : store.state.cart.push({ productId, qty: 1 });
   store.log("cart_add", { productId, merchantId: product.merchantId });
@@ -242,10 +265,20 @@ function cartTotal() { return store.state.cart.reduce((sum, line) => sum + (stor
 function openCart() {
   const lines = store.state.cart.map(line => {
     const product = store.product(line.productId);
-    return product ? `<div class="cart-line"><div><strong>${esc(product.name)}</strong><div style="color:var(--muted);font-size:12px">${money(product.price)}</div></div><div class="qty"><button data-qty="-1" data-product="${product.id}">−</button><strong>${line.qty}</strong><button data-qty="1" data-product="${product.id}">+</button></div><strong>${money(product.price * line.qty)}</strong></div>` : "";
+    return product ? `<div class="cart-line"><div><strong>${esc(product.name)}</strong><div class="muted">${money(product.price)} each</div></div><div class="qty"><button data-qty="-1" data-product="${product.id}" aria-label="Remove one ${esc(product.name)}">−</button><strong>${line.qty}</strong><button data-qty="1" data-product="${product.id}" aria-label="Add one ${esc(product.name)}">+</button></div><strong>${money(product.price * line.qty)}</strong></div>` : "";
   }).join("");
 
-  modal.innerHTML = `<div class="modal-body"><div class="modal-head"><div><div class="eyebrow">Pickup order</div><h2>Your kota</h2></div><button class="modal-close" data-close>×</button></div><div style="margin-top:16px">${lines || `<div class="empty">Your cart is empty.</div>`}</div>${store.state.cart.length ? `<div class="cart-total"><span>Total</span><span>${money(cartTotal())}</span></div><button class="btn primary" style="width:100%;margin-top:16px" id="placeOrder">Place pickup order</button>` : ""}</div>`;
+  const details = store.state.customerDetails;
+  const pickupMerchant = store.product(store.state.cart[0]?.productId)?.merchantId;
+  const pickup = store.merchant(pickupMerchant);
+  modal.innerHTML = `<div class="modal-body"><div class="modal-head"><div><div class="eyebrow">Pickup order</div><h2>Your cart</h2></div><button class="modal-close" data-close aria-label="Close cart">×</button></div><div class="cart-items">${lines || `<div class="empty">Your cart is empty.</div>`}</div>${store.state.cart.length ? `<div class="cart-total"><span>Total</span><span>${money(cartTotal())}</span></div><p class="pickup-detail">Collect from ${esc(pickup?.name || "the merchant")} · <a class="text-link" href="${directionsUrl(pickup)}" target="_blank" rel="noopener noreferrer">Get directions ↗</a></p><form id="checkoutForm" class="checkout-fields">
+    <label>First name<input name="firstName" autocomplete="given-name" required value="${esc(details.firstName)}"></label>
+    <label>Last name<input name="lastName" autocomplete="family-name" value="${esc(details.lastName)}"></label>
+    <label>Mobile number<input name="phone" type="tel" inputmode="tel" autocomplete="tel" required value="${esc(details.phone)}"></label>
+    <label>Email address<input name="email" type="email" autocomplete="email" required value="${esc(details.email)}"></label>
+    <div class="payment-choice"><strong>Payment</strong><span>Pay on collection</span></div>
+    <button class="btn primary checkout-submit" type="submit">Place pickup order</button>
+  </form>` : ""}</div>`;
   modal.showModal();
   modal.querySelector("[data-close]").addEventListener("click", () => modal.close());
   modal.querySelectorAll("[data-qty]").forEach(button => button.addEventListener("click", () => {
@@ -257,21 +290,35 @@ function openCart() {
     modal.close();
     openCart();
   }));
-  modal.querySelector("#placeOrder")?.addEventListener("click", placeOrder);
+  modal.querySelector("#checkoutForm")?.addEventListener("submit", event => {
+    event.preventDefault();
+    if (!event.currentTarget.reportValidity()) return;
+    placeOrder(Object.fromEntries(new FormData(event.currentTarget)));
+  });
 }
 
-function placeOrder() {
+function placeOrder(details) {
   if (!store.state.cart.length) return;
   const product = store.product(store.state.cart[0].productId);
-  const id = `GK-${Math.floor(1100 + Math.random() * 800)}`;
+  if (!product || store.state.cart.some(line => !store.product(line.productId)?.available) || !store.merchant(product.merchantId)?.online) {
+    showToast("Some items are no longer available");
+    modal.close();
+    render();
+    return;
+  }
+  const id = `GK-${Date.now().toString(36).toUpperCase()}`;
+  store.state.customerDetails = details;
   store.state.orders.unshift({
     id,
     merchantId: product.merchantId,
-    customer: "Sani",
+    customer: `${details.firstName} ${details.lastName}`.trim(),
+    contact: { phone: details.phone, email: details.email },
+    paymentMethod: "pay_on_collection",
+    paymentStatus: "unpaid",
     status: "new",
     total: cartTotal(),
     items: store.state.cart.map(item => ({...item})),
-    createdAt: "Just now"
+    createdAt: new Date().toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" })
   });
   store.state.cart = [];
   store.state.customerTab = "orders";
@@ -287,16 +334,16 @@ function renderMerchant() {
   const orders = store.state.orders.filter(o => o.merchantId === merchant.id && o.status !== "completed");
   const groups = ["new","accepted","ready"];
   app.innerHTML = `
-    <div class="page-title"><div class="eyebrow">Merchant</div><h1>${esc(merchant.name)}</h1><p>The merchant MVP is deliberately operationally light.</p></div>
+    <div class="page-title"><div class="eyebrow">Merchant</div><h1>${esc(merchant.name)}</h1></div>
     <div class="metric-grid">
       <div class="metric"><div class="value">${merchant.online ? "Open" : "Closed"}</div><div class="label">Listing status</div></div>
       <div class="metric"><div class="value">${orders.length}</div><div class="label">Active pickup orders</div></div>
-      <div class="metric"><div class="value">${merchant.rating.toFixed(1)}</div><div class="label">Verified rating</div></div>
+      <div class="metric"><div class="value">${merchant.rating.toFixed(1)}</div><div class="label">Customer rating</div></div>
       <div class="metric"><div class="value">${standardPass(merchant) ? "5/5" : "4/5"}</div><div class="label">GoodKota Standard</div></div>
     </div>
 
     <section class="section">
-      <div class="section-head"><div><h2>Pickup queue</h2><p>Accept → ready → collected. Nothing more.</p></div><button class="btn ${merchant.online ? "ghost" : "primary"}" id="toggleOnline">${merchant.online ? "Close listing" : "Open listing"}</button></div>
+      <div class="section-head"><div><h2>Pickup queue</h2></div><button class="btn ${merchant.online ? "ghost" : "primary"}" id="toggleOnline">${merchant.online ? "Close listing" : "Open listing"}</button></div>
       <div class="queue-grid">
         ${groups.map(status => `<div class="queue-column"><h3>${status === "new" ? "New" : status === "accepted" ? "Preparing" : "Ready"}</h3>${orders.filter(o => o.status === status).map(merchantOrderCard).join("") || `<div class="empty">Nothing here.</div>`}</div>`).join("")}
       </div>
@@ -304,10 +351,17 @@ function renderMerchant() {
 
     <section class="section detail-layout">
       <div class="panel"><h2>Menu availability</h2>${merchant.menu.map(item => `<div class="list-row"><div><strong>${esc(item.name)}</strong><p>${money(item.price)}</p></div><button class="btn ${item.available ? "ghost" : "dark"} small" data-toggle-item="${item.id}">${item.available ? "Available" : "Unavailable"}</button></div>`).join("")}</div>
-      <div class="panel"><h2>Your GoodKota listing</h2><p style="color:var(--muted);line-height:1.55">The badge is controlled by GoodKota. The merchant keeps operational information current.</p><div class="standard-list">${STANDARD.map(item => `<div class="standard-row"><div class="standard-icon">${merchant.standard[item.id] ? "✓" : "!"}</div><div><strong>${esc(item.name)}</strong></div><span class="badge ${merchant.standard[item.id] ? "green" : "amber"}">${merchant.standard[item.id] ? "Pass" : "Review"}</span></div>`).join("")}</div></div>
+      <div class="panel"><h2>Your GoodKota listing</h2><form id="merchantAddressForm" class="address-form"><label>Pickup address<input name="address" required value="${esc(merchant.address || merchant.area)}" autocomplete="street-address"></label><button class="btn primary" type="submit">Save address</button></form><a class="text-link" href="${directionsUrl(merchant)}" target="_blank" rel="noopener noreferrer" data-directions="${merchant.id}">Open in Maps ↗</a><div class="standard-list">${STANDARD.map(item => `<div class="standard-row"><div class="standard-icon">${merchant.standard[item.id] ? "✓" : "!"}</div><div><strong>${esc(item.name)}</strong></div><span class="badge ${merchant.standard[item.id] ? "green" : "amber"}">${merchant.standard[item.id] ? "Pass" : "Review"}</span></div>`).join("")}</div></div>
     </section>`;
 
   app.querySelector("#toggleOnline").addEventListener("click", () => { merchant.online = !merchant.online; store.save(); render(); });
+  app.querySelector("#merchantAddressForm").addEventListener("submit", event => {
+    event.preventDefault();
+    merchant.address = new FormData(event.currentTarget).get("address").trim();
+    store.save();
+    showToast("Pickup address saved");
+    render();
+  });
   app.querySelectorAll("[data-order-next]").forEach(button => button.addEventListener("click", () => {
     const order = store.state.orders.find(o => o.id === button.dataset.orderNext);
     if (!order) return;
@@ -329,34 +383,30 @@ function merchantOrderCard(order) {
 }
 
 function renderAdmin() {
-  const metrics = store.state.metrics;
   app.innerHTML = `
-    <div class="page-title"><div class="eyebrow">GoodKota control</div><h1>Own the kota category.</h1><p>The office view is focused on quality, hyperlocal coverage and repeat behaviour.</p></div>
+    <div class="page-title"><div class="eyebrow">GoodKota</div><h1>Overview</h1></div>
 
     <div class="metric-grid">
-      <article class="metric north-star"><div class="eyebrow">North star</div><div class="value">${metrics.repeatFinderRate}%</div><div class="label">30-day Repeat Finder Rate <strong style="color:white">↑ ${metrics.repeatFinderRate - metrics.repeatFinderPrevious} pts</strong></div><div class="definition">Users who complete a qualified GoodKota action on 2+ different days within 30 days ÷ users with at least one qualified action. Qualified = merchant open, save, directions or pickup order.</div></article>
-      <article class="metric"><div class="value">${metrics.verifiedOutlets}</div><div class="label">Verified outlets in the launch cluster</div></article>
-      <article class="metric"><div class="value">${metrics.pendingReview}</div><div class="label">Listings needing a decision</div></article>
+      <article class="metric"><div class="value">${store.state.orders.length}</div><div class="label">Pickup orders</div></article>
+      <article class="metric"><div class="value">${store.state.merchants.filter(standardPass).length}</div><div class="label">GoodKota Picks</div></article>
+      <article class="metric"><div class="value">${store.state.candidates.length}</div><div class="label">Listings to review</div></article>
     </div>
 
     <section class="section">
-      <div class="section-head"><div><h2>GoodKota Standard</h2><p>One badge, five clear checks.</p></div></div>
+      <div class="section-head"><div><h2>GoodKota Standard</h2></div></div>
       <div class="criteria-grid">${STANDARD.map((item,index) => `<article class="criteria-card"><div class="criteria-number">0${index+1}</div><strong>${esc(item.name)}</strong><p>${esc(item.description)}</p></article>`).join("")}</div>
     </section>
 
     <section class="section detail-layout">
       <div class="panel"><h2>Verification queue</h2>${store.state.candidates.map(candidate => candidateRow(candidate)).join("") || `<div class="empty">Queue clear.</div>`}</div>
       <div class="panel"><h2>Launch cluster</h2>${store.state.merchants.map(m => `<div class="list-row"><div><strong>${esc(m.name)}</strong><p>${esc(m.area)} · ${m.distanceKm.toFixed(1)} km</p></div><span class="badge ${standardPass(m) ? "green" : "amber"}">${standardPass(m) ? "Verified" : "Review"}</span></div>`).join("")}</div>
-    </section>
-
-    <section class="section panel"><div class="section-head"><div><h2>What we are not building yet</h2><p>The feature ceasefire is visible in the product.</p></div></div><div class="filter-row"><span class="chip">No driver fleet</span><span class="chip">No dispatch console</span><span class="chip">No subscriptions</span><span class="chip">No promotions engine</span><span class="chip">No social feed</span><span class="chip">No complex loyalty</span></div></section>`;
+    </section>`;
 
   app.querySelectorAll("[data-verify-candidate]").forEach(button => button.addEventListener("click", () => {
     const candidate = store.state.candidates.find(c => c.id === button.dataset.verifyCandidate);
     if (!candidate) return;
     if (!Object.values(candidate.checks).every(Boolean)) { showToast("All five checks must pass first"); return; }
     store.state.candidates = store.state.candidates.filter(c => c.id !== candidate.id);
-    store.state.metrics.pendingReview = Math.max(0, store.state.metrics.pendingReview - 1);
     store.log("candidate_verified", { candidateId: candidate.id });
     showToast(`${candidate.name} verified`);
     render();
@@ -382,23 +432,11 @@ document.querySelector("#brandHome").addEventListener("click", () => {
   render();
 });
 
-document.querySelector("#locationButton").addEventListener("click", () => {
-  const current = store.state.locations.indexOf(store.state.location);
-  store.state.location = store.state.locations[(current + 1) % store.state.locations.length];
-  store.log("location_change", { location: store.state.location });
-  render();
-});
-
 app.addEventListener("click", event => {
   if (event.target.id === "backDiscover") {
     store.state.selectedMerchantId = null;
     store.save();
     render();
-  }
-  if (event.target.id === "directionsButton") {
-    const merchant = store.merchant(store.state.selectedMerchantId);
-    store.log("directions_intent", { merchantId: merchant?.id });
-    showToast(`Directions intent recorded for ${merchant?.name}`);
   }
 });
 

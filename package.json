@@ -1,6 +1,6 @@
 {
-  "name": "goodkota-mvp-v7",
-  "version": "7.0.0",
+  "name": "goodkota-mvp-v8",
+  "version": "8.0.0",
   "private": true,
   "type": "module",
   "scripts": { "test": "node tests/static-validation.mjs" }

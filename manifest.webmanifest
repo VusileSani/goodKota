@@ -3,8 +3,8 @@
   "short_name": "GoodKota",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#f4f1ea",
-  "theme_color": "#181818",
+  "background_color": "#fff8f2",
+  "theme_color": "#f15a29",
   "icons": [
     { "src": "./assets/goodkota-logo.png", "sizes": "300x300", "type": "image/png" }
   ]

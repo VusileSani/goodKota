@@ -17,9 +17,12 @@ export class Store {
       search: "",
       filter: "All",
       cart: [],
+      customerDetails: { firstName: "", lastName: "", email: "", phone: "" },
       merchantId: "m1",
       events: []
     };
+    this.state.customerDetails ||= { firstName: "", lastName: "", email: "", phone: "" };
+    this.state.merchants.forEach(merchant => { merchant.address ||= merchant.area; });
   }
 
   load() {

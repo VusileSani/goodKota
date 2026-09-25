@@ -1,6 +1,6 @@
-# GoodKota MVP v12
+# GoodKota MVP v13
 
-An orange, charcoal and white pickup discovery prototype. GoodKota helps people find a kota worth eating in one launch cluster, see what a spot is known for, tailor an order and collect it. Merchant cards lead with food placeholders, menu highlights and live availability. The merchant and GoodKota workspaces retain the core operating flows from the supplied full-spectrum build.
+An orange-led pickup discovery prototype with the premium graphite, black and white visual language of the uploaded build. GoodKota helps people find a kota worth eating in one launch cluster, see what a spot is known for, tailor an order and collect it. Merchant cards lead with food placeholders, menu highlights and live availability. The merchant and GoodKota workspaces retain the core operating flows from the supplied full-spectrum build.
 
 ## Run locally
 
@@ -60,6 +60,6 @@ Copy the setup token from your own environment into the Payments unlock form. Ke
 
 ## Updating GitHub Pages
 
-Extract the ZIP and copy its **contents** to the configured Pages publishing branch and folder. Commit and push changed files. Pushing only the ZIP leaves the public app unchanged. The customer, merchant and management demo works on Pages, while Payments explains that secure setup requires a backend. The service-worker cache name is bumped to v12; after deployment, reload or clear older site data if necessary.
+Extract the ZIP and copy its **contents** to the configured Pages publishing branch and folder. Commit and push changed files. Pushing only the ZIP leaves the public app unchanged. The customer, merchant and management demo works on Pages, while Payments explains that secure setup requires a backend. The service-worker cache name is bumped to v13; after deployment, reload or clear older site data if necessary.
 
 Run `npm test` for integrity and workflow checks.

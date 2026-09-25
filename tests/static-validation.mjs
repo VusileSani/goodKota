@@ -22,4 +22,4 @@ for (const phrase of ["Applications", "Quality", "Support", "Payments", "Export 
 }
 if (!readme.includes("PayFast")) throw new Error("Payment boundary missing");
 if (/Keep the MVP simple|What we are not building yet|directions intent recorded/.test(app)) throw new Error("Development copy leaked into UI");
-console.log("GoodKota MVP v12 static validation passed.");
+console.log("GoodKota MVP v13 static validation passed.");

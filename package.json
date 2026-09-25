@@ -1,7 +1,7 @@
 {
-  "name": "goodkota-mvp-v10",
-  "version": "10.0.0",
+  "name": "goodkota-mvp-v12",
+  "version": "12.0.0",
   "private": true,
   "type": "module",
-  "scripts": { "test": "node tests/static-validation.mjs && node tests/menu-integrity.mjs && node tests/operations.mjs && node tests/render-smoke.mjs" }
+  "scripts": { "start": "node server/server.mjs", "test": "node tests/static-validation.mjs && node tests/menu-integrity.mjs && node tests/operations.mjs && node tests/render-smoke.mjs && node tests/merchant-ux.mjs && node tests/payfast-setup.mjs" }
 }

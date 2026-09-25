@@ -1,7 +1,9 @@
 import { STANDARD } from "../data/seed.js";
 import { isPick, submitApplication, reviewApplication, saveMerchant, reviewMerchant, setMerchantStatus, setQuality, transitionOrder, updateCase, orderReport } from "../core/operations.js";
+import { merchantExperience } from "../core/feedback.js";
+import { mountPayfastSetup } from "./payfast-setup.js";
 
-const tabs = ["overview", "applications", "merchants", "orders", "quality", "support", "reports", "activity"];
+const tabs = ["overview", "applications", "merchants", "orders", "quality", "support", "reports", "payments", "activity"];
 const date = value => value ? new Date(value).toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" }) : "—";
 const statusBadge = value => `<span class="badge ${value === "active" || value === "approved" || value === "resolved" || value === "completed" ? "green" : value === "paused" || value === "declined" || value === "cancelled" || value === "intervention" ? "red" : "amber"}">${value.replaceAll("_", " ")}</span>`;
 const row = (title, detail, badge, action) => `<div class="work-row"><div class="work-row-copy"><strong>${title}</strong><p>${detail}</p></div><div class="work-row-actions">${badge || ""}${action || ""}</div></div>`;
@@ -13,6 +15,7 @@ export function renderAdminWorkspace({store, app, modal, render, showToast, esc,
   const pending = state.applications.filter(a => ["new", "review"].includes(a.status)).length;
   const openCases = state.supportCases.filter(c => c.status !== "resolved").length;
   const newOrders = state.orders.filter(o => o.status === "new").length;
+  const lowFeedback = state.merchants.filter(m => merchantExperience(state, m.id).tone === "red").length;
   const e = esc;
   const open = (html, callback) => {
     modal.innerHTML = html;
@@ -35,7 +38,8 @@ export function renderAdminWorkspace({store, app, modal, render, showToast, esc,
       ${pending ? row("Merchant applications", `${pending} waiting for a decision`, statusBadge("review"), `<button class="btn ghost small" data-admin-tab="applications">Review</button>`) : ""}
       ${newOrders ? row("New orders", `${newOrders} waiting for merchant acceptance`, statusBadge("new"), `<button class="btn ghost small" data-admin-tab="orders">View</button>`) : ""}
       ${openCases ? row("Support cases", `${openCases} unresolved`, statusBadge("open"), `<button class="btn ghost small" data-admin-tab="support">View</button>`) : ""}
-      ${!pending && !newOrders && !openCases ? empty("All clear for now.") : ""}</section>
+      ${lowFeedback ? row("Pickup experience", `${lowFeedback} spot(s) need quality review`, statusBadge("intervention"), `<button class="btn ghost small" data-admin-tab="quality">Review</button>`) : ""}
+      ${!pending && !newOrders && !openCases && !lowFeedback ? empty("All clear for now.") : ""}</section>
       <section class="panel"><h2>Recently changed</h2>${state.events.slice(-5).reverse().map(ev => row(e(ev.type.replaceAll("_", " ")), date(ev.at), "", "")).join("") || empty("Actions will appear here.")}</section></div>`;
   const applications = () => `${heading("Intake", "Merchant applications", "Review details, approve a listing into setup, or decline with a reason.")}
     <div class="work-toolbar"><button class="btn primary small" id="newApplication">+ Add application</button></div>
@@ -48,7 +52,7 @@ export function renderAdminWorkspace({store, app, modal, render, showToast, esc,
     <div class="work-toolbar"><select id="adminOrderFilter" aria-label="Filter orders">${["all","new","accepted","ready","completed","cancelled"].map(s => `<option value="${s}" ${state.adminOrderFilter === s ? "selected" : ""}>${s === "all" ? "All orders" : s}</option>`).join("")}</select></div>
     <section class="panel">${state.orders.filter(o => !state.adminOrderFilter || state.adminOrderFilter === "all" || o.status === state.adminOrderFilter).map(o => row(e(o.id), `${e(store.merchant(o.merchantId)?.name || "Merchant") } · ${e(o.customer)} · ${date(o.createdIso)} · ${money(o.total)}`, statusBadge(o.status), `<button class="btn ghost small" data-admin-order="${e(o.id)}">Details</button>`)).join("") || empty("No orders in this view.")}</section>`;
   const quality = () => `${heading("GoodKota Standard", "Quality review", "Record evidence for each check and act on quality concerns.")}
-    <section class="panel">${state.merchants.map(m => row(e(m.name), `${STANDARD.filter(check => m.standard?.[check.id]).length}/5 checks · ${e(m.quality?.note || "No quality note")}`, `${statusBadge(m.quality?.status || "healthy")} ${isPick(m) ? `<span class="badge orange">Pick</span>` : ""}`, `<button class="btn ghost small" data-quality="${e(m.id)}">Review</button>`)).join("")}</section>`;
+    <section class="panel">${state.merchants.map(m => { const signal = merchantExperience(state, m.id); return row(e(m.name), `${STANDARD.filter(check => m.standard?.[check.id]).length}/5 checks · Pickup feedback: ${signal.count ? `${signal.counts.amazing} amazing, ${signal.counts.good} good, ${signal.counts.average} average` : "none"} · ${e(m.quality?.note || "No quality note")}`, `${statusBadge(m.quality?.status || "healthy")} ${signal.count >= 3 ? `<span class="badge ${signal.tone}">${signal.label}</span>` : ""} ${isPick(m) ? `<span class="badge orange">Pick</span>` : ""}`, `<button class="btn ghost small" data-quality="${e(m.id)}">Review</button>`); }).join("")}</section>`;
   const support = () => `${heading("Help desk", "Support cases", "Record a handover note before changing a case status.")}
     <section class="panel">${state.supportCases.map(c => row(e(c.subject), `${e(store.merchant(c.merchantId)?.name || "Merchant")} · ${e(c.message)}${c.note ? ` · ${e(c.note)}` : ""}`, statusBadge(c.status), `<button class="btn ghost small" data-case="${e(c.id)}">Open case</button>`)).join("") || empty("No support cases. Merchants can open one from their workspace.")}</section>`;
   const today = new Date().toISOString().slice(0,10);
@@ -65,8 +69,10 @@ export function renderAdminWorkspace({store, app, modal, render, showToast, esc,
       <section class="panel">${result.orders.map(o => row(e(o.id), `${date(o.createdIso)} · ${e(store.merchant(o.merchantId)?.name || "Merchant")} · ${e(o.customer)} · ${money(o.total)}`, statusBadge(o.status), "")).join("") || empty("No orders in this range.")}</section>`;
   };
   const activity = () => `${heading("Audit", "Activity", "Recent actions recorded in this browser.")}<section class="panel">${state.events.slice().reverse().map(ev => row(e(ev.type.replaceAll("_", " ")), `${date(ev.at)} · ${e(JSON.stringify(ev.payload))}`, "", "")).join("") || empty("No activity yet.")}</section>`;
-  const screens = {overview, applications, merchants, orders, quality, support, reports, activity};
+  const payments = () => `${heading("Provider", "Payments", "Prepare PayFast without exposing credentials in this browser.")}<div id="payfastSetup"></div>`;
+  const screens = {overview, applications, merchants, orders, quality, support, reports, payments, activity};
   app.innerHTML = `<nav class="work-tabs" aria-label="Management sections">${tabs.map(id => `<button class="${tab === id ? "active" : ""}" data-admin-tab="${id}">${id === "overview" ? "Overview" : id[0].toUpperCase() + id.slice(1)}${id === "applications" && pending ? `<small>${pending}</small>` : ""}</button>`).join("")}</nav>${screens[tab]()}`;
+  if (tab === "payments") mountPayfastSetup(app.querySelector("#payfastSetup"), {esc:e, showToast, merchants:state.merchants});
 
   app.querySelectorAll("[data-admin-tab]").forEach(button => button.addEventListener("click", () => { state.adminTab = button.dataset.adminTab; store.save(); render(); }));
   app.querySelector("#adminMerchantSearch")?.addEventListener("input", event => { state.adminMerchantSearch = event.target.value; store.save(); app.querySelector("#adminMerchantRows").innerHTML = merchantRows(); bindMerchantRows(); });
@@ -91,13 +97,52 @@ export function renderAdminWorkspace({store, app, modal, render, showToast, esc,
   function bindMerchantRows() {
     app.querySelectorAll("[data-manage-merchant]").forEach(button => button.addEventListener("click", () => {
       const m = store.merchant(button.dataset.manageMerchant);
-      open(`<form class="modal-body editor-form" id="manageMerchantForm"><div class="modal-head"><div><div class="eyebrow">Listing · ${e(m.listingStatus)}</div><h2>${e(m.name)}</h2></div><button type="button" class="modal-close" data-close aria-label="Close">×</button></div>
-        <div class="editor-pair"><label>Trading name<input name="name" required value="${e(m.name)}"></label><label>Area<input name="area" required value="${e(m.area)}"></label></div><label>Pickup address<input name="address" required value="${e(m.address)}"></label><label>Prep time (minutes)<input name="prepMinutes" type="number" min="1" max="180" required value="${m.prepMinutes}"></label>
-        <div class="editor-pair"><label>Contact name<input name="contactName" value="${e(m.contact?.name)}"></label><label>Contact phone<input name="phone" type="tel" value="${e(m.contact?.phone)}"></label></div><label>Contact email<input name="email" type="email" value="${e(m.contact?.email)}"></label>
-        <button class="btn primary" type="submit">Save merchant details</button><div class="divider"></div><label>Status reason<textarea name="reason" rows="2" placeholder="Required for status change"></textarea></label><div class="action-row"><button type="button" class="btn ghost" data-listing-status="active">Activate</button><button type="button" class="btn ghost" data-listing-status="review">Return to review</button><button type="button" class="btn dark" data-listing-status="paused">Pause listing</button></div><p class="muted">Activation requires all five checks, a pickup address and at least one available item.</p><a href="${directionsUrl(m)}" target="_blank" rel="noopener noreferrer" class="text-link">Open pickup address in Maps ↗</a></form>`, () => {
-        const form = modal.querySelector("form");
+      const standardCount = STANDARD.filter(check => m.standard?.[check.id]).length;
+      const availableCount = m.menu.filter(item => item.available).length;
+      const addressReady = Boolean(m.address?.trim());
+      const qualityReady = m.quality?.status !== "intervention";
+      const ready = standardCount === STANDARD.length && addressReady && availableCount > 0 && qualityReady;
+      const primaryStatus = m.listingStatus === "active" ? "paused" : "active";
+      const primaryLabel = m.listingStatus === "active" ? "Pause listing" : m.listingStatus === "paused" ? "Resume listing" : "Activate listing";
+      const secondaryStatus = m.listingStatus === "review" ? "paused" : "review";
+      const secondaryLabel = secondaryStatus === "paused" ? "Pause listing" : "Return to review";
+      const readiness = [
+        [standardCount === STANDARD.length, `GoodKota Standard · ${standardCount}/${STANDARD.length}`],
+        [addressReady, "Pickup address saved"],
+        [availableCount > 0, `${availableCount} available menu item${availableCount === 1 ? "" : "s"}`],
+        [qualityReady, "Quality clear for trading"]
+      ];
+      open(`<div class="modal-body merchant-manager"><div class="modal-head"><div><div class="eyebrow">Merchant management</div><h2>${e(m.name)}</h2></div><button type="button" class="modal-close" data-close aria-label="Close">×</button></div>
+        <form id="manageMerchantForm" class="editor-form compact-form"><section class="merchant-editor-section"><h3>Merchant details</h3>
+          <label>Trading name<input name="name" required value="${e(m.name)}"></label>
+          <div class="editor-pair"><label>Area<input name="area" required value="${e(m.area)}"></label><label>Prep time (min)<input name="prepMinutes" type="number" min="1" max="180" required value="${m.prepMinutes}"></label></div>
+          <div class="editor-pair"><label>Contact name<input name="contactName" value="${e(m.contact?.name)}"></label><label>Contact phone<input name="phone" type="tel" value="${e(m.contact?.phone)}"></label></div>
+          <label>Contact email<input name="email" type="email" value="${e(m.contact?.email)}"></label></section>
+          <section class="merchant-editor-section pickup-section"><div class="merchant-section-title"><h3>Pickup location</h3><a href="${directionsUrl(m)}" target="_blank" rel="noopener noreferrer" class="text-link" data-pickup-maps>Open Maps ↗</a></div>
+          <label>Pickup address<input name="address" required value="${e(m.address)}" autocomplete="street-address"></label></section>
+          <button class="btn primary save-merchant" type="submit">Save changes</button></form>
+        <section class="merchant-status-card" aria-labelledby="tradingStatusHeading"><div class="merchant-section-title"><h3 id="tradingStatusHeading">Trading status</h3>${statusBadge(m.listingStatus)}</div>
+          <p class="merchant-status-note">${m.listingStatus === "active" ? "Listed. The merchant can open or close orders." : m.listingStatus === "paused" ? "Listing paused. Resume when the spot is ready." : "Listing in review. Complete the checks before activation."}</p>
+          <ul class="readiness-list">${readiness.map(([passed, label]) => `<li class="${passed ? "ready" : "missing"}"><span aria-hidden="true">${passed ? "✓" : "•"}</span>${e(label)}</li>`).join("")}</ul>
+          <button class="text-link readiness-link" type="button" data-open-quality>Review the five checks ↗</button>
+          <label class="status-reason">Reason for status change<textarea name="statusReason" rows="2" required placeholder="A short note for the activity log"></textarea></label>
+          <button type="button" class="btn ${primaryStatus === "active" ? "primary" : "dark"} status-primary" data-listing-status="${primaryStatus}" ${primaryStatus === "active" && !ready ? "disabled title=\"Complete the readiness checklist first\"" : ""}>${primaryLabel}</button>
+          <details class="status-more"><summary>Other status action</summary><button type="button" class="btn ghost small" data-listing-status="${secondaryStatus}">${secondaryLabel}</button></details>
+        </section></div>`, () => {
+        const form = modal.querySelector("#manageMerchantForm");
         form.addEventListener("submit", event => { event.preventDefault(); if (form.reportValidity()) perform(() => saveMerchant(store, m.id, Object.fromEntries(new FormData(form)))); });
-        form.querySelectorAll("[data-listing-status]").forEach(button => button.addEventListener("click", () => perform(() => setMerchantStatus(store, m.id, button.dataset.listingStatus, formValue(form, "reason")))));
+        const address = form.querySelector('[name="address"]');
+        const area = form.querySelector('[name="area"]');
+        const maps = modal.querySelector("[data-pickup-maps]");
+        const updateMaps = () => { maps.href = directionsUrl({address: address.value.trim(), area: area.value.trim()}); };
+        address.addEventListener("input", updateMaps);
+        area.addEventListener("input", updateMaps);
+        const reason = modal.querySelector('[name="statusReason"]');
+        modal.querySelectorAll("[data-listing-status]").forEach(action => action.addEventListener("click", () => {
+          if (!reason.reportValidity()) return;
+          perform(() => setMerchantStatus(store, m.id, action.dataset.listingStatus, reason.value));
+        }));
+        modal.querySelector("[data-open-quality]").addEventListener("click", () => { modal.close(); state.adminTab = "quality"; store.save(); render(); });
       });
     }));
   }
@@ -107,7 +152,7 @@ export function renderAdminWorkspace({store, app, modal, render, showToast, esc,
     const o = state.orders.find(order => order.id === button.dataset.adminOrder);
     const m = store.merchant(o.merchantId);
     open(`<div class="modal-body editor-form"><div class="modal-head"><div><div class="eyebrow">Pickup order · ${e(o.status)}</div><h2>${e(o.id)}</h2></div><button class="modal-close" data-close aria-label="Close">×</button></div><p>${e(m?.name || "Merchant")} · ${date(o.createdIso)} · ${money(o.total)}</p>
-      <p><strong>${e(o.customer)}</strong><br>${e(o.contact?.phone)} · ${e(o.contact?.email)}<br>Payment: pay on collection · ${e(o.paymentStatus || "unpaid")}</p><div class="order-items">${o.items.map(line => `<div>${line.qty} × ${e(line.name || store.product(line.productId)?.name || "Item")} · ${money((line.unitPrice || 0) * line.qty)}<small>${e(choiceText(line))}</small></div>`).join("")}</div>
+      <p><strong>${e(o.customer)}</strong><br>${e(o.contact?.phone)} · ${e(o.contact?.email)}<br>Payment: pay on collection · ${e(o.paymentStatus || "unpaid")}${o.experience ? `<br>Pickup experience: ${e(o.experience.value)}` : ""}</p><div class="order-items">${o.items.map(line => `<div>${line.qty} × ${e(line.name || store.product(line.productId)?.name || "Item")} · ${money((line.unitPrice || 0) * line.qty)}<small>${e(choiceText(line))}</small></div>`).join("")}</div>
       ${m ? `<a class="text-link" href="${directionsUrl(m)}" target="_blank" rel="noopener noreferrer">Pickup directions ↗</a>` : ""}${o.cancelReason ? `<p class="muted">Cancellation: ${e(o.cancelReason)}</p>` : ""}
       ${["new","accepted"].includes(o.status) ? `<label>Cancellation reason<textarea id="adminCancelReason" rows="2" placeholder="Reason required"></textarea></label><button class="btn dark" id="adminCancelOrder">Cancel order</button>` : ""}</div>`, () => modal.querySelector("#adminCancelOrder")?.addEventListener("click", () => perform(() => transitionOrder(store, o.id, "cancelled", modal.querySelector("#adminCancelReason").value))));
   }));

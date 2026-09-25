@@ -63,7 +63,7 @@ export function reviewApplication(store, applicationId, decision, fields, reason
       prepMinutes: 20, listingStatus: "review", online: false, menu: [],
       standard: Object.fromEntries(CHECK_IDS.map(key => [key, false])),
       quality: { status: "healthy", note: "" },
-      note: "", tags: [], rating: null, verifiedRatings: 0, distanceKm: null, priceBand: "Menu pending"
+      note: "", tags: [], distanceKm: null
     };
     store.state.merchants.push(merchant);
     Object.assign(application, { businessName: name, area, address,

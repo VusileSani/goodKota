@@ -12,14 +12,16 @@ export const seed = {
   merchants: [
     {
       id: "m1", name: "Kasi Bites Midrand", area: "Halfway House, Midrand", address: "Halfway House, Midrand", distanceKm: 1.4,
-      rating: 4.8, verifiedRatings: 284, prepMinutes: 14, priceBand: "R45–R95", online: true,
+      prepMinutes: 14, priceBand: "R45–R95", online: true,
       standard: { local: true, kota: true, consistency: true, value: true, readiness: true },
       note: "Big flavour, crisp chips and a dependable classic kota.",
       tags: ["Classic", "Loaded", "Chicken"],
       menu: [
         { id: "p1", name: "Classic Kota", price: 4800, desc: "Chips, polony, cheese, atchar and house sauce.", emoji: "🥪", available: true, choices: [
           {id: "p1-cheese", name: "Cheese slice", kind: "add", price: 1200, available: true},
-          {id: "p1-atchar", name: "Atchar", kind: "remove", price: 0, available: true}
+          {id: "p1-atchar", name: "Atchar", kind: "remove", price: 0, available: true},
+          {id: "p1-mild", name: "Mild", kind: "select", group: "Heat", price: 0, available: true},
+          {id: "p1-hot", name: "Hot", kind: "select", group: "Heat", price: 0, available: true}
         ] },
         { id: "p2", name: "Loaded Kota", price: 7600, desc: "Chips, russian, egg, bacon, cheese and sauce.", emoji: "🍔", available: true },
         { id: "p3", name: "Chicken Kota", price: 8200, desc: "Crispy chicken, chips, cheese, slaw and chilli mayo.", emoji: "🍗", available: true }
@@ -27,30 +29,36 @@ export const seed = {
     },
     {
       id: "m2", name: "Tembisa Kota House", area: "Ivory Park, Tembisa", address: "Ivory Park, Tembisa", distanceKm: 6.7,
-      rating: 4.7, verifiedRatings: 191, prepMinutes: 18, priceBand: "R40–R90", online: true,
+      prepMinutes: 18, priceBand: "R40–R90", online: true,
       standard: { local: true, kota: true, consistency: true, value: true, readiness: true },
       note: "Known for generous portions and a proper kasi-style build.",
       tags: ["Best value", "Russian", "Big portions"],
       menu: [
         { id: "p4", name: "Tembisa Special", price: 6900, desc: "Chips, russian, vienna, egg, cheese and atchar.", emoji: "🥪", available: true },
         { id: "p5", name: "Double Trouble", price: 8400, desc: "Double protein, chips, cheese, egg and atchar.", emoji: "🍔", available: true },
-        { id: "p6", name: "Budget Kota", price: 4200, desc: "Chips, polony, atchar and sauce.", emoji: "🥪", available: true }
+        { id: "p6", name: "Budget Kota", price: 4200, desc: "Chips, polony, atchar and sauce.", emoji: "🥪", available: true, choices: [
+          {id: "p6-russian", name: "Russian", kind: "add", price: 1800, available: true},
+          {id: "p6-no-atchar", name: "Atchar", kind: "remove", price: 0, available: true}
+        ] }
       ]
     },
     {
       id: "m3", name: "Centurion Kota Works", area: "The Reeds, Centurion", address: "The Reeds, Centurion", distanceKm: 10.9,
-      rating: 4.6, verifiedRatings: 148, prepMinutes: 16, priceBand: "R55–R105", online: true,
+      prepMinutes: 16, priceBand: "R55–R105", online: true,
       standard: { local: true, kota: true, consistency: true, value: true, readiness: true },
       note: "A cleaner modern take without losing the kota identity.",
       tags: ["Chicken", "Fresh", "Modern"],
       menu: [
-        { id: "p7", name: "Centurion Crunch", price: 7200, desc: "Crunchy chicken strips, chips, cheese and sauce.", emoji: "🍗", available: true },
+        { id: "p7", name: "Centurion Crunch", price: 7200, desc: "Crunchy chicken strips, chips, cheese and sauce.", emoji: "🍗", available: true, choices: [
+          {id: "p7-mayo", name: "Chilli mayo", kind: "select", group: "Sauce", price: 0, available: true},
+          {id: "p7-peri", name: "Peri peri", kind: "select", group: "Sauce", price: 0, available: true}
+        ] },
         { id: "p8", name: "Works Kota", price: 9400, desc: "Beef patty, russian, egg, cheese, chips and relish.", emoji: "🍔", available: true }
       ]
     },
     {
       id: "m4", name: "Ebony Park Corner", area: "Ebony Park, Midrand", address: "Ebony Park, Midrand", distanceKm: 3.8,
-      rating: 4.2, verifiedRatings: 72, prepMinutes: 20, priceBand: "R40–R80", online: true,
+      prepMinutes: 20, priceBand: "R40–R80", online: true,
       standard: { local: true, kota: true, consistency: false, value: true, readiness: true },
       note: "Popular local stop currently under GoodKota quality review.",
       tags: ["Local favourite", "Value"],

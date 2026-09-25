@@ -2,6 +2,8 @@ import { Store } from "./core/store.js";
 import { STANDARD } from "./data/seed.js";
 import { canOrder, isPick, submitApplication, saveMerchant, transitionOrder, createCase } from "./core/operations.js";
 import { buildPickupOrder } from "./core/checkout.js";
+import { EXPERIENCE, merchantExperience, rateCompletedOrder } from "./core/feedback.js";
+import { choicesFor, choiceLabel, selectedChoices, sameChoice } from "./core/menu-choices.js";
 import { renderAdminWorkspace } from "./views/admin-view.js";
 
 const store = new Store();
@@ -10,6 +12,7 @@ const modal = document.querySelector("#modal");
 const toast = document.querySelector("#toast");
 const roleSelect = document.querySelector("#roleSelect");
 const locationLabel = document.querySelector("#locationLabel");
+const locationButton = document.querySelector("#locationButton");
 
 const money = cents => new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR", maximumFractionDigits: 0 }).format(cents / 100);
 const esc = value => String(value ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[ch]));
@@ -94,6 +97,7 @@ function renderCustomer() {
     showToast("Details saved");
   });
   app.querySelector("#merchantApplication")?.addEventListener("click", openMerchantApplication);
+  app.querySelectorAll("[data-rate-order]").forEach(button => button.addEventListener("click", () => openExperience(button.dataset.rateOrder)));
 
   app.querySelectorAll("[data-filter]").forEach(button => button.addEventListener("click", () => {
     store.state.filter = button.dataset.filter;
@@ -108,9 +112,9 @@ function discoverView() {
       <div class="hero-copy">
         <div class="eyebrow">The kota authority</div>
         <h1>Good kota.<br>Near you.</h1>
-        <p>Find your next favourite kota spot.</p>
+        <p>Find the kota worth eating, close to where you are.</p>
         <label class="searchbar">
-          <input id="discoverSearch" type="search" placeholder="Search a kota spot or area" autocomplete="off" />
+          <input id="discoverSearch" type="search" placeholder="Search kota, chicken, russian or area" autocomplete="off" />
           <button class="btn primary" type="button" id="findKota">Find kota</button>
         </label>
       </div>
@@ -118,9 +122,9 @@ function discoverView() {
 
     <section class="section">
       <div class="section-head">
-        <div><h2>Where the good kota is</h2><p>Explore kota spots near you.</p></div>
+        <div><h2>Where the good kota is</h2><p>Start around ${esc(store.state.location)}. Choose the food you feel like.</p></div>
         <div class="filter-row">
-          ${["All","Verified","Best value","Chicken"].map(filter => `<button class="chip ${store.state.filter === filter ? "active" : ""}" data-filter="${filter}">${filter}</button>`).join("")}
+          ${["All","Under R60","Chicken","Russian","Customisable"].map(filter => `<button class="chip ${store.state.filter === filter ? "active" : ""}" data-filter="${filter}">${filter}</button>`).join("")}
         </div>
       </div>
       <div class="merchant-grid" id="merchantGrid">${merchantCards(filteredMerchants())}</div>
@@ -130,11 +134,13 @@ function discoverView() {
 function filteredMerchants() {
   const q = store.state.search.trim().toLowerCase();
   const filter = store.state.filter;
+  const near = m => m.area.toLowerCase().includes(store.state.location.toLowerCase()) ? 0 : 1;
+  const products = m => m.menu.filter(item => item.available);
   return store.state.merchants
     .filter(m => m.listingStatus === "active")
-    .filter(m => !q || `${m.name} ${m.area} ${m.tags.join(" ")}`.toLowerCase().includes(q))
-    .filter(m => filter === "All" || (filter === "Verified" && standardPass(m)) || m.tags.includes(filter))
-    .sort((a,b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity));
+    .filter(m => !q || `${m.name} ${m.area} ${m.tags.join(" ")} ${products(m).map(item => `${item.name} ${item.desc} ${choicesFor(item).filter(choice => choice.available !== false).map(choice => choice.name).join(" ")}`).join(" ")}`.toLowerCase().includes(q))
+    .filter(m => filter === "All" || products(m).some(item => filter === "Under R60" ? item.price <= 6000 : filter === "Customisable" ? choicesFor(item).some(choice => choice.available !== false) : `${item.name} ${item.desc}`.toLowerCase().includes(filter.toLowerCase())))
+    .sort((a,b) => near(a) - near(b) || Number(canOrder(b)) - Number(canOrder(a)) || (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity));
 }
 
 function updateMerchantGrid() {
@@ -146,37 +152,42 @@ function updateMerchantGrid() {
 
 function merchantCards(merchants) {
   if (!merchants.length) return `<div class="empty">No kota spots match that search yet.</div>`;
-  return merchants.map((m, index) => `
+  return merchants.map(m => {
+    const feedback = merchantExperience(store.state, m.id);
+    const signature = m.menu.find(item => item.available);
+    return `
     <article class="merchant-card" data-open-merchant="${m.id}">
       <div class="merchant-card-top">
         <div class="merchant-monogram">${firstLetter(m.name)}</div>
         <button class="link-button" data-favourite="${m.id}" aria-label="${store.state.favourites.includes(m.id) ? "Remove favourite" : "Save favourite"}">${store.state.favourites.includes(m.id) ? "♥" : "♡"}</button>
       </div>
-      <div class="merchant-photo" aria-hidden="true"><span>${esc(m.menu.find(item => item.available)?.emoji || "🥪")}</span><small>Food photo coming soon</small></div>
+      <div class="merchant-photo" aria-hidden="true"><span>${esc(signature?.emoji || "🥪")}</span><small>Food photo coming soon</small></div>
       <h3>${esc(m.name)}</h3>
+      ${signature ? `<div class="signature-line">Try ${esc(signature.name)} · ${money(signature.price)}</div>` : ""}
       <div class="address"><a href="${directionsUrl(m)}" target="_blank" rel="noopener noreferrer" data-directions="${m.id}" aria-label="Navigate to ${esc(m.name)}">${esc(m.address || m.area)} ↗</a></div>
       <div class="merchant-facts">
-        ${m.distanceKm != null ? `<span><strong>${m.distanceKm.toFixed(1)} km</strong></span>` : ""}
-        ${m.rating != null ? `<span>★ ${m.rating.toFixed(1)}</span>` : ""}
+        ${store.state.location === "Midrand" && m.distanceKm != null ? `<span><strong>~${m.distanceKm.toFixed(1)} km</strong></span>` : ""}
         <span>~${m.prepMinutes} min</span>
-        <span>${esc(m.priceBand)}</span>
+        <span class="experience-dot ${feedback.tone}"></span><span>${feedback.count >= 3 ? `${feedback.label} · ${feedback.count} orders` : feedback.count ? `${feedback.count} pickup rating${feedback.count === 1 ? "" : "s"}` : "Feedback pending"}</span>
         <span class="badge ${m.online ? "green" : "dark"}">${m.online ? "Open now" : "Closed"}</span>
       </div>
       <div class="card-bottom">
         ${standardPass(m) ? `<span class="badge orange">✓ GoodKota Pick</span>` : `<span class="badge amber">Under review</span>`}
-        <button class="link-button" data-open-merchant="${m.id}">${index === 0 ? "Closest · " : ""}View menu →</button>
+        <button class="link-button" data-open-merchant="${m.id}">View menu →</button>
       </div>
-    </article>`).join("");
+    </article>`;
+  }).join("");
 }
 
 function merchantDetail(merchant) {
   if (!merchant) return `<div class="empty">Merchant not found.</div>`;
+  const feedback = merchantExperience(store.state, merchant.id);
   return `
     <section class="detail-hero">
       <button class="link-button back" id="backDiscover">← Back to nearby</button>
       <div class="eyebrow">${standardPass(merchant) ? "GoodKota Pick" : "Quality review"}</div>
       <h1>${esc(merchant.name)}</h1>
-      <p>${esc(merchant.address || merchant.area)}${merchant.distanceKm != null ? ` · ${merchant.distanceKm.toFixed(1)} km away` : ""}${merchant.rating != null ? ` · ★ ${merchant.rating.toFixed(1)}` : ""}</p>
+      <p>${esc(merchant.address || merchant.area)}${store.state.location === "Midrand" && merchant.distanceKm != null ? ` · ~${merchant.distanceKm.toFixed(1)} km` : ""}${feedback.count >= 3 ? ` · ${feedback.label} from ${feedback.count} collected orders` : ""}</p>
       <div class="detail-actions">
         <a class="btn primary" href="${directionsUrl(merchant)}" target="_blank" rel="noopener noreferrer" data-directions="${merchant.id}">Get directions ↗</a>
         <button class="btn light" data-favourite="${merchant.id}">${store.state.favourites.includes(merchant.id) ? "♥ Saved" : "♡ Save"}</button>
@@ -208,7 +219,19 @@ function ordersView() {
 function orderRow(order) {
   const merchant = store.merchant(order.merchantId);
   const tone = order.status === "cancelled" ? "red" : order.status === "completed" ? "green" : order.status === "ready" ? "orange" : "dark";
-  return `<div class="list-row"><div><strong>${esc(merchant?.name || "GoodKota")}</strong><p>${esc(order.id)} · ${esc(order.createdAt)} · Pay on collection</p><p>${order.items.map(line => `${line.qty} × ${esc(line.name || store.product(line.productId)?.name || "Item")}${choiceText(line) ? ` (${esc(choiceText(line))})` : ""}`).join(" · ")}</p>${order.cancelReason ? `<p>Cancelled: ${esc(order.cancelReason)}</p>` : ""}${merchant ? `<a class="text-link" href="${directionsUrl(merchant)}" target="_blank" rel="noopener noreferrer" data-directions="${merchant.id}">Get directions ↗</a>` : ""}</div><div class="list-row-actions"><span class="badge ${tone}">${esc(order.status)}</span><strong>${money(order.total)}</strong></div></div>`;
+  return `<div class="list-row"><div><strong>${esc(merchant?.name || "GoodKota")}</strong><p>${esc(order.id)} · ${esc(order.createdAt)} · Pay on collection</p><p>${order.items.map(line => `${line.qty} × ${esc(line.name || store.product(line.productId)?.name || "Item")}${choiceText(line) ? ` (${esc(choiceText(line))})` : ""}`).join(" · ")}</p>${order.cancelReason ? `<p>Cancelled: ${esc(order.cancelReason)}</p>` : ""}${merchant ? `<a class="text-link" href="${directionsUrl(merchant)}" target="_blank" rel="noopener noreferrer" data-directions="${merchant.id}">Get directions ↗</a>` : ""}${order.status === "completed" ? order.experience ? `<p><span class="badge ${EXPERIENCE[order.experience.value]?.tone || "dark"}">Your experience: ${esc(EXPERIENCE[order.experience.value]?.label || "Rated")}</span></p>` : `<p><button class="btn primary small" data-rate-order="${esc(order.id)}">Rate this pickup</button></p>` : ""}</div><div class="list-row-actions"><span class="badge ${tone}">${esc(order.status)}</span><strong>${money(order.total)}</strong></div></div>`;
+}
+
+function openExperience(orderId) {
+  const order = store.state.orders.find(item => item.id === orderId);
+  if (!order || order.status !== "completed" || order.experience) return;
+  modal.innerHTML = `<div class="modal-body"><div class="modal-head"><div><div class="eyebrow">Collected order</div><h2>How was ${esc(store.merchant(order.merchantId)?.name || "your kota")}?</h2></div><button type="button" class="modal-close" data-close aria-label="Close">×</button></div><p class="muted">Rate the food and pickup experience for order ${esc(order.id)}.</p><div class="experience-choices">${Object.entries(EXPERIENCE).map(([value, item]) => `<button class="experience-choice ${item.tone}" data-experience="${value}"><span class="experience-dot ${item.tone}"></span>${item.label}</button>`).join("")}</div></div>`;
+  modal.showModal();
+  modal.querySelector("[data-close]").addEventListener("click", () => modal.close());
+  modal.querySelectorAll("[data-experience]").forEach(button => button.addEventListener("click", () => {
+    try { rateCompletedOrder(store, orderId, button.dataset.experience); modal.close(); showToast("Thanks for rating your pickup"); render(); }
+    catch (error) { showToast(error.message); }
+  }));
 }
 
 function accountView() {
@@ -248,27 +271,30 @@ function customerNav() {
 
 // A choice is bound to one item. Store a price and label snapshot so later menu edits
 // cannot silently change the price or contents of an order already placed.
-const choicesFor = product => Array.isArray(product?.choices) ? product.choices : [];
 const linePrice = line => line.unitPrice ?? store.product(line.productId)?.price ?? 0;
-const choiceText = line => (line.choices || []).map(choice => choice.kind === "remove" ? `No ${choice.name}` : `Extra ${choice.name}`).join(" · ");
+const choiceText = line => (line.choices || []).map(choiceLabel).join(" · ");
 
 function addToCart(productId) {
   const product = store.product(productId);
   if (!product || !product.available || !canOrder(store.merchant(product.merchantId))) return;
   const choices = choicesFor(product);
-  modal.innerHTML = `<form class="modal-body" id="optionsForm"><div class="modal-head"><div><div class="eyebrow">Make it yours</div><h2>${esc(product.name)}</h2></div><button class="modal-close" type="button" data-close aria-label="Close">×</button></div><p class="muted">${esc(product.desc)}</p><div class="choice-list">${choices.map(choice => `<label class="choice-row"><input type="checkbox" name="choice" value="${esc(choice.id)}" ${choice.available === false ? "disabled" : ""}><span><strong>${choice.kind === "remove" ? "No" : "Extra"} ${esc(choice.name)}</strong>${choice.available === false ? `<small>Unavailable</small>` : ""}</span><b>${choice.kind === "remove" ? "Included" : choice.price ? `+ ${money(choice.price)}` : "Free"}</b></label>`).join("") || `<p class="muted">No changes needed? Add it as it comes.</p>`}</div><div class="cart-total"><span>Total per item</span><span id="optionsTotal">${money(product.price)}</span></div><button class="btn primary wide" type="submit">Add to cart</button></form>`;
+  const optionLine = choice => `<label class="choice-row"><input type="checkbox" data-choice value="${esc(choice.id)}" ${choice.available === false ? "disabled" : ""}><span><strong>${esc(choiceLabel(choice))}</strong>${choice.available === false ? `<small>Unavailable</small>` : ""}</span><b>${choice.price ? `+ ${money(choice.price)}` : "Free"}</b></label>`;
+  const groups = [...new Set(choices.filter(choice => choice.kind === "select").map(choice => choice.group).filter(Boolean))];
+  const pickOne = groups.map((group, index) => `<fieldset class="choice-group"><legend>${esc(group)} <small>Choose one, or keep it as listed</small></legend><label class="choice-row"><input type="radio" name="group-${index}" checked value="">As listed <b>Included</b></label>${choices.filter(choice => choice.kind === "select" && choice.group === group).map(choice => `<label class="choice-row"><input type="radio" name="group-${index}" data-choice value="${esc(choice.id)}" ${choice.available === false ? "disabled" : ""}><span>${esc(choice.name)}${choice.available === false ? `<small>Unavailable</small>` : ""}</span><b>${choice.price ? `+ ${money(choice.price)}` : "Free"}</b></label>`).join("")}</fieldset>`).join("");
+  modal.innerHTML = `<form class="modal-body" id="optionsForm"><div class="modal-head"><div><div class="eyebrow">Your kota, your way</div><h2>${esc(product.name)}</h2></div><button class="modal-close" type="button" data-close aria-label="Close">×</button></div><p class="muted">${esc(product.desc)}</p><div class="choice-list">${choices.some(choice => choice.kind === "add") ? `<h3>Make it bigger</h3>${choices.filter(choice => choice.kind === "add").map(optionLine).join("")}` : ""}${choices.some(choice => choice.kind === "remove") ? `<h3>Leave it out</h3>${choices.filter(choice => choice.kind === "remove").map(optionLine).join("")}` : ""}${pickOne || ""}${!choices.length ? `<p class="muted">No changes needed? Add it as it comes.</p>` : ""}</div><div class="cart-total"><span>Total per item</span><span id="optionsTotal">${money(product.price)}</span></div><button class="btn primary wide" type="submit">Add to cart</button></form>`;
   modal.showModal();
   modal.querySelector("[data-close]").addEventListener("click", () => modal.close());
   const form = modal.querySelector("#optionsForm");
-  const selected = () => choices.filter(choice => [...form.querySelectorAll('input[name="choice"]:checked')].some(input => input.value === choice.id));
+  const selected = () => selectedChoices(product, [...form.querySelectorAll("[data-choice]:checked")].map(input => input.value));
   form.addEventListener("change", () => { form.querySelector("#optionsTotal").textContent = money(product.price + selected().reduce((sum, choice) => sum + choice.price, 0)); });
   form.addEventListener("submit", event => {
     event.preventDefault();
     const current = store.product(productId);
     if (!current?.available || !canOrder(store.merchant(current.merchantId))) { modal.close(); showToast("Item no longer available"); return; }
-    const options = selected();
+    let options;
+    try { options = selected(); } catch (error) { showToast(error.message); return; }
     const live = choicesFor(current);
-    if (current.price !== product.price || options.some(option => !live.some(choice => choice.id === option.id && choice.available !== false && choice.price === option.price))) {
+    if (current.price !== product.price || options.some(option => !live.some(choice => sameChoice(option, choice)))) {
       modal.close(); showToast("Menu changed. Please choose again."); render(); return;
     }
     const previousMerchant = store.state.cart[0] && store.product(store.state.cart[0].productId)?.merchantId;
@@ -279,7 +305,7 @@ function addToCart(productId) {
     const ids = options.map(choice => choice.id).sort().join("|");
     const line = store.state.cart.find(item => item.productId === productId && (item.choices || []).map(choice => choice.id).sort().join("|") === ids);
     if (line) line.qty += 1;
-    else store.state.cart.push({productId, qty: 1, name: current.name, unitPrice: current.price + options.reduce((sum, choice) => sum + choice.price, 0), choices: options.map(({id,name,kind,price}) => ({id,name,kind,price}))});
+    else store.state.cart.push({productId, qty: 1, name: current.name, unitPrice: current.price + options.reduce((sum, choice) => sum + choice.price, 0), choices: options.map(({id,name,kind,group,price}) => ({id,name,kind,group: group || "",price}))});
     store.log("cart_add", {productId, merchantId: current.merchantId});
     modal.close(); showToast(`${current.name} added`); render();
   });
@@ -326,7 +352,9 @@ function placeOrder(details) {
   const stale = store.state.cart.some(line => {
     const current = store.product(line.productId);
     const live = choicesFor(current);
-    return !current?.available || current.merchantId !== product?.merchantId || (line.name && line.name !== current.name) || linePrice(line) !== current.price + (line.choices || []).reduce((sum, option) => sum + option.price, 0) || (line.choices || []).some(option => !live.some(choice => choice.id === option.id && choice.name === option.name && choice.kind === option.kind && choice.price === option.price && choice.available !== false));
+    if (!current?.available || current.merchantId !== product?.merchantId) return true;
+    try { selectedChoices(current, (line.choices || []).map(choice => choice.id)); } catch { return true; }
+    return (line.name && line.name !== current.name) || linePrice(line) !== current.price + (line.choices || []).reduce((sum, option) => sum + option.price, 0) || (line.choices || []).some(option => !live.some(choice => sameChoice(option, choice)));
   });
   if (!product || stale || !canOrder(store.merchant(product.merchantId))) {
     showToast("Menu changed. Review your cart before ordering"); modal.close(); render(); return;
@@ -344,22 +372,25 @@ function placeOrder(details) {
 function renderMerchant() {
   const merchant = store.merchant(store.state.merchantId);
   if (!merchant) { app.innerHTML = `<div class="empty">No merchant selected.</div>`; return; }
+  const experience = merchantExperience(store.state, merchant.id);
   const orders = store.state.orders.filter(o => o.merchantId === merchant.id);
   const active = orders.filter(o => ["new","accepted","ready"].includes(o.status));
+  const queueStatuses = ["new", "accepted", "ready"].sort((a, b) => Number(active.some(o => o.status === b)) - Number(active.some(o => o.status === a)));
   const tab = store.state.merchantTab || "orders";
   const tabs = [["orders","Orders"],["menu","Menu"],["store","Store"],["support","Support"]];
+  const merchantMetrics = `<div class="metric-grid merchant-metrics"><div class="metric"><div class="value">${merchant.online && merchant.listingStatus === "active" ? "Open" : "Closed"}</div><div class="label">Accepting orders</div></div><div class="metric"><div class="value">${active.length}</div><div class="label">Active pickup orders</div></div><div class="metric"><div class="value experience-value"><span class="experience-dot ${experience.tone}"></span>${experience.count >= 3 ? experience.label : "New"}</div><div class="label">Pickup experience · ${experience.count} rated</div></div><div class="metric"><div class="value">${merchant.menu.filter(i => i.available).length}/${merchant.menu.length}</div><div class="label">Items available</div></div></div>`;
   const orderScreen = `<div class="section-head"><div><h2>Pickup queue</h2><p>Accept, prepare and hand over each order.</p></div><button class="btn ${merchant.online ? "ghost" : "primary"}" id="toggleOnline" ${merchant.listingStatus !== "active" ? "disabled" : ""}>${merchant.online ? "Close for orders" : "Open for orders"}</button></div>
-    <div class="queue-grid">${["new","accepted","ready"].map(status => `<div class="queue-column"><h3>${status === "new" ? "New" : status === "accepted" ? "Preparing" : "Ready"} · ${active.filter(o => o.status === status).length}</h3>${active.filter(o => o.status === status).map(merchantOrderCard).join("") || `<div class="empty">Nothing here.</div>`}</div>`).join("")}</div>
-    <section class="panel section"><h2>Order history</h2>${orders.filter(o => ["completed","cancelled"].includes(o.status)).map(o => `<div class="list-row"><div><strong>${esc(o.id)} · ${esc(o.customer)}</strong><p>${esc(o.createdAt)} · ${o.cancelReason ? `Reason: ${esc(o.cancelReason)}` : "Collected"}</p></div><div class="list-row-actions"><span class="badge ${o.status === "completed" ? "green" : "red"}">${esc(o.status)}</span><strong>${money(o.total)}</strong></div></div>`).join("") || `<div class="empty">Completed and cancelled orders appear here.</div>`}</section>`;
+    <div class="queue-grid">${queueStatuses.map(status => `<div class="queue-column"><h3>${status === "new" ? "New" : status === "accepted" ? "Preparing" : "Ready"} · ${active.filter(o => o.status === status).length}</h3>${active.filter(o => o.status === status).map(merchantOrderCard).join("") || `<div class="empty">Nothing here.</div>`}</div>`).join("")}</div>
+    ${merchantMetrics}<section class="panel section"><h2>Order history</h2>${orders.filter(o => ["completed","cancelled"].includes(o.status)).map(o => `<div class="list-row"><div><strong>${esc(o.id)} · ${esc(o.customer)}</strong><p>${esc(o.createdAt)} · ${o.cancelReason ? `Reason: ${esc(o.cancelReason)}` : "Collected"}${o.experience ? ` · Experience: ${esc(EXPERIENCE[o.experience.value]?.label || "Rated")}` : ""}</p></div><div class="list-row-actions"><span class="badge ${o.status === "completed" ? "green" : "red"}">${esc(o.status)}</span><strong>${money(o.total)}</strong></div></div>`).join("") || `<div class="empty">Completed and cancelled orders appear here.</div>`}</section>`;
   const menuScreen = `<section class="panel"><div class="section-head"><div><h2>Your menu</h2><p>Edit products, paid extras and free removals.</p></div><button class="btn primary small" id="addMenuItem">+ Add item</button></div>
     ${merchant.menu.map(item => `<div class="list-row"><div class="menu-summary"><div class="menu-thumb" aria-hidden="true">${esc(item.emoji || "🥪")}</div><div><strong>${esc(item.name)}</strong><p>${money(item.price)} · ${choicesFor(item).length} choices</p></div></div><div class="list-row-actions"><button class="btn ghost small" data-edit-item="${item.id}">Edit</button><button class="btn ${item.available ? "ghost" : "dark"} small" data-toggle-item="${item.id}">${item.available ? "Available" : "Unavailable"}</button></div></div>`).join("") || `<div class="empty">Add your first product to prepare the listing.</div>`}</section>`;
-  const storeScreen = `<div class="detail-layout"><section class="panel"><h2>Operating details</h2><form id="merchantStoreForm" class="editor-form"><div class="editor-pair"><label>Trading name<input name="name" required value="${esc(merchant.name)}"></label><label>Area<input name="area" required value="${esc(merchant.area)}"></label></div><label>Pickup address<input name="address" required value="${esc(merchant.address)}" autocomplete="street-address"></label><label>Usual prep time (minutes)<input name="prepMinutes" type="number" min="1" max="180" required value="${merchant.prepMinutes}"></label><div class="editor-pair"><label>Contact name<input name="contactName" value="${esc(merchant.contact?.name)}"></label><label>Phone<input name="phone" type="tel" value="${esc(merchant.contact?.phone)}"></label></div><label>Email<input name="email" type="email" value="${esc(merchant.contact?.email)}"></label><button class="btn primary" type="submit">Save store details</button></form><a class="text-link" href="${directionsUrl(merchant)}" target="_blank" rel="noopener noreferrer" data-directions="${merchant.id}">Open pickup address in Maps ↗</a></section>
-    <section class="panel"><h2>Listing and quality</h2><p>${merchant.listingStatus === "active" ? "Your spot is listed." : "Your listing is awaiting GoodKota approval."} ${merchant.online ? "Customers can order now." : "Orders are currently closed."}</p><div class="action-row"><span class="badge ${merchant.listingStatus === "active" ? "green" : "amber"}">${esc(merchant.listingStatus)}</span><span class="badge ${merchant.quality?.status === "intervention" ? "red" : merchant.quality?.status === "watch" ? "amber" : "green"}">Quality: ${esc(merchant.quality?.status || "healthy")}</span></div><p class="muted">${esc(merchant.statusReason || "")}</p><p class="muted">${esc(merchant.quality?.note || "")}</p><div class="standard-list">${STANDARD.map(item => `<div class="standard-row"><span>${merchant.standard?.[item.id] ? "✓" : "•"}</span><span>${esc(item.name)}</span></div>`).join("")}</div><p class="muted">${esc(merchant.reviewNote || "")}</p></section></div>`;
+  const storeScreen = `<div class="detail-layout"><section class="panel"><form id="merchantStoreForm" class="editor-form compact-form"><section class="merchant-editor-section"><h2>Merchant details</h2><label>Trading name<input name="name" required value="${esc(merchant.name)}"></label><div class="editor-pair"><label>Area<input name="area" required value="${esc(merchant.area)}"></label><label>Prep time (min)<input name="prepMinutes" type="number" min="1" max="180" required value="${merchant.prepMinutes}"></label></div><div class="editor-pair"><label>Contact name<input name="contactName" value="${esc(merchant.contact?.name)}"></label><label>Phone<input name="phone" type="tel" value="${esc(merchant.contact?.phone)}"></label></div><label>Email<input name="email" type="email" value="${esc(merchant.contact?.email)}"></label></section>
+    <section class="merchant-editor-section pickup-section"><div class="merchant-section-title"><h2>Pickup location</h2><a class="text-link" href="${directionsUrl(merchant)}" target="_blank" rel="noopener noreferrer" data-directions="${merchant.id}">Open Maps ↗</a></div><label>Pickup address<input name="address" required value="${esc(merchant.address)}" autocomplete="street-address"></label></section><button class="btn primary" type="submit">Save changes</button></form></section>
+    <section class="panel"><h2>Listing and quality</h2><p>${merchant.listingStatus === "active" ? "Your spot is listed." : "Your listing is awaiting GoodKota approval."} ${merchant.online ? "Customers can order now." : "Orders are currently closed."}</p><div class="action-row"><span class="badge ${merchant.listingStatus === "active" ? "green" : "amber"}">${esc(merchant.listingStatus)}</span><span class="badge ${merchant.quality?.status === "intervention" ? "red" : merchant.quality?.status === "watch" ? "amber" : "green"}">Quality: ${esc(merchant.quality?.status || "healthy")}</span></div><p class="muted">${esc(merchant.statusReason || "")}</p><p class="muted">${esc(merchant.quality?.note || "")}</p><p class="muted">Collected-order feedback: ${experience.counts.amazing} amazing · ${experience.counts.good} good · ${experience.counts.average} average</p><div class="standard-list">${STANDARD.map(item => `<div class="standard-row"><span>${merchant.standard?.[item.id] ? "✓" : "•"}</span><span>${esc(item.name)}</span></div>`).join("")}</div><p class="muted">${esc(merchant.reviewNote || "")}</p></section></div>`;
   const supportScreen = `<div class="detail-layout"><section class="panel"><h2>Contact GoodKota</h2><form class="editor-form" id="merchantCaseForm"><label>Subject<input name="subject" required maxlength="80" placeholder="What do you need help with?"></label><label>Message<textarea name="message" required rows="5" maxlength="1000" placeholder="Give us the details"></textarea></label><button class="btn primary" type="submit">Send support request</button></form></section><section class="panel"><h2>Your cases</h2>${store.state.supportCases.filter(c => c.merchantId === merchant.id).map(c => `<div class="work-row"><div><strong>${esc(c.subject)}</strong><p>${esc(c.message)}</p>${c.note ? `<p class="muted">GoodKota: ${esc(c.note)}</p>` : ""}</div><span class="badge ${c.status === "resolved" ? "green" : "amber"}">${esc(c.status.replaceAll("_", " "))}</span></div>`).join("") || `<div class="empty">No support cases yet.</div>`}</section></div>`;
   app.innerHTML = `<div class="work-topline"><div class="page-title compact"><div class="eyebrow">Merchant workspace</div><h1>${esc(merchant.name)}</h1><p>Pickup orders and your storefront in one place.</p></div><label class="merchant-switch">Viewing spot<select id="merchantSwitch" aria-label="Select merchant">${store.state.merchants.map(m => `<option value="${esc(m.id)}" ${m.id === merchant.id ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select></label></div>
-    <div class="metric-grid"><div class="metric"><div class="value">${merchant.online && merchant.listingStatus === "active" ? "Open" : "Closed"}</div><div class="label">Accepting orders</div></div><div class="metric"><div class="value">${active.length}</div><div class="label">Active pickup orders</div></div><div class="metric"><div class="value">${merchant.rating == null ? "—" : merchant.rating.toFixed(1)}</div><div class="label">Customer rating</div></div><div class="metric"><div class="value">${merchant.menu.filter(i => i.available).length}/${merchant.menu.length}</div><div class="label">Items available</div></div></div>
     <nav class="work-tabs" aria-label="Merchant sections">${tabs.map(([id,label]) => `<button class="${tab === id ? "active" : ""}" data-merchant-tab="${id}">${label}</button>`).join("")}</nav>
-    ${tab === "menu" ? menuScreen : tab === "store" ? storeScreen : tab === "support" ? supportScreen : orderScreen}`;
+    ${tab === "orders" ? orderScreen : `${merchantMetrics}${tab === "menu" ? menuScreen : tab === "store" ? storeScreen : supportScreen}`}`;
 
   app.querySelector("#merchantSwitch")?.addEventListener("change", event => { store.state.merchantId = event.target.value; store.save(); render(); });
   app.querySelectorAll("[data-merchant-tab]").forEach(button => button.addEventListener("click", () => { store.state.merchantTab = button.dataset.merchantTab; store.save(); render(); }));
@@ -377,6 +408,10 @@ function renderMerchant() {
     try { saveMerchant(store, merchant.id, Object.fromEntries(new FormData(event.currentTarget))); showToast("Store details saved"); render(); }
     catch (error) { showToast(error.message); }
   });
+  const storeForm = app.querySelector("#merchantStoreForm");
+  storeForm?.querySelectorAll('[name="address"], [name="area"]').forEach(input => input.addEventListener("input", () => {
+    storeForm.querySelector("[data-directions]").href = directionsUrl({address: storeForm.elements.address.value.trim(), area: storeForm.elements.area.value.trim()});
+  }));
   app.querySelector("#merchantCaseForm")?.addEventListener("submit", event => {
     event.preventDefault();
     if (!event.currentTarget.reportValidity()) return;
@@ -411,14 +446,23 @@ function openCancelOrder(orderId) {
 }
 
 function openMenuEditor(merchant, item) {
-  const optionRow = option => `<div class="option-editor-row"><input name="optionName" aria-label="Option name" placeholder="Cheese slice or atchar" maxlength="50" required value="${esc(option?.name || "")}"><select name="optionKind" aria-label="Option type"><option value="add" ${option?.kind === "add" ? "selected" : ""}>Add extra</option><option value="remove" ${option?.kind === "remove" ? "selected" : ""}>Remove ingredient</option></select><input name="optionPrice" aria-label="Extra price in rand" type="number" min="0" max="999" step="0.01" inputmode="decimal" value="${option?.kind === "remove" ? "0" : ((option?.price || 0) / 100).toFixed(2)}" required><button class="btn ghost small" type="button" data-remove-option aria-label="Remove option">×</button></div>`;
-  modal.innerHTML = `<form class="modal-body editor-form" id="menuForm"><div class="modal-head"><div><div class="eyebrow">Merchant menu</div><h2>${item ? "Edit item" : "Add item"}</h2></div><button type="button" class="modal-close" data-close aria-label="Close">×</button></div><label>Item name<input name="name" required maxlength="80" value="${esc(item?.name || "")}" placeholder="Classic Kota"></label><label>Description<textarea name="desc" required maxlength="220" rows="2" placeholder="What comes with it">${esc(item?.desc || "")}</textarea></label><div class="editor-pair"><label>Price (R)<input name="price" type="number" min="1" max="9999" step="0.01" inputmode="decimal" required value="${item ? (item.price / 100).toFixed(2) : ""}"></label><label>Picture placeholder<select name="emoji"><option value="🥪" ${item?.emoji === "🥪" ? "selected" : ""}>🥪 Kota</option><option value="🍔" ${item?.emoji === "🍔" ? "selected" : ""}>🍔 Loaded</option><option value="🍗" ${item?.emoji === "🍗" ? "selected" : ""}>🍗 Chicken</option></select></label></div><div class="option-editor"><div class="section-head"><div><strong>Customer choices</strong><p class="muted">Add a paid extra or let customers leave out an ingredient. Removals are free.</p></div><button class="btn ghost small" type="button" id="addOption">+ Choice</button></div><div id="optionRows">${choicesFor(item).map(optionRow).join("")}</div></div><label class="inline-check"><input name="available" type="checkbox" ${!item || item.available ? "checked" : ""}> Available to order</label><button class="btn primary wide" type="submit">Save item</button></form>`;
+  const optionRow = option => `<div class="option-editor-row"><input name="optionName" aria-label="Choice name" placeholder="Cheese, no atchar, hot" maxlength="50" required value="${esc(option?.name || "")}"><select name="optionKind" aria-label="Choice type"><option value="add" ${option?.kind === "add" ? "selected" : ""}>Extra</option><option value="remove" ${option?.kind === "remove" ? "selected" : ""}>Leave out</option><option value="select" ${option?.kind === "select" ? "selected" : ""}>Choose one</option></select><input name="optionGroup" aria-label="Group for choose one" placeholder="Sauce / Heat" maxlength="40" ${option?.kind === "select" ? "required" : "disabled"} value="${esc(option?.group || "")}"><input name="optionPrice" aria-label="Choice price in rand" type="number" min="0" max="999" step="0.01" inputmode="decimal" value="${option?.kind === "remove" ? "0" : ((option?.price || 0) / 100).toFixed(2)}" ${option?.kind === "remove" ? "readonly" : ""} required><label class="option-on" title="Available to customers"><input name="optionAvailable" type="checkbox" ${option?.available === false ? "" : "checked"}>On</label><button class="btn ghost small" type="button" data-remove-option aria-label="Remove choice">×</button></div>`;
+  modal.innerHTML = `<form class="modal-body editor-form" id="menuForm"><div class="modal-head"><div><div class="eyebrow">Merchant menu</div><h2>${item ? "Edit item" : "Add item"}</h2></div><button type="button" class="modal-close" data-close aria-label="Close">×</button></div><label>Item name<input name="name" required maxlength="80" value="${esc(item?.name || "")}" placeholder="Classic Kota"></label><label>Description<textarea name="desc" required maxlength="220" rows="2" placeholder="What comes with it">${esc(item?.desc || "")}</textarea></label><div class="editor-pair"><label>Price (R)<input name="price" type="number" min="1" max="9999" step="0.01" inputmode="decimal" required value="${item ? (item.price / 100).toFixed(2) : ""}"></label><label>Picture placeholder<select name="emoji"><option value="🥪" ${item?.emoji === "🥪" ? "selected" : ""}>🥪 Kota</option><option value="🍔" ${item?.emoji === "🍔" ? "selected" : ""}>🍔 Loaded</option><option value="🍗" ${item?.emoji === "🍗" ? "selected" : ""}>🍗 Chicken</option></select></label></div><div class="option-editor"><div class="section-head"><div><strong>Customer choices</strong><p class="muted">Extras can cost more, removals are free, and “Choose one” groups sauce or heat preferences.</p></div><button class="btn ghost small" type="button" id="addOption">+ Choice</button></div><div id="optionRows">${choicesFor(item).map(optionRow).join("")}</div></div><label class="inline-check"><input name="available" type="checkbox" ${!item || item.available ? "checked" : ""}> Available to order</label><button class="btn primary wide" type="submit">Save item</button></form>`;
   modal.showModal();
   const form = modal.querySelector("#menuForm");
   form.querySelector("[data-close]").addEventListener("click", () => modal.close());
   form.querySelector("#addOption").addEventListener("click", () => form.querySelector("#optionRows").insertAdjacentHTML("beforeend", optionRow()));
   form.addEventListener("click", event => { if (event.target.closest("[data-remove-option]")) event.target.closest(".option-editor-row").remove(); });
-  form.addEventListener("change", event => { if (event.target.name === "optionKind" && event.target.value === "remove") event.target.closest(".option-editor-row").querySelector('[name="optionPrice"]').value = "0.00"; });
+  form.addEventListener("change", event => {
+    if (event.target.name !== "optionKind") return;
+    const row = event.target.closest(".option-editor-row");
+    const group = row.querySelector('[name="optionGroup"]');
+    group.disabled = event.target.value !== "select";
+    group.required = event.target.value === "select";
+    const price = row.querySelector('[name="optionPrice"]');
+    price.readOnly = event.target.value === "remove";
+    if (price.readOnly) price.value = "0.00";
+  });
   form.addEventListener("submit", event => {
     event.preventDefault();
     if (!form.reportValidity()) return;
@@ -427,15 +471,18 @@ function openMenuEditor(merchant, item) {
     const desc = data.get("desc").trim();
     if (!name || !desc) { showToast("Enter a name and description"); return; }
     const rows = [...form.querySelectorAll(".option-editor-row")];
-    const names = rows.map(row => `${row.querySelector('[name="optionKind"]').value}:${row.querySelector('[name="optionName"]').value.trim().toLowerCase()}`);
-    if (rows.some(row => !row.querySelector('[name="optionName"]').value.trim()) || new Set(names).size !== names.length) { showToast("Give each choice a unique name"); return; }
+    const names = rows.map(row => { const kind = row.querySelector('[name="optionKind"]').value; return `${kind}:${kind === "select" ? row.querySelector('[name="optionGroup"]').value.trim().toLowerCase() : ""}:${row.querySelector('[name="optionName"]').value.trim().toLowerCase()}`; });
+    if (rows.some(row => !row.querySelector('[name="optionName"]').value.trim() || (row.querySelector('[name="optionKind"]').value === "select" && !row.querySelector('[name="optionGroup"]').value.trim())) || new Set(names).size !== names.length) { showToast("Give each choice a unique name and a group where needed"); return; }
     const old = choicesFor(item);
+    const groupNames = new Map();
     const choices = rows.map(row => {
       const name = row.querySelector('[name="optionName"]').value.trim();
       const kind = row.querySelector('[name="optionKind"]').value;
+      let group = kind === "select" ? row.querySelector('[name="optionGroup"]').value.trim() : "";
+      if (group) { const key = group.toLowerCase(); group = groupNames.get(key) || group; groupNames.set(key, group); }
       const price = kind === "remove" ? 0 : Math.round(Number(row.querySelector('[name="optionPrice"]').value) * 100);
-      const existing = old.find(choice => choice.name.toLowerCase() === name.toLowerCase() && choice.kind === kind);
-      return {id: existing?.id || `c-${crypto.randomUUID()}`, name, kind, price, available: true};
+      const existing = old.find(choice => choice.name.toLowerCase() === name.toLowerCase() && choice.kind === kind && (choice.group || "").toLowerCase() === group.toLowerCase());
+      return {id: existing?.id || `c-${crypto.randomUUID()}`, name, kind, group, price, available: row.querySelector('[name="optionAvailable"]').checked};
     });
     const saved = {id: item?.id || `p-${crypto.randomUUID()}`, name, desc, price: Math.round(Number(data.get("price")) * 100), emoji: data.get("emoji"), available: data.has("available"), choices};
     if (item) Object.assign(item, saved); else merchant.menu.push(saved);
@@ -454,6 +501,22 @@ roleSelect.addEventListener("change", () => {
   store.state.selectedMerchantId = null;
   store.save();
   render();
+});
+
+locationButton.addEventListener("click", () => {
+  modal.innerHTML = `<form class="modal-body editor-form" id="areaForm"><div class="modal-head"><div><div class="eyebrow">Explore nearby</div><h2>Choose your area</h2></div><button class="modal-close" type="button" data-close aria-label="Close">×</button></div><p class="muted">We show kota spots in your area first. You can still explore every listed spot.</p><div class="area-picks">${store.state.locations.map(area => `<button type="button" class="chip ${store.state.location === area ? "active" : ""}" data-area="${esc(area)}">${esc(area)}</button>`).join("")}</div><label>Or enter your area<input name="area" maxlength="80" required value="${esc(store.state.location)}" placeholder="e.g. Ebony Park"></label><button class="btn primary" type="submit">Explore this area</button></form>`;
+  modal.showModal();
+  modal.querySelector("[data-close]").addEventListener("click", () => modal.close());
+  const form = modal.querySelector("form");
+  form.querySelectorAll("[data-area]").forEach(button => button.addEventListener("click", () => { form.querySelector('[name="area"]').value = button.dataset.area; form.requestSubmit(); }));
+  form.addEventListener("submit", event => {
+    event.preventDefault();
+    const area = new FormData(form).get("area").trim();
+    if (!area) return;
+    store.state.location = area;
+    store.save();
+    modal.close(); render();
+  });
 });
 
 document.querySelector("#brandHome").addEventListener("click", () => {

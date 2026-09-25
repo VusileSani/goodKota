@@ -135,6 +135,11 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 }
 .chip { padding: 9px 13px; border: 1px solid var(--line); background: var(--paper-2); color: var(--ink); }
 .chip.active { background: var(--orange); color: white; border-color: var(--orange); }
+.experience-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex: none; background: #aaa19b; }
+.experience-dot.green { background: var(--green); box-shadow: 0 0 0 4px var(--green-soft); }
+.experience-dot.amber { background: #d2a31a; box-shadow: 0 0 0 4px var(--amber-soft); }
+.experience-dot.red { background: var(--red); box-shadow: 0 0 0 4px var(--red-soft); }
+.experience-dot.neutral { background: #a9a29b; }
 .badge { padding: 6px 9px; font-size: 11px; }
 .badge.orange { background: var(--orange-soft); color: #9b3816; }
 .badge.green { background: var(--green-soft); color: var(--green); }
@@ -160,6 +165,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .merchant-card h3 { font-size: 22px; line-height: 1.05; letter-spacing: -.035em; margin: 18px 0 7px; }
 .merchant-card .address { color: var(--muted); font-size: 13px; line-height: 1.45; }
 .merchant-card .address a { color: inherit; text-decoration-color: var(--orange); text-underline-offset: 3px; }
+.signature-line { color: #a53615; font-weight: 850; font-size: 13px; margin-bottom: 6px; }
 .merchant-facts { display: flex; flex-wrap: wrap; gap: 7px 12px; margin: 16px 0 18px; color: var(--muted); font-size: 13px; font-weight: 700; }
 .merchant-facts strong { color: var(--ink); }
 .card-bottom { margin-top: auto; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
@@ -349,6 +355,11 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .order-items { margin-top: 10px; font-size: 12px; line-height: 1.5; }
 .order-items small { display: block; color: var(--muted); }
 .choice-list { display: grid; gap: 8px; max-height: 38vh; overflow-y: auto; margin-top: 18px; }
+.choice-list h3 { margin: 12px 0 0; font-size: 14px; }
+.choice-group { border: 1px solid var(--line); border-radius: 16px; display: grid; gap: 7px; margin: 10px 0 0; padding: 12px; min-width: 0; }
+.choice-group legend { font-weight: 900; padding: 0 5px; }
+.choice-group legend small { display: block; color: var(--muted); font-weight: 500; font-size: 11px; }
+.choice-group .choice-row { border: 0; padding: 9px; }
 .choice-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 13px; border: 1px solid var(--line); border-radius: 14px; cursor: pointer; }
 .choice-row:has(input:checked) { border-color: var(--orange); background: #fff6f0; }
 .choice-row input { width: 18px; height: 18px; accent-color: var(--orange); }
@@ -361,14 +372,22 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .option-editor { border-top: 1px solid var(--line); padding-top: 15px; }
 .option-editor .section-head { align-items: start; }
 .option-editor p { margin: 4px 0 0; font-size: 12px; }
-.option-editor-row { display: grid; grid-template-columns: 1fr 135px 86px 34px; gap: 6px; margin-top: 8px; align-items: center; }
+.modal:has(#menuForm) { width: min(720px, calc(100% - 24px)); }
+.option-editor-row { display: grid; grid-template-columns: minmax(120px,1.4fr) minmax(95px,1fr) minmax(105px,1fr) 80px 42px 34px; gap: 6px; margin-top: 8px; align-items: center; }
 .option-editor-row input, .option-editor-row select { font-size: 12px; }
+.option-editor-row [name=optionGroup]:disabled { background: #f7f3ef; opacity: .55; }
+.option-on { display: flex !important; align-items: center; flex-direction: column; gap: 3px !important; font-size: 10px !important; }
+.option-on input { accent-color: var(--orange); }
 .inline-check { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 800; }
 .inline-check input { accent-color: var(--orange); width: 18px; height: 18px; }
 @media (max-width: 620px) {
-  .option-editor-row { grid-template-columns: 1fr 1fr 36px; }
-  .option-editor-row input[name=optionName] { grid-column: 1 / -1; }
-  .option-editor-row button { grid-column: 3; grid-row: 2; }
+  .option-editor-row { grid-template-columns: 1fr 1fr 42px 34px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .option-editor-row input[name=optionName] { grid-column: 1 / 3; }
+  .option-editor-row select[name=optionKind] { grid-column: 1; grid-row: 2; }
+  .option-editor-row input[name=optionGroup] { grid-column: 2 / 5; grid-row: 2; }
+  .option-editor-row input[name=optionPrice] { grid-column: 1 / 3; grid-row: 3; }
+  .option-editor-row .option-on { grid-column: 3; grid-row: 3; }
+  .option-editor-row button { grid-column: 4; grid-row: 3; }
   .list-row-actions { flex-wrap: wrap; justify-content: end; }
   .cart-line { grid-template-columns: 1fr auto; }
   .cart-line > strong { grid-column: 1 / -1; text-align: right; }
@@ -391,7 +410,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .merchant-switch { display: grid; gap: 6px; font-size: 12px; color: var(--muted); font-weight: 800; margin-bottom: 20px; }
 .work-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 5px 0 14px; margin: 20px 0 12px; border-bottom: 1px solid var(--line); scrollbar-width: thin; }
 .work-tabs button { display: inline-flex; align-items: center; gap: 6px; flex: none; border: 1px solid var(--line); border-radius: 999px; background: white; color: var(--ink); font-weight: 800; padding: 10px 15px; }
-.work-tabs button.active { background: var(--ink); color: white; border-color: var(--ink); }
+.work-tabs button.active { background: var(--orange); color: white; border-color: var(--orange); }
 .work-tabs small { background: var(--orange); color: white; border-radius: 99px; padding: 2px 6px; }
 .metric-action { text-align: left; cursor: pointer; color: var(--ink); }
 .metric-action:hover { border-color: var(--orange); box-shadow: 0 8px 24px rgba(241,90,41,.10); }
@@ -417,14 +436,68 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .menu-summary { display: flex; gap: 12px; align-items: center; }
 .menu-thumb { width: 56px; height: 56px; border-radius: 12px; background: var(--orange-soft); display: grid; place-items: center; font-size: 30px; flex: none; }
 .order-card .order-footer { flex-wrap: wrap; }
+.experience-value { display: flex; gap: 12px; align-items: center; font-size: 25px !important; }
+.experience-choices { display: grid; gap: 10px; margin-top: 18px; }
+.experience-choice { border: 1px solid var(--line); border-radius: 15px; background: white; padding: 16px; text-align: left; display: flex; gap: 16px; align-items: center; font-weight: 900; }
+.experience-choice:hover { border-color: var(--orange); background: var(--paper); }
+.area-picks { display: flex; flex-wrap: wrap; gap: 8px; }
+.payment-setup { max-width: 650px; }
+.payment-setup p { color: var(--muted); line-height: 1.55; }
+.payment-setup .editor-form { margin-top: 20px; }
+.modal:has(.merchant-manager) { width: min(620px, calc(100% - 24px)); max-height: min(92dvh, 900px); }
+.merchant-manager { display: grid; gap: 15px; padding: 20px; }
+.merchant-manager .modal-head h2 { font-size: 24px; line-height: 1.1; }
+.merchant-manager .compact-form { gap: 13px; }
+.merchant-editor-section { display: grid; gap: 10px; }
+.merchant-editor-section h3, .merchant-section-title h3 { margin: 0; font-size: 16px; letter-spacing: -.02em; }
+.merchant-editor-section h2, .merchant-section-title h2 { margin: 0; font-size: 19px; letter-spacing: -.02em; }
+.merchant-editor-section + .merchant-editor-section { padding-top: 12px; border-top: 1px solid var(--line); }
+.merchant-editor-section .editor-pair { gap: 9px; }
+#merchantStoreForm { gap: 13px; }
+#merchantStoreForm .merchant-section-title .text-link { margin: 0; font-size: 12px; white-space: nowrap; }
+#merchantStoreForm input { padding: 10px; }
+.merchant-manager .editor-pair { gap: 9px; }
+.merchant-manager .editor-form label, .merchant-status-card .status-reason { display: grid; gap: 4px; font-size: 12px; font-weight: 800; }
+.merchant-manager .editor-form input, .merchant-status-card textarea { border: 1px solid var(--line); border-radius: 10px; background: white; color: var(--ink); padding: 9px 10px; width: 100%; min-width: 0; font: inherit; }
+.merchant-manager .editor-form input { min-height: 41px; }
+.merchant-section-title { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.merchant-section-title .text-link { margin: 0; font-size: 12px; white-space: nowrap; }
+.merchant-manager .save-merchant { justify-self: start; }
+.merchant-status-card { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--line); border-radius: 17px; background: #fff8f2; }
+.merchant-status-card .merchant-status-note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.readiness-list { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; list-style: none; margin: 0; padding: 0; }
+.readiness-list li { display: flex; gap: 6px; align-items: baseline; font-size: 12px; line-height: 1.3; }
+.readiness-list li span { font-weight: 900; }
+.readiness-list .ready span { color: var(--green); }
+.readiness-list .missing span { color: var(--orange); }
+.merchant-status-card .readiness-link { justify-self: start; border: 0; background: transparent; padding: 0; margin: 0; font-size: 12px; }
+.merchant-status-card textarea { resize: vertical; min-height: 52px; }
+.merchant-status-card .status-primary { justify-self: start; }
+.merchant-metrics { margin-top: 16px; }
+.status-more { font-size: 12px; color: var(--muted); }
+.status-more summary { cursor: pointer; width: max-content; }
+.status-more .btn { margin-top: 8px; }
 textarea { font: inherit; }
 button:focus-visible, textarea:focus-visible { outline: 3px solid rgba(241,90,41,.35); outline-offset: 2px; }
 @media (max-width: 920px) { .work-grid { grid-template-columns: 1fr; } }
 @media (max-width: 620px) {
+  .merchant-manager { gap: 12px; padding: 16px; }
+  .merchant-manager .compact-form { gap: 11px; }
+  .merchant-editor-section { gap: 8px; }
+  .merchant-manager .editor-form input { font-size: 14px; }
+  .merchant-status-card { padding: 12px; }
+  .merchant-manager .save-merchant, .merchant-status-card .status-primary { width: 100%; }
   .work-topline { display: block; }
+  .work-topline .page-title { margin-bottom: 10px; }
+  .work-topline .page-title h1 { font-size: 30px; }
+  .work-topline .page-title p { font-size: 12px; }
   .merchant-switch { margin: 0 0 12px; }
+  .queue-column { min-height: 0; }
+  .queue-column .empty { padding: 10px; font-size: 12px; }
   .work-row { align-items: start; flex-direction: column; }
   .work-row-actions { flex-wrap: wrap; }
   .report-form label { flex: 1 1 130px; }
   .list-row { align-items: start; }
+  .filter-row { flex-wrap: nowrap; width: 100%; overflow-x: auto; padding: 2px 1px 8px; }
+  .filter-row .chip { flex: none; }
 }

@@ -11,12 +11,14 @@ for (const merchant of seed.merchants) {
     for (const option of product.choices || []) {
       assert(!ids.has(option.id), `Duplicate choice ${option.id}`);
       ids.add(option.id);
-      assert(['add','remove'].includes(option.kind));
+    assert(['add','remove','select'].includes(option.kind));
       assert(Number.isInteger(option.price) && option.price >= 0);
-      if (option.kind === 'remove') assert.equal(option.price, 0);
+    if (option.kind === 'remove') assert.equal(option.price, 0);
+    if (option.kind === 'select') assert(option.group?.trim(), `Choice group missing for ${option.id}`);
     }
   }
 }
 assert(seed.merchants.some(merchant => merchant.menu.some(item => item.choices?.some(option => option.kind === 'add'))));
 assert(seed.merchants.some(merchant => merchant.menu.some(item => item.choices?.some(option => option.kind === 'remove'))));
+assert(seed.merchants.some(merchant => merchant.menu.some(item => item.choices?.some(option => option.kind === 'select'))));
 console.log('Menu integrity passed.');

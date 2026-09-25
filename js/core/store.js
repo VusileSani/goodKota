@@ -22,6 +22,9 @@ export class Store {
       events: []
     };
     this.state.customerDetails ||= { firstName: "", lastName: "", email: "", phone: "" };
+    this.state.location ||= "Midrand";
+    this.state.locations ||= ["Midrand", "Tembisa", "Centurion"];
+    if (!["All","Under R60","Chicken","Russian","Customisable"].includes(this.state.filter)) this.state.filter = "All";
     this.state.applications ||= [];
     this.state.supportCases ||= [];
     this.state.events ||= [];

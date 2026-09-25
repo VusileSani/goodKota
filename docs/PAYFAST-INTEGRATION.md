@@ -1,15 +1,15 @@
 # PayFast integration boundary
 
-Current checkout captures first name, last name, mobile, email, merchant, product IDs, quantities, total in ZAR cents, a unique GoodKota order ID and the explicit `pay_on_collection` / `unpaid` state. The cart recalculates the total from product prices. These fields are a UI and order contract only; static browser storage is not a trusted payment or order database.
+Current checkout captures first name, last name, mobile, email, merchant ID, pickup address, product IDs, item and option snapshots, quantities, total in ZAR cents, currency, fulfillment, a unique GoodKota order ID and the explicit `pay_on_collection` / `unpaid` state. `js/core/checkout.js` defines this browser order shape. Before placing an order, the browser rechecks live item availability, selected options and prices. These fields are a UI and order contract only; static browser storage is not a trusted payment or order database.
 
 ## Server flow to add before enabling online payment
 
-1. Authenticate the customer and merchant roles and store the order in a server database. Accept product IDs and quantities from the browser. Reprice every item server-side, check availability and one-merchant cart rules, then create a durable order with a unique ID and `payment_status=pending`.
+1. Authenticate the customer and merchant roles and store the order in a server database. Accept product IDs, option IDs and quantities from the browser. Reprice every item and option server-side, check availability and one-merchant cart rules, then create a durable order with a unique ID and `payment_status=pending`. Persist customer contact details under an appropriate privacy and retention policy.
 2. On choosing PayFast, ask the server to create a payment attempt tied to that order. The server uses its configured PayFast merchant ID/key and passphrase and creates the hosted checkout payload, including the unique `m_payment_id`, server-calculated amount, item name, customer fields, HTTPS `return_url`, `cancel_url` and public `notify_url`. Redirect the customer to PayFast's hosted checkout. Keep provider configuration and signing on the server.
 3. On the PayFast notification endpoint, validate the signature, origin, PayFast server confirmation and expected order amount/merchant against the stored order. Deduplicate notifications and update payment status atomically. Only a verified completed payment may move a PayFast order into the merchant's actionable queue.
 4. A return URL is only a navigation event. Read the server's order status there; never mark an order paid because the browser returned. A cancelled attempt leaves the cart/order recoverable. Handle delayed, duplicate and out-of-order notifications and maintain an audit trail of payment attempts and status transitions.
 5. Test the full flow with a PayFast Sandbox account and a publicly reachable notification endpoint before switching to live credentials. Do not expose credentials, passphrase, signatures or customer details in static assets.
 
-Suggested payment statuses: `unpaid` (pay on collection), `pending`, `paid`, `failed`, `cancelled`, `refunded`. The current `placeOrder` path writes `pay_on_collection` and `unpaid`; an online path must call the server and must not reuse the local order insertion as proof of payment.
+Suggested payment statuses: `unpaid` (pay on collection), `pending`, `paid`, `failed`, `cancelled`, `refunded`. The current `placeOrder` path writes `pay_on_collection` and `unpaid`; an online path must call the server and must not reuse the local order insertion as proof of payment. Merchant order acceptance for online payments should be gated by the server's verified payment state.
 
 PayFast documentation: https://developers.payfast.co.za/documentation

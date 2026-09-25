@@ -22,7 +22,26 @@ export class Store {
       events: []
     };
     this.state.customerDetails ||= { firstName: "", lastName: "", email: "", phone: "" };
-    this.state.merchants.forEach(merchant => { merchant.address ||= merchant.area; });
+    this.state.applications ||= [];
+    this.state.supportCases ||= [];
+    this.state.events ||= [];
+    this.state.adminTab ||= "overview";
+    this.state.merchantTab ||= "orders";
+    this.state.merchants.forEach(merchant => {
+      merchant.address ||= merchant.area;
+      merchant.listingStatus ||= "active";
+      merchant.quality ||= { status: "healthy", note: "" };
+      merchant.contact ||= { name: "", phone: "", email: "" };
+      merchant.tags ||= [];
+      merchant.menu ||= [];
+    });
+    this.state.orders ||= [];
+    this.state.orders.forEach(order => {
+      if (!order.createdIso && order.createdAt && Number.isFinite(Date.parse(order.createdAt))) {
+        order.createdIso = new Date(order.createdAt).toISOString();
+      }
+    });
+    if (!this.merchant(this.state.merchantId)) this.state.merchantId = this.state.merchants[0]?.id;
   }
 
   load() {

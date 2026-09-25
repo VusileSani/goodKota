@@ -17,7 +17,10 @@ export const seed = {
       note: "Big flavour, crisp chips and a dependable classic kota.",
       tags: ["Classic", "Loaded", "Chicken"],
       menu: [
-        { id: "p1", name: "Classic Kota", price: 4800, desc: "Chips, polony, cheese, atchar and house sauce.", emoji: "🥪", available: true },
+        { id: "p1", name: "Classic Kota", price: 4800, desc: "Chips, polony, cheese, atchar and house sauce.", emoji: "🥪", available: true, choices: [
+          {id: "p1-cheese", name: "Cheese slice", kind: "add", price: 1200, available: true},
+          {id: "p1-atchar", name: "Atchar", kind: "remove", price: 0, available: true}
+        ] },
         { id: "p2", name: "Loaded Kota", price: 7600, desc: "Chips, russian, egg, bacon, cheese and sauce.", emoji: "🍔", available: true },
         { id: "p3", name: "Chicken Kota", price: 8200, desc: "Crispy chicken, chips, cheese, slaw and chilli mayo.", emoji: "🍗", available: true }
       ]
@@ -59,8 +62,6 @@ export const seed = {
   ],
   favourites: [],
   orders: [],
-  candidates: [
-    { id: "c1", name: "Ma-Lebo's Kota", area: "Rabie Ridge", checks: { local: true, kota: true, consistency: true, value: true, readiness: true } },
-    { id: "c2", name: "Corner Grill Kota", area: "Olifantsfontein", checks: { local: true, kota: true, consistency: true, value: false, readiness: true } }
-  ]
+  applications: [],
+  supportCases: []
 };

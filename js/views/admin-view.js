@@ -2,10 +2,11 @@ import { STANDARD } from "../data/seed.js";
 import { isPick, submitApplication, reviewApplication, saveMerchant, reviewMerchant, setMerchantStatus, setQuality, transitionOrder, updateCase, orderReport } from "../core/operations.js";
 import { merchantExperience } from "../core/feedback.js";
 import { mountPayfastSetup } from "./payfast-setup.js";
+import { payfastAccount, reviewPayfastAccount } from "../core/payfast-onboarding.js";
 
 const tabs = ["overview", "applications", "merchants", "orders", "quality", "support", "reports", "payments", "activity"];
 const date = value => value ? new Date(value).toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" }) : "—";
-const statusBadge = value => `<span class="badge ${value === "active" || value === "approved" || value === "resolved" || value === "completed" ? "green" : value === "paused" || value === "declined" || value === "cancelled" || value === "intervention" ? "red" : "amber"}">${value.replaceAll("_", " ")}</span>`;
+const statusBadge = value => `<span class="badge ${value === "active" || value === "approved" || value === "resolved" || value === "completed" || value === "details_checked" ? "green" : value === "paused" || value === "declined" || value === "cancelled" || value === "intervention" || value === "needs_action" ? "red" : "amber"}">${value.replaceAll("_", " ")}</span>`;
 const row = (title, detail, badge, action) => `<div class="work-row"><div class="work-row-copy"><strong>${title}</strong><p>${detail}</p></div><div class="work-row-actions">${badge || ""}${action || ""}</div></div>`;
 const empty = text => `<div class="empty">${text}</div>`;
 
@@ -16,6 +17,7 @@ export function renderAdminWorkspace({store, app, modal, render, showToast, esc,
   const openCases = state.supportCases.filter(c => c.status !== "resolved").length;
   const newOrders = state.orders.filter(o => o.status === "new").length;
   const lowFeedback = state.merchants.filter(m => merchantExperience(state, m.id).tone === "red").length;
+  const paymentIntake = state.merchants.filter(m => payfastAccount(m).status === "submitted").length;
   const e = esc;
   const open = (html, callback) => {
     modal.innerHTML = html;
@@ -39,7 +41,8 @@ export function renderAdminWorkspace({store, app, modal, render, showToast, esc,
       ${newOrders ? row("New orders", `${newOrders} waiting for merchant acceptance`, statusBadge("new"), `<button class="btn ghost small" data-admin-tab="orders">View</button>`) : ""}
       ${openCases ? row("Support cases", `${openCases} unresolved`, statusBadge("open"), `<button class="btn ghost small" data-admin-tab="support">View</button>`) : ""}
       ${lowFeedback ? row("Pickup experience", `${lowFeedback} spot(s) need quality review`, statusBadge("intervention"), `<button class="btn ghost small" data-admin-tab="quality">Review</button>`) : ""}
-      ${!pending && !newOrders && !openCases && !lowFeedback ? empty("All clear for now.") : ""}</section>
+      ${paymentIntake ? row("PayFast account details", `${paymentIntake} merchant submission(s) to check`, statusBadge("submitted"), `<button class="btn ghost small" data-admin-tab="payments">Review</button>`) : ""}
+      ${!pending && !newOrders && !openCases && !lowFeedback && !paymentIntake ? empty("All clear for now.") : ""}</section>
       <section class="panel"><h2>Recently changed</h2>${state.events.slice(-5).reverse().map(ev => row(e(ev.type.replaceAll("_", " ")), date(ev.at), "", "")).join("") || empty("Actions will appear here.")}</section></div>`;
   const applications = () => `${heading("Intake", "Merchant applications", "Review details, approve a listing into setup, or decline with a reason.")}
     <div class="work-toolbar"><button class="btn primary small" id="newApplication">+ Add application</button></div>
@@ -69,10 +72,28 @@ export function renderAdminWorkspace({store, app, modal, render, showToast, esc,
       <section class="panel">${result.orders.map(o => row(e(o.id), `${date(o.createdIso)} · ${e(store.merchant(o.merchantId)?.name || "Merchant")} · ${e(o.customer)} · ${money(o.total)}`, statusBadge(o.status), "")).join("") || empty("No orders in this range.")}</section>`;
   };
   const activity = () => `${heading("Audit", "Activity", "Recent actions recorded in this browser.")}<section class="panel">${state.events.slice().reverse().map(ev => row(e(ev.type.replaceAll("_", " ")), `${date(ev.at)} · ${e(JSON.stringify(ev.payload))}`, "", "")).join("") || empty("No activity yet.")}</section>`;
-  const payments = () => `${heading("Provider", "Payments", "Prepare PayFast without exposing credentials in this browser.")}<div id="payfastSetup"></div>`;
+  const payments = () => `${heading("Provider", "Payments", "Help merchants set up PayFast and review their account details.")}
+    <section class="panel payment-intake"><div class="section-head"><div><h2>Merchant accounts</h2><p>Each spot registers with PayFast. An ID submitted here is not proof of account ownership or payment readiness.</p></div></div>
+      ${state.merchants.map(m => { const account = payfastAccount(m); return row(e(m.name), account.merchantId ? `${e(account.accountType)} · Merchant ID ${e(account.merchantId)}${account.reviewNote ? ` · ${e(account.reviewNote)}` : ""}` : "Open Merchant → Store to start the guided sign-up", statusBadge(account.status), account.merchantId ? `<button class="btn ghost small" data-payfast-review="${e(m.id)}">Review details</button>` : ""); }).join("") || empty("Approve a merchant to begin payment setup.")}
+      <p class="muted">A details check keeps online checkout off. PayFast must verify the accounts and GoodKota must finish and test the split integration.</p></section>
+    <div id="payfastSetup"></div>`;
   const screens = {overview, applications, merchants, orders, quality, support, reports, payments, activity};
   app.innerHTML = `<nav class="work-tabs" aria-label="Management sections">${tabs.map(id => `<button class="${tab === id ? "active" : ""}" data-admin-tab="${id}">${id === "overview" ? "Overview" : id[0].toUpperCase() + id.slice(1)}${id === "applications" && pending ? `<small>${pending}</small>` : ""}</button>`).join("")}</nav>${screens[tab]()}`;
   if (tab === "payments") mountPayfastSetup(app.querySelector("#payfastSetup"), {esc:e, showToast, merchants:state.merchants});
+  app.querySelectorAll("[data-payfast-review]").forEach(button => button.addEventListener("click", () => {
+    const merchant = store.merchant(button.dataset.payfastReview);
+    const account = payfastAccount(merchant);
+    open(`<form class="modal-body editor-form" id="payfastReviewForm"><div class="modal-head"><div><div class="eyebrow">PayFast onboarding</div><h2>${e(merchant.name)}</h2></div><button type="button" class="modal-close" data-close aria-label="Close">×</button></div>
+      <p>${e(account.accountType)} account · Merchant ID ${e(account.merchantId)}. Check the merchant's account and agreed split arrangement with PayFast separately.</p>
+      <label>Note to merchant<textarea name="note" required rows="3" maxlength="400" placeholder="What was checked or what they need to do next">${e(account.reviewNote || "")}</textarea></label>
+      <div class="action-row"><button type="button" class="btn primary" data-payment-decision="details_checked">Mark details checked</button><button type="button" class="btn ghost" data-payment-decision="needs_action">Request update</button></div><p class="muted">This review does not verify a payment or activate online checkout.</p></form>`, () => {
+      const form = modal.querySelector("#payfastReviewForm");
+      form.querySelectorAll("[data-payment-decision]").forEach(action => action.addEventListener("click", () => {
+        if (!form.reportValidity()) return;
+        perform(() => reviewPayfastAccount(store, merchant.id, action.dataset.paymentDecision, formValue(form, "note")));
+      }));
+    });
+  }));
 
   app.querySelectorAll("[data-admin-tab]").forEach(button => button.addEventListener("click", () => { state.adminTab = button.dataset.adminTab; store.save(); render(); }));
   app.querySelector("#adminMerchantSearch")?.addEventListener("input", event => { state.adminMerchantSearch = event.target.value; store.save(); app.querySelector("#adminMerchantRows").innerHTML = merchantRows(); bindMerchantRows(); });

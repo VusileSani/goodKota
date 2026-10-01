@@ -5,6 +5,7 @@ import { buildPickupOrder } from "./core/checkout.js";
 import { EXPERIENCE, merchantExperience, rateCompletedOrder } from "./core/feedback.js";
 import { choicesFor, choiceLabel, selectedChoices, sameChoice } from "./core/menu-choices.js";
 import { renderAdminWorkspace } from "./views/admin-view.js";
+import { PAYFAST_SIGNUP_URL, PAYFAST_DASHBOARD_URL, payfastAccount, submitPayfastAccount } from "./core/payfast-onboarding.js";
 
 const store = new Store();
 const app = document.querySelector("#app");
@@ -14,7 +15,7 @@ const roleSelect = document.querySelector("#roleSelect");
 const locationLabel = document.querySelector("#locationLabel");
 const locationButton = document.querySelector("#locationButton");
 
-const money = cents => new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR", maximumFractionDigits: 0 }).format(cents / 100);
+const money = cents => new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR", minimumFractionDigits: cents % 100 === 0 ? 0 : 2, maximumFractionDigits: 2 }).format(cents / 100);
 const esc = value => String(value ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[ch]));
 const standardPass = isPick;
 const firstLetter = text => esc(String(text).trim().slice(0,1).toUpperCase());
@@ -242,7 +243,7 @@ function accountView() {
     <label>Mobile number<input name="phone" type="tel" inputmode="tel" autocomplete="tel" required value="${esc(details.phone)}"></label>
     <label>Email address<input name="email" type="email" autocomplete="email" required value="${esc(details.email)}"></label>
     <button class="btn primary" type="submit">Save details</button>
-  </form></section><section class="panel account-panel section"><h2>Own a kota spot?</h2><p class="muted">Tell us about your business and where customers can collect.</p><button class="btn ghost" id="merchantApplication">Apply to list your spot</button></section>`;
+  </form></section><section class="panel account-panel section"><h2>Own a kota spot?</h2><p class="muted">Tell us about your business and where customers can collect. Once approved, we will guide you through setting up your own PayFast account.</p><button class="btn ghost" id="merchantApplication">Apply to list your spot</button></section>`;
 }
 
 function openMerchantApplication() {
@@ -251,6 +252,7 @@ function openMerchantApplication() {
     <label>Pickup address<input name="address" required autocomplete="street-address" placeholder="Street address customers can navigate to"></label>
     <div class="editor-pair"><label>Contact name<input name="contactName" required autocomplete="name"></label><label>Mobile number<input name="phone" type="tel" required autocomplete="tel"></label></div>
     <label>Email<input name="email" type="email" required autocomplete="email"></label><label>About your spot<textarea name="note" rows="3" placeholder="What makes your kota special?"></textarea></label>
+    <p class="muted">Next: set up your menu and your own PayFast account. You can apply before you have an account.</p>
     <button class="btn primary" type="submit">Send application</button></form>`;
   modal.showModal();
   modal.querySelector("[data-close]").addEventListener("click", () => modal.close());
@@ -377,6 +379,9 @@ function renderMerchant() {
   const active = orders.filter(o => ["new","accepted","ready"].includes(o.status));
   const queueStatuses = ["new", "accepted", "ready"].sort((a, b) => Number(active.some(o => o.status === b)) - Number(active.some(o => o.status === a)));
   const tab = store.state.merchantTab || "orders";
+  const paymentAccount = payfastAccount(merchant);
+  const paymentLabel = {not_started:"Start here",submitted:"Under review",needs_action:"Needs an update",details_checked:"Details reviewed"}[paymentAccount.status] || "Start here";
+  const paymentTone = paymentAccount.status === "details_checked" ? "green" : paymentAccount.status === "needs_action" ? "red" : "amber";
   const tabs = [["orders","Orders"],["menu","Menu"],["store","Store"],["support","Support"]];
   const merchantMetrics = `<div class="metric-grid merchant-metrics"><div class="metric"><div class="value">${merchant.online && merchant.listingStatus === "active" ? "Open" : "Closed"}</div><div class="label">Accepting orders</div></div><div class="metric"><div class="value">${active.length}</div><div class="label">Active pickup orders</div></div><div class="metric"><div class="value experience-value"><span class="experience-dot ${experience.tone}"></span>${experience.count >= 3 ? experience.label : "New"}</div><div class="label">Pickup experience · ${experience.count} rated</div></div><div class="metric"><div class="value">${merchant.menu.filter(i => i.available).length}/${merchant.menu.length}</div><div class="label">Items available</div></div></div>`;
   const orderScreen = `<div class="section-head"><div><h2>Pickup queue</h2><p>Accept, prepare and hand over each order.</p></div><button class="btn ${merchant.online ? "ghost" : "primary"}" id="toggleOnline" ${merchant.listingStatus !== "active" ? "disabled" : ""}>${merchant.online ? "Close for orders" : "Open for orders"}</button></div>
@@ -386,6 +391,13 @@ function renderMerchant() {
     ${merchant.menu.map(item => `<div class="list-row"><div class="menu-summary"><div class="menu-thumb" aria-hidden="true">${esc(item.emoji || "🥪")}</div><div><strong>${esc(item.name)}</strong><p>${money(item.price)} · ${choicesFor(item).length} choices</p></div></div><div class="list-row-actions"><button class="btn ghost small" data-edit-item="${item.id}">Edit</button><button class="btn ${item.available ? "ghost" : "dark"} small" data-toggle-item="${item.id}">${item.available ? "Available" : "Unavailable"}</button></div></div>`).join("") || `<div class="empty">Add your first product to prepare the listing.</div>`}</section>`;
   const storeScreen = `<div class="detail-layout"><section class="panel"><form id="merchantStoreForm" class="editor-form compact-form"><section class="merchant-editor-section"><h2>Merchant details</h2><label>Trading name<input name="name" required value="${esc(merchant.name)}"></label><div class="editor-pair"><label>Area<input name="area" required value="${esc(merchant.area)}"></label><label>Prep time (min)<input name="prepMinutes" type="number" min="1" max="180" required value="${merchant.prepMinutes}"></label></div><div class="editor-pair"><label>Contact name<input name="contactName" value="${esc(merchant.contact?.name)}"></label><label>Phone<input name="phone" type="tel" value="${esc(merchant.contact?.phone)}"></label></div><label>Email<input name="email" type="email" value="${esc(merchant.contact?.email)}"></label></section>
     <section class="merchant-editor-section pickup-section"><div class="merchant-section-title"><h2>Pickup location</h2><a class="text-link" href="${directionsUrl(merchant)}" target="_blank" rel="noopener noreferrer" data-directions="${merchant.id}">Open Maps ↗</a></div><label>Pickup address<input name="address" required value="${esc(merchant.address)}" autocomplete="street-address"></label></section><button class="btn primary" type="submit">Save changes</button></form></section>
+    <section class="panel payfast-onboarding"><div class="merchant-section-title"><div><div class="eyebrow">Get paid online</div><h2>Your PayFast account</h2></div><span class="badge ${paymentTone}">${paymentLabel}</span></div>
+      <p>You will need your own PayFast account for the planned online payment split. We can help you get it ready while your kota spot is being set up.</p>
+      <ol class="payment-steps"><li><strong>Choose your account.</strong> Individual is for a trader or sole proprietor; Business is for a registered business.</li><li><strong>Sign up and verify with PayFast.</strong> Give your identity and bank details to PayFast on its own site.</li><li><strong>Send us your Merchant ID.</strong> Find it in your PayFast dashboard under Account → Personal Information after verification.</li></ol>
+      <div class="action-row"><a class="btn primary" href="${PAYFAST_SIGNUP_URL}" target="_blank" rel="noopener noreferrer">Create a PayFast account ↗</a><a class="text-link" href="${PAYFAST_DASHBOARD_URL}" target="_blank" rel="noopener noreferrer">I already have one ↗</a></div>
+      ${paymentAccount.reviewNote ? `<p class="payment-review-note">GoodKota: ${esc(paymentAccount.reviewNote)}</p>` : ""}
+      <form id="payfastAccountForm" class="editor-form"><div class="editor-pair"><label>Account type<select name="accountType" required><option value="">Choose one</option><option value="individual" ${paymentAccount.accountType === "individual" ? "selected" : ""}>Individual trader</option><option value="business" ${paymentAccount.accountType === "business" ? "selected" : ""}>Registered business</option></select></label><label>PayFast Merchant ID<input name="merchantId" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" autocomplete="off" required placeholder="8 digits" value="${esc(paymentAccount.merchantId)}"></label></div><button class="btn ghost" type="submit">${paymentAccount.merchantId ? "Update account details" : "Send account details"}</button></form>
+      <p class="muted">Send only your Merchant ID. GoodKota does not ask for your PayFast password, bank details or identity documents here. Online payment remains off until the payment integration is verified.</p></section>
     <section class="panel"><h2>Listing and quality</h2><p>${merchant.listingStatus === "active" ? "Your spot is listed." : "Your listing is awaiting GoodKota approval."} ${merchant.online ? "Customers can order now." : "Orders are currently closed."}</p><div class="action-row"><span class="badge ${merchant.listingStatus === "active" ? "green" : "amber"}">${esc(merchant.listingStatus)}</span><span class="badge ${merchant.quality?.status === "intervention" ? "red" : merchant.quality?.status === "watch" ? "amber" : "green"}">Quality: ${esc(merchant.quality?.status || "healthy")}</span></div><p class="muted">${esc(merchant.statusReason || "")}</p><p class="muted">${esc(merchant.quality?.note || "")}</p><p class="muted">Collected-order feedback: ${experience.counts.amazing} amazing · ${experience.counts.good} good · ${experience.counts.average} average</p><div class="standard-list">${STANDARD.map(item => `<div class="standard-row"><span>${merchant.standard?.[item.id] ? "✓" : "•"}</span><span>${esc(item.name)}</span></div>`).join("")}</div><p class="muted">${esc(merchant.reviewNote || "")}</p></section></div>`;
   const supportScreen = `<div class="detail-layout"><section class="panel"><h2>Contact GoodKota</h2><form class="editor-form" id="merchantCaseForm"><label>Subject<input name="subject" required maxlength="80" placeholder="What do you need help with?"></label><label>Message<textarea name="message" required rows="5" maxlength="1000" placeholder="Give us the details"></textarea></label><button class="btn primary" type="submit">Send support request</button></form></section><section class="panel"><h2>Your cases</h2>${store.state.supportCases.filter(c => c.merchantId === merchant.id).map(c => `<div class="work-row"><div><strong>${esc(c.subject)}</strong><p>${esc(c.message)}</p>${c.note ? `<p class="muted">GoodKota: ${esc(c.note)}</p>` : ""}</div><span class="badge ${c.status === "resolved" ? "green" : "amber"}">${esc(c.status.replaceAll("_", " "))}</span></div>`).join("") || `<div class="empty">No support cases yet.</div>`}</section></div>`;
   app.innerHTML = `<div class="work-topline"><div class="page-title compact"><div class="eyebrow">Merchant workspace</div><h1>${esc(merchant.name)}</h1><p>Pickup orders and your storefront in one place.</p></div><label class="merchant-switch">Viewing spot<select id="merchantSwitch" aria-label="Select merchant">${store.state.merchants.map(m => `<option value="${esc(m.id)}" ${m.id === merchant.id ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select></label></div>
@@ -406,6 +418,12 @@ function renderMerchant() {
     event.preventDefault();
     if (!event.currentTarget.reportValidity()) return;
     try { saveMerchant(store, merchant.id, Object.fromEntries(new FormData(event.currentTarget))); showToast("Store details saved"); render(); }
+    catch (error) { showToast(error.message); }
+  });
+  app.querySelector("#payfastAccountForm")?.addEventListener("submit", event => {
+    event.preventDefault();
+    if (!event.currentTarget.reportValidity()) return;
+    try { submitPayfastAccount(store, merchant.id, Object.fromEntries(new FormData(event.currentTarget))); showToast("Account details sent for review"); render(); }
     catch (error) { showToast(error.message); }
   });
   const storeForm = app.querySelector("#merchantStoreForm");

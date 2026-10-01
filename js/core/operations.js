@@ -63,6 +63,7 @@ export function reviewApplication(store, applicationId, decision, fields, reason
       prepMinutes: 20, listingStatus: "review", online: false, menu: [],
       standard: Object.fromEntries(CHECK_IDS.map(key => [key, false])),
       quality: { status: "healthy", note: "" },
+      payfast: { status: "not_started", accountType: "", merchantId: "", reviewNote: "" },
       note: "", tags: [], distanceKm: null
     };
     store.state.merchants.push(merchant);

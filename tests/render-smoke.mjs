@@ -5,6 +5,7 @@ const screens = [
   ["customer", "discover", "Good kota."],
   ["customer", "account", "Apply to list your spot"],
   ["merchant", "menu", "Your menu"],
+  ["merchant", "store", "Your PayFast account"],
   ["merchant", "orders", "Pickup queue"],
   ["merchant", "support", "Contact GoodKota"],
   ...["overview", "applications", "merchants", "orders", "quality", "support", "reports", "payments", "activity"].map(tab => ["admin", tab, tab === "overview" ? "Today at GoodKota" : tab[0].toUpperCase() + tab.slice(1)])
@@ -18,6 +19,7 @@ for (let index = 0; index < screens.length; index++) {
     merchantId: "m1", selectedMerchantId: null, search: "", filter: "All", cart: [],
     customerDetails: {firstName:"",lastName:"",phone:"",email:""}, events: []
   };
+  if (role === "merchant" && tab === "menu") state.merchants[0].menu[0].price = 4850;
   const app = {innerHTML:"", insertAdjacentHTML(_position, html) { this.innerHTML += html; }, querySelectorAll() { return []; }, querySelector() { return null; }, addEventListener() {}};
   const passive = {addEventListener() {}};
   const elements = {"#app":app, "#modal":passive, "#toast":{classList:{add(){},remove(){}}}, "#roleSelect":{value:"",addEventListener(){}}, "#locationLabel":{}, "#locationButton":passive, "#brandHome":passive};
@@ -25,6 +27,12 @@ for (let index = 0; index < screens.length; index++) {
   globalThis.localStorage = {getItem() { return JSON.stringify(state); }, setItem() {}, removeItem() {}};
   await import(`../js/app.js?smoke=${index}`);
   assert(app.innerHTML.includes(expected), `${role}/${tab} did not render ${expected}`);
+  if (role === "merchant" && tab === "menu") assert(app.innerHTML.includes("48,50"), "Rand and cents must be shown exactly");
+  if (role === "merchant" && tab === "store") {
+    assert(app.innerHTML.includes("payfastAccountForm"));
+    assert(app.innerHTML.includes("https://payfast.io/gateway-aggregator-selector/"));
+    assert(app.innerHTML.includes("Open Maps"));
+  }
 }
 const merchantState = {
   ...structuredClone(seed), role:"merchant", merchantTab:"orders", merchantId:"m1", events:[],

@@ -10,7 +10,7 @@ export async function mountPayfastSetup(container, {esc, showToast, merchants}) 
     capability = await response.json();
   } catch { /* Static hosting has no credential service. */ }
   if (!capability?.secureSetup) {
-    container.innerHTML = `<section class="panel payment-setup"><h2>Secure setup unavailable here</h2><p>This static preview can take pay-on-collection orders. To add PayFast credentials, run the secure GoodKota server and open its management workspace. Online checkout stays off until payment verification is built and tested.</p></section>`;
+    container.innerHTML = `<section class="panel payment-setup"><h2>Technical setup unavailable here</h2><p>This static preview can take pay-on-collection orders and track merchant PayFast sign-up. Provider credentials require the local GoodKota server and an agreed integration design with PayFast. Online checkout stays off until split payments and notifications are built and tested.</p></section>`;
     return;
   }
   if (!merchants.length) { container.innerHTML = `<section class="panel payment-setup"><h2>No merchant yet</h2><p>Approve a merchant before configuring its PayFast account.</p></section>`; return; }
@@ -35,7 +35,7 @@ export async function mountPayfastSetup(container, {esc, showToast, merchants}) 
     return data;
   };
   const unlock = () => {
-    container.innerHTML = `<section class="panel payment-setup"><div class="eyebrow">PayFast</div><h2>Unlock payment setup</h2><p>Configure a separate provider account for each approved merchant. PayFast calls these credentials Merchant ID, Merchant Key and an optional Security Passphrase.</p><div class="editor-form">${picker()}</div><form id="unlockPayfast" class="editor-form"><label>GoodKota setup access code<input name="code" type="password" autocomplete="off" required></label><button class="btn primary" type="submit">Unlock</button></form></section>`;
+    container.innerHTML = `<section class="panel payment-setup"><div class="eyebrow">Technical setup</div><h2>Unlock payment setup</h2><p>Only the GoodKota office should handle provider integration credentials. Confirm with PayFast which account initiates the split before configuring a store. Merchant onboarding asks for the Merchant ID only.</p><div class="editor-form">${picker()}</div><form id="unlockPayfast" class="editor-form"><label>GoodKota setup access code<input name="code" type="password" autocomplete="off" required></label><button class="btn primary" type="submit">Unlock</button></form></section>`;
     bindPicker();
     container.querySelector("#unlockPayfast").addEventListener("submit", async event => {
       event.preventDefault();
@@ -50,7 +50,7 @@ export async function mountPayfastSetup(container, {esc, showToast, merchants}) 
       <div class="editor-form">${picker()}</div>
       <p>${status.configured ? `Credentials stored for <strong>${esc(status.merchantIdMasked)}</strong> (${esc(status.environment)}).` : "No credentials saved yet."} Online checkout is still disabled until a trusted order service and verified payment notifications are deployed.</p>
       <form id="payfastCredentials" class="editor-form"><label>Environment<select name="environment"><option value="sandbox" ${status.environment === "sandbox" ? "selected" : ""}>Sandbox</option><option value="live" ${status.environment === "live" ? "selected" : ""}>Live</option></select></label><label>Merchant ID<input name="merchantId" inputmode="numeric" pattern="[0-9]{6,12}" autocomplete="off" required></label><label>Merchant Key<input name="merchantKey" type="password" autocomplete="off" minlength="8" maxlength="64" required></label><label>Security Passphrase (if enabled)<input name="passphrase" type="password" autocomplete="off" maxlength="32"></label><div class="action-row"><button class="btn primary" type="submit">${status.configured ? "Replace credentials" : "Save credentials"}</button>${status.configured ? `<button class="btn ghost" type="button" id="removePayfast">Remove credentials</button>` : ""}</div></form>
-      <p class="muted">Credentials go only to the secure server and never enter browser storage. Entering them does not switch on online payments.</p></section>`;
+      <p class="muted">Save credentials only for the account PayFast confirms will initiate checkout. They go to the local secure server, never browser storage. Entering them does not switch on online payments.</p></section>`;
     bindPicker();
     container.querySelector("#payfastCredentials").addEventListener("submit", async event => {
       event.preventDefault();

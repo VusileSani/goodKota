@@ -24,7 +24,8 @@ assert.equal(merchant.listingStatus, "review");
 assert.equal(canOrder(merchant), false);
 assert.throws(() => setMerchantStatus(store, merchant.id, "active", "Ready"), /quality checks/);
 
-merchant.menu.push({id: "test-product", name: "Kota", price: 5000, available: true});
+merchant.menu.push({id: "test-product", name: "Kota", price: 5000, available: true,
+  choices:[{id:"extra",name:"Cheese",kind:"add",price:1200,available:true}]});
 reviewMerchant(store, merchant.id, {local:true,kota:true,consistency:true,value:true,readiness:true}, "All five checks documented");
 setMerchantStatus(store, merchant.id, "active", "Ready for listing");
 merchant.online = true;
@@ -35,11 +36,22 @@ assert.equal(merchant.listingStatus, "paused");
 assert.throws(() => setMerchantStatus(store, merchant.id, "active", "Try again"), /intervention/);
 setQuality(store, merchant.id, "healthy", "Follow-up passed");
 setMerchantStatus(store, merchant.id, "active", "Follow-up complete");
+merchant.online = true;
 
 const checkout = buildPickupOrder({firstName:"Nandi",lastName:"Dube",phone:"0111111111",email:"nandi@example.test"}, merchant, [
   {productId:"test-product", name:"Kota", unitPrice:6200, qty:2, choices:[{id:"extra",name:"Cheese",kind:"add",price:1200}]}
 ]);
 assert.equal(checkout.total, 12400);
+assert.match(checkout.id, /^GK-[0-9A-F]{16}$/);
+assert.throws(() => buildPickupOrder(checkout.customerDetails, merchant, [{productId:"test-product",name:"Kota",unitPrice:1,qty:1,choices:[]}]), /Menu changed/);
+assert.throws(() => buildPickupOrder(checkout.customerDetails, merchant, [{productId:seed.merchants[0].menu[0].id,unitPrice:4800,qty:1,choices:[]}]), /Menu changed/);
+assert.throws(() => buildPickupOrder(checkout.customerDetails, merchant, [{productId:"test-product",name:"Kota",unitPrice:5000,qty:Number.MAX_SAFE_INTEGER,choices:[]}]), /Review your cart/);
+merchant.menu.push({id:"cent-product",name:"Small Kota",price:4850,available:true});
+const centOrder = buildPickupOrder(checkout.customerDetails, merchant, [{productId:"cent-product",name:"Small Kota",unitPrice:4850,qty:1,choices:[]}]);
+assert.equal(centOrder.total, 4850, "Cents must survive order creation");
+merchant.online = false;
+assert.throws(() => buildPickupOrder(checkout.customerDetails, merchant, [{productId:"cent-product",name:"Small Kota",unitPrice:4850,qty:1,choices:[]}]), /not taking orders/);
+merchant.online = true;
 assert.equal(checkout.paymentStatus, "unpaid");
 assert.equal(checkout.fulfillment, "pickup");
 assert.equal(checkout.pickup.address, "10 Test Street, Midrand");

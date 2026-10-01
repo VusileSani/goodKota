@@ -35,6 +35,7 @@ export class Store {
       merchant.listingStatus ||= "active";
       merchant.quality ||= { status: "healthy", note: "" };
       merchant.contact ||= { name: "", phone: "", email: "" };
+      merchant.payfast ||= { status: "not_started", accountType: "", merchantId: "", reviewNote: "" };
       merchant.tags ||= [];
       merchant.menu ||= [];
     });

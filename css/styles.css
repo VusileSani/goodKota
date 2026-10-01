@@ -451,6 +451,23 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .payment-setup { max-width: 650px; }
 .payment-setup p { color: var(--muted); line-height: 1.55; }
 .payment-setup .editor-form { margin-top: 20px; }
+.payment-intake { margin: 16px 0 20px; }
+.payment-intake .section-head p { color: var(--muted); margin: 6px 0 0; }
+.payfast-onboarding {
+  border-color: #75412e;
+  background: radial-gradient(circle at top right, rgba(241,90,41,.15), transparent 70%), var(--paper-2);
+}
+.payfast-onboarding .merchant-section-title { align-items: start; }
+.payfast-onboarding .merchant-section-title .badge { white-space: nowrap; }
+.payfast-onboarding p { color: var(--ink-2); line-height: 1.5; }
+.payfast-onboarding .payment-steps { margin: 8px 0; padding-left: 24px; display: grid; gap: 12px; color: var(--ink-2); line-height: 1.45; }
+.payfast-onboarding .payment-steps li::marker { color: var(--orange); font-weight: 900; }
+.payfast-onboarding .payment-steps strong { color: var(--ink); }
+.payfast-onboarding .action-row { align-items: center; }
+.payfast-onboarding .btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+.payfast-onboarding .text-link { margin: 0; }
+.payfast-onboarding .editor-form { border-top: 1px solid var(--line); padding-top: 16px; }
+.payfast-onboarding .payment-review-note { border-left: 3px solid var(--orange); padding: 9px 12px; background: var(--orange-soft); border-radius: 0 9px 9px 0; }
 .modal:has(.merchant-manager) { width: min(620px, calc(100% - 24px)); max-height: min(92dvh, 900px); }
 .merchant-manager { display: grid; gap: 15px; padding: 20px; }
 .merchant-manager .modal-head h2 { font-size: 24px; line-height: 1.1; }
@@ -488,6 +505,8 @@ textarea { font: inherit; }
 button:focus-visible, textarea:focus-visible { outline: 3px solid rgba(241,90,41,.35); outline-offset: 2px; }
 @media (max-width: 920px) { .work-grid { grid-template-columns: 1fr; } }
 @media (max-width: 620px) {
+  .payfast-onboarding .editor-pair { grid-template-columns: 1fr; }
+  .payfast-onboarding .action-row .btn { width: 100%; }
   .merchant-manager { gap: 12px; padding: 16px; }
   .merchant-manager .compact-form { gap: 11px; }
   .merchant-editor-section { gap: 8px; }

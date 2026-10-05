@@ -1,5 +1,5 @@
 import { STANDARD } from "../data/seed.js";
-import { isPick, submitApplication, reviewApplication, saveMerchant, reviewMerchant, setMerchantStatus, setQuality, transitionOrder, updateCase, orderReport } from "../core/operations.js";
+import { isPick, submitApplication, reviewApplication, saveMerchant, reviewMerchant, setMerchantStatus, setQuality, transitionOrder, reviewRefundRequest, updateCase, orderReport } from "../core/operations.js";
 import { merchantExperience } from "../core/feedback.js";
 import { mountPayfastSetup } from "./payfast-setup.js";
 import { payfastAccount, reviewPayfastAccount } from "../core/payfast-onboarding.js";
@@ -16,6 +16,7 @@ export function renderAdminWorkspace({store, app, modal, render, showToast, esc,
   const pending = state.applications.filter(a => ["new", "review"].includes(a.status)).length;
   const openCases = state.supportCases.filter(c => c.status !== "resolved").length;
   const newOrders = state.orders.filter(o => o.status === "new").length;
+  const refundPending = state.orders.filter(o => o.refundReview?.status === "requested").length;
   const lowFeedback = state.merchants.filter(m => merchantExperience(state, m.id).tone === "red").length;
   const paymentIntake = state.merchants.filter(m => payfastAccount(m).status === "submitted").length;
   const e = esc;
@@ -39,10 +40,11 @@ export function renderAdminWorkspace({store, app, modal, render, showToast, esc,
     <div class="work-grid section"><section class="panel"><div class="section-head"><h2>Needs attention</h2></div>
       ${pending ? row("Merchant applications", `${pending} waiting for a decision`, statusBadge("review"), `<button class="btn ghost small" data-admin-tab="applications">Review</button>`) : ""}
       ${newOrders ? row("New orders", `${newOrders} waiting for merchant acceptance`, statusBadge("new"), `<button class="btn ghost small" data-admin-tab="orders">View</button>`) : ""}
+      ${refundPending ? row("Refund reviews", `${refundPending} merchant request(s) to check`, statusBadge("review"), `<button class="btn ghost small" data-review-refunds>Review</button>`) : ""}
       ${openCases ? row("Support cases", `${openCases} unresolved`, statusBadge("open"), `<button class="btn ghost small" data-admin-tab="support">View</button>`) : ""}
       ${lowFeedback ? row("Pickup experience", `${lowFeedback} spot(s) need quality review`, statusBadge("intervention"), `<button class="btn ghost small" data-admin-tab="quality">Review</button>`) : ""}
       ${paymentIntake ? row("PayFast account details", `${paymentIntake} merchant submission(s) to check`, statusBadge("submitted"), `<button class="btn ghost small" data-admin-tab="payments">Review</button>`) : ""}
-      ${!pending && !newOrders && !openCases && !lowFeedback && !paymentIntake ? empty("All clear for now.") : ""}</section>
+      ${!pending && !newOrders && !refundPending && !openCases && !lowFeedback && !paymentIntake ? empty("All clear for now.") : ""}</section>
       <section class="panel"><h2>Recently changed</h2>${state.events.slice(-5).reverse().map(ev => row(e(ev.type.replaceAll("_", " ")), date(ev.at), "", "")).join("") || empty("Actions will appear here.")}</section></div>`;
   const applications = () => `${heading("Intake", "Merchant applications", "Review details, approve a listing into setup, or decline with a reason.")}
     <div class="work-toolbar"><button class="btn primary small" id="newApplication">+ Add application</button></div>
@@ -52,8 +54,8 @@ export function renderAdminWorkspace({store, app, modal, render, showToast, esc,
     <section class="panel" id="adminMerchantRows">${merchantRows()}</section>`;
   const merchantRows = () => state.merchants.filter(m => `${m.name} ${m.area}`.toLowerCase().includes((state.adminMerchantSearch || "").toLowerCase())).map(m => row(e(m.name), `${e(m.area)} · ${e(m.address)} · ${m.menu.length} menu items`, statusBadge(m.listingStatus), `<button class="btn ghost small" data-manage-merchant="${e(m.id)}">Manage</button>`)).join("") || empty("No matching merchants.");
   const orders = () => `${heading("Pickup", "Order oversight", "Inspect order contents and handle exceptions.")}
-    <div class="work-toolbar"><select id="adminOrderFilter" aria-label="Filter orders">${["all","new","accepted","ready","completed","cancelled"].map(s => `<option value="${s}" ${state.adminOrderFilter === s ? "selected" : ""}>${s === "all" ? "All orders" : s}</option>`).join("")}</select></div>
-    <section class="panel">${state.orders.filter(o => !state.adminOrderFilter || state.adminOrderFilter === "all" || o.status === state.adminOrderFilter).map(o => row(e(o.id), `${e(store.merchant(o.merchantId)?.name || "Merchant") } · ${e(o.customer)} · ${date(o.createdIso)} · ${money(o.total)}`, statusBadge(o.status), `<button class="btn ghost small" data-admin-order="${e(o.id)}">Details</button>`)).join("") || empty("No orders in this view.")}</section>`;
+    <div class="work-toolbar"><select id="adminOrderFilter" aria-label="Filter orders">${["all","refund_review","new","accepted","ready","completed","cancelled"].map(s => `<option value="${s}" ${state.adminOrderFilter === s ? "selected" : ""}>${s === "all" ? "All orders" : s === "refund_review" ? "Refund reviews needing action" : s}</option>`).join("")}</select></div>
+    <section class="panel">${state.orders.filter(o => !state.adminOrderFilter || state.adminOrderFilter === "all" || (state.adminOrderFilter === "refund_review" ? o.refundReview?.status === "requested" : o.status === state.adminOrderFilter)).sort((a,b) => Number(b.refundReview?.status === "requested") - Number(a.refundReview?.status === "requested")).map(o => row(e(o.id), `${e(store.merchant(o.merchantId)?.name || "Merchant") } · ${e(o.customer)} · ${date(o.createdIso)} · ${money(o.total)}`, `${statusBadge(o.status)}${o.refundReview ? ` <span class="badge ${o.refundReview.status === "requested" ? "orange" : "amber"}">Refund: ${e(o.refundReview.status.replaceAll("_", " "))}</span>` : ""}`, `<button class="btn ghost small" data-admin-order="${e(o.id)}">Details</button>`)).join("") || empty("No orders in this view.")}</section>`;
   const quality = () => `${heading("GoodKota Standard", "Quality review", "Record evidence for each check and act on quality concerns.")}
     <section class="panel">${state.merchants.map(m => { const signal = merchantExperience(state, m.id); return row(e(m.name), `${STANDARD.filter(check => m.standard?.[check.id]).length}/5 checks · Pickup feedback: ${signal.count ? `${signal.counts.amazing} amazing, ${signal.counts.good} good, ${signal.counts.average} average` : "none"} · ${e(m.quality?.note || "No quality note")}`, `${statusBadge(m.quality?.status || "healthy")} ${signal.count >= 3 ? `<span class="badge ${signal.tone}">${signal.label}</span>` : ""} ${isPick(m) ? `<span class="badge orange">Pick</span>` : ""}`, `<button class="btn ghost small" data-quality="${e(m.id)}">Review</button>`); }).join("")}</section>`;
   const support = () => `${heading("Help desk", "Support cases", "Record a handover note before changing a case status.")}
@@ -96,6 +98,7 @@ export function renderAdminWorkspace({store, app, modal, render, showToast, esc,
   }));
 
   app.querySelectorAll("[data-admin-tab]").forEach(button => button.addEventListener("click", () => { state.adminTab = button.dataset.adminTab; store.save(); render(); }));
+  app.querySelector("[data-review-refunds]")?.addEventListener("click", () => { state.adminTab = "orders"; state.adminOrderFilter = "refund_review"; store.save(); render(); });
   app.querySelector("#adminMerchantSearch")?.addEventListener("input", event => { state.adminMerchantSearch = event.target.value; store.save(); app.querySelector("#adminMerchantRows").innerHTML = merchantRows(); bindMerchantRows(); });
   app.querySelector("#adminOrderFilter")?.addEventListener("change", event => { state.adminOrderFilter = event.target.value; store.save(); render(); });
 
@@ -175,7 +178,33 @@ export function renderAdminWorkspace({store, app, modal, render, showToast, esc,
     open(`<div class="modal-body editor-form"><div class="modal-head"><div><div class="eyebrow">Pickup order · ${e(o.status)}</div><h2>${e(o.id)}</h2></div><button class="modal-close" data-close aria-label="Close">×</button></div><p>${e(m?.name || "Merchant")} · ${date(o.createdIso)} · ${money(o.total)}</p>
       <p><strong>${e(o.customer)}</strong><br>${e(o.contact?.phone)} · ${e(o.contact?.email)}<br>Payment: pay on collection · ${e(o.paymentStatus || "unpaid")}${o.experience ? `<br>Pickup experience: ${e(o.experience.value)}` : ""}</p><div class="order-items">${o.items.map(line => `<div>${line.qty} × ${e(line.name || store.product(line.productId)?.name || "Item")} · ${money((line.unitPrice || 0) * line.qty)}<small>${e(choiceText(line))}</small></div>`).join("")}</div>
       ${m ? `<a class="text-link" href="${directionsUrl(m)}" target="_blank" rel="noopener noreferrer">Pickup directions ↗</a>` : ""}${o.cancelReason ? `<p class="muted">Cancellation: ${e(o.cancelReason)}</p>` : ""}
-      ${["new","accepted"].includes(o.status) ? `<label>Cancellation reason<textarea id="adminCancelReason" rows="2" placeholder="Reason required"></textarea></label><button class="btn dark" id="adminCancelOrder">Cancel order</button>` : ""}</div>`, () => modal.querySelector("#adminCancelOrder")?.addEventListener("click", () => perform(() => transitionOrder(store, o.id, "cancelled", modal.querySelector("#adminCancelReason").value))));
+      ${o.refundReview ? `<section class="order-detail-block"><h3>Refund review · ${e(o.refundReview.status.replaceAll("_", " "))}</h3><p>Full order amount: ${money(o.refundReview.amount)} · Merchant reports ${e(o.refundReview.paymentMethod)} payment${o.refundReview.paymentReference ? ` · Ref: ${e(o.refundReview.paymentReference)}` : ""}</p><p>Reason: ${e(o.refundReview.reason)}</p>${o.refundReview.adminNote ? `<p>GoodKota note: ${e(o.refundReview.adminNote)}</p>` : ""}${o.refundReview.status === "resolved" ? `<p>Recorded outcome: ${o.refundReview.outcome === "handled_externally" ? "Handled outside GoodKota" : "No refund due"}${o.refundReview.externalReference ? ` · Ref: ${e(o.refundReview.externalReference)}` : ""}</p>` : ""}${o.refundReview.history?.length ? `<details class="refund-timeline"><summary>Review activity</summary><ul>${o.refundReview.history.map(entry => `<li><strong>${e(entry.actor)} · ${e(entry.action.replaceAll("_", " "))}</strong><small>${e(entry.at)}</small><span>${e(entry.note)}</span></li>`).join("")}</ul></details>` : ""}<p class="muted">GoodKota has not issued or verified a payment through this app.</p>
+      ${o.refundReview.status === "requested" ? `<form id="refundDecisionForm" class="editor-form"><label>Decision<select name="decision"><option value="needs_info">Ask merchant for more information</option><option value="resolved">Record manual outcome</option></select></label><div class="refund-outcome-fields editor-form" id="refundOutcomeFields" hidden><label>Manual outcome<select name="outcome"><option value="">Choose outcome</option><option value="handled_externally">Refund handled outside GoodKota</option><option value="not_due">No refund due</option></select></label><label>Receipt or transaction reference, if refunded<input name="externalReference" maxlength="100" placeholder="External refund reference"></label></div><label>Note to merchant<textarea name="note" required maxlength="500" rows="2" placeholder="Decision, evidence and next step"></textarea></label><button class="btn primary" type="submit">Save review</button></form>` : ""}</section>` : ""}
+      ${["new","accepted"].includes(o.status) ? `<label>Cancellation reason<textarea id="adminCancelReason" rows="2" placeholder="Reason required"></textarea></label><button class="btn dark" id="adminCancelOrder">Cancel order</button>` : ""}</div>`, () => {
+        modal.querySelector("#adminCancelOrder")?.addEventListener("click", () => perform(() => transitionOrder(store, o.id, "cancelled", modal.querySelector("#adminCancelReason").value)));
+        const refundForm = modal.querySelector("#refundDecisionForm");
+        if (refundForm) {
+          const decision = refundForm.querySelector('[name="decision"]');
+          const outcome = refundForm.querySelector('[name="outcome"]');
+          const reference = refundForm.querySelector('[name="externalReference"]');
+          const outcomeFields = refundForm.querySelector("#refundOutcomeFields");
+          const sync = () => {
+            const resolving = decision.value === "resolved";
+            outcomeFields.hidden = !resolving;
+            outcome.required = resolving;
+            reference.required = resolving && outcome.value === "handled_externally";
+          };
+          decision.addEventListener("change", sync);
+          outcome.addEventListener("change", sync);
+          sync();
+        }
+        refundForm?.addEventListener("submit", event => {
+          event.preventDefault();
+          if (!event.currentTarget.reportValidity()) return;
+          const fields = Object.fromEntries(new FormData(event.currentTarget));
+          perform(() => reviewRefundRequest(store, o.id, fields.decision, fields.note, fields.outcome, fields.externalReference));
+        });
+      });
   }));
   app.querySelectorAll("[data-quality]").forEach(button => button.addEventListener("click", () => {
     const m = store.merchant(button.dataset.quality);

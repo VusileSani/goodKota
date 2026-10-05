@@ -137,6 +137,50 @@ export function transitionOrder(store, orderId, next, reason = "") {
   return order;
 }
 
+// An operational record only. A refund must be performed and verified through
+// the actual payment method; this never changes the order's payment status.
+export function requestRefundReview(store, merchantId, orderId, fields) {
+  const order = store.state.orders.find(item => item.id === orderId && item.merchantId === merchantId);
+  if (!order || !["completed", "cancelled"].includes(order.status)) throw new Error("Only a previous order from this spot can be reviewed for a refund.");
+  if (order.refundReview && order.refundReview.status !== "needs_info") throw new Error("This order already has a refund review.");
+  if (!Number.isSafeInteger(order.total) || order.total <= 0) throw new Error("This order has no valid amount to review.");
+  const reason = required(fields.reason, "Refund reason");
+  if (reason.length > 500) throw new Error("Keep the refund reason under 500 characters.");
+  const paymentMethod = clean(fields.paymentMethod);
+  if (!["cash", "card", "eft", "other"].includes(paymentMethod)) throw new Error("Choose how the customer paid.");
+  const paymentReference = clean(fields.paymentReference);
+  if (paymentReference.length > 100) throw new Error("Keep the payment reference under 100 characters.");
+  const now = new Date().toISOString();
+  const history = order.refundReview?.history || [];
+  order.refundReview = {
+    requestedAt: order.refundReview?.requestedAt || now,
+    updatedAt: now, status: "requested", amount: order.total,
+    reason, paymentMethod, paymentReference, adminNote: "", outcome: "", externalReference: "",
+    history: [...history, {at: now, actor: "merchant", action: history.length ? "resubmitted" : "requested", note: reason}]
+  };
+  store.log("refund_review_requested", {orderId, merchantId, amount: order.total, paymentMethod});
+  return order.refundReview;
+}
+
+export function reviewRefundRequest(store, orderId, decision, note, outcome = "", externalReference = "") {
+  const order = store.state.orders.find(item => item.id === orderId);
+  const request = order?.refundReview;
+  if (!request || request.status !== "requested" || !["needs_info", "resolved"].includes(decision)) throw new Error("This refund request is not awaiting review.");
+  const adminNote = required(note, "Review note");
+  if (adminNote.length > 500) throw new Error("Keep the review note under 500 characters.");
+  const reference = clean(externalReference);
+  if (decision === "resolved") {
+    if (!["handled_externally", "not_due"].includes(outcome)) throw new Error("Choose a manual outcome.");
+    if (outcome === "handled_externally" && !reference) throw new Error("Enter a receipt or transaction reference for the external refund.");
+    if (reference.length > 100) throw new Error("Keep the external reference under 100 characters.");
+  }
+  const now = new Date().toISOString();
+  Object.assign(request, {status: decision, adminNote, outcome: decision === "resolved" ? outcome : "", externalReference: decision === "resolved" ? reference : "", updatedAt: now,
+    history: [...(request.history || []), {at: now, actor: "goodkota", action: decision, note: adminNote, outcome: decision === "resolved" ? outcome : ""}]});
+  store.log("refund_review_updated", {orderId, merchantId: order.merchantId, status: decision, outcome: request.outcome});
+  return request;
+}
+
 export function createCase(store, merchantId, subject, message) {
   if (!store.merchant(merchantId)) throw new Error("Merchant not found.");
   const item = { id: id("case"), merchantId, subject: required(subject, "Subject"), message: required(message, "Message"), status: "open", note: "", updatedAt: new Date().toISOString() };

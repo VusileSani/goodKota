@@ -1,6 +1,6 @@
 import { Store } from "./core/store.js";
 import { STANDARD } from "./data/seed.js";
-import { canOrder, isPick, submitApplication, saveMerchant, transitionOrder, createCase } from "./core/operations.js";
+import { canOrder, isPick, submitApplication, saveMerchant, transitionOrder, createCase, requestRefundReview } from "./core/operations.js";
 import { buildPickupOrder } from "./core/checkout.js";
 import { EXPERIENCE, merchantExperience, rateCompletedOrder } from "./core/feedback.js";
 import { choicesFor, choiceLabel, selectedChoices, sameChoice } from "./core/menu-choices.js";
@@ -66,12 +66,13 @@ function bindCommon(root) {
 function renderCustomer() {
   if (store.state.selectedMerchantId) {
     app.innerHTML = merchantDetail(store.merchant(store.state.selectedMerchantId));
+    if (cartCount()) app.insertAdjacentHTML("beforeend", bottomCart(true));
     return;
   }
 
   const tab = store.state.customerTab;
   app.innerHTML = tab === "saved" ? savedView() : tab === "orders" ? ordersView() : tab === "account" ? accountView() : discoverView();
-  if (cartCount()) app.insertAdjacentHTML("beforeend", `<button class="cart-fab" data-cart aria-label="Open cart with ${cartCount()} items">Cart · ${cartCount()} <span>${money(cartTotal())}</span></button>`);
+  if (cartCount()) app.insertAdjacentHTML("beforeend", bottomCart());
   app.insertAdjacentHTML("beforeend", customerNav());
 
   app.querySelectorAll("[data-customer-tab]").forEach(button => button.addEventListener("click", () => {
@@ -192,7 +193,6 @@ function merchantDetail(merchant) {
       <div class="detail-actions">
         <a class="btn primary" href="${directionsUrl(merchant)}" target="_blank" rel="noopener noreferrer" data-directions="${merchant.id}">Get directions ↗</a>
         <button class="btn light" data-favourite="${merchant.id}">${store.state.favourites.includes(merchant.id) ? "♥ Saved" : "♡ Save"}</button>
-        <button class="btn light" data-cart>Cart · ${cartCount()}</button>
       </div>
     </section>
 
@@ -271,6 +271,12 @@ function customerNav() {
   return `<nav class="bottom-nav" aria-label="Customer navigation">${tabs.map(([id,icon,label]) => `<button class="${store.state.customerTab === id ? "active" : ""}" data-customer-tab="${id}"><span>${icon}</span>${label}</button>`).join("")}</nav>`;
 }
 
+function bottomCart(onMerchantDetail = false) {
+  const count = cartCount();
+  const total = money(cartTotal());
+  return `${onMerchantDetail ? "" : `<div class="cart-dock-spacer" aria-hidden="true"></div>`}<button class="cart-dock ${onMerchantDetail ? "detail" : ""}" type="button" data-cart aria-label="View cart, ${count} ${count === 1 ? "item" : "items"}, ${total}"><span class="cart-dock-label">View cart <span class="cart-dock-count">${count}</span></span><span class="cart-dock-total">${total}<span aria-hidden="true"> →</span></span></button>`;
+}
+
 // A choice is bound to one item. Store a price and label snapshot so later menu edits
 // cannot silently change the price or contents of an order already placed.
 const linePrice = line => line.unitPrice ?? store.product(line.productId)?.price ?? 0;
@@ -339,7 +345,7 @@ function openCart() {
     if (!line) return;
     line.qty += Number(button.dataset.qty);
     if (line.qty <= 0) store.state.cart.splice(Number(button.dataset.line), 1);
-    store.save(); modal.close(); openCart();
+    store.save(); modal.close(); render(); openCart();
   }));
   modal.querySelector("#checkoutForm")?.addEventListener("submit", event => {
     event.preventDefault();
@@ -384,9 +390,10 @@ function renderMerchant() {
   const paymentTone = paymentAccount.status === "details_checked" ? "green" : paymentAccount.status === "needs_action" ? "red" : "amber";
   const tabs = [["orders","Orders"],["menu","Menu"],["store","Store"],["support","Support"]];
   const merchantMetrics = `<div class="metric-grid merchant-metrics"><div class="metric"><div class="value">${merchant.online && merchant.listingStatus === "active" ? "Open" : "Closed"}</div><div class="label">Accepting orders</div></div><div class="metric"><div class="value">${active.length}</div><div class="label">Active pickup orders</div></div><div class="metric"><div class="value experience-value"><span class="experience-dot ${experience.tone}"></span>${experience.count >= 3 ? experience.label : "New"}</div><div class="label">Pickup experience · ${experience.count} rated</div></div><div class="metric"><div class="value">${merchant.menu.filter(i => i.available).length}/${merchant.menu.length}</div><div class="label">Items available</div></div></div>`;
-  const orderScreen = `<div class="section-head"><div><h2>Pickup queue</h2><p>Accept, prepare and hand over each order.</p></div><button class="btn ${merchant.online ? "ghost" : "primary"}" id="toggleOnline" ${merchant.listingStatus !== "active" ? "disabled" : ""}>${merchant.online ? "Close for orders" : "Open for orders"}</button></div>
+  const pastOrders = orders.filter(o => ["completed", "cancelled"].includes(o.status));
+  const orderScreen = `<div class="section-head"><div><h2>Pickup queue</h2><p>Accept, prepare and hand over each order.</p></div><div class="action-row">${pastOrders.length ? `<a class="btn ghost small" href="#merchantOrderHistory">Past orders · ${pastOrders.length} ↓</a>` : ""}<button class="btn ${merchant.online ? "ghost" : "primary"}" id="toggleOnline" ${merchant.listingStatus !== "active" ? "disabled" : ""}>${merchant.online ? "Close for orders" : "Open for orders"}</button></div></div>
     <div class="queue-grid">${queueStatuses.map(status => `<div class="queue-column"><h3>${status === "new" ? "New" : status === "accepted" ? "Preparing" : "Ready"} · ${active.filter(o => o.status === status).length}</h3>${active.filter(o => o.status === status).map(merchantOrderCard).join("") || `<div class="empty">Nothing here.</div>`}</div>`).join("")}</div>
-    ${merchantMetrics}<section class="panel section"><h2>Order history</h2>${orders.filter(o => ["completed","cancelled"].includes(o.status)).map(o => `<div class="list-row"><div><strong>${esc(o.id)} · ${esc(o.customer)}</strong><p>${esc(o.createdAt)} · ${o.cancelReason ? `Reason: ${esc(o.cancelReason)}` : "Collected"}${o.experience ? ` · Experience: ${esc(EXPERIENCE[o.experience.value]?.label || "Rated")}` : ""}</p></div><div class="list-row-actions"><span class="badge ${o.status === "completed" ? "green" : "red"}">${esc(o.status)}</span><strong>${money(o.total)}</strong></div></div>`).join("") || `<div class="empty">Completed and cancelled orders appear here.</div>`}</section>`;
+    ${merchantMetrics}<section class="panel section" id="merchantOrderHistory"><h2>Order history</h2><p class="muted">Open a previous order to review its items, contact details and refund requests.</p>${pastOrders.map(merchantHistoryRow).join("") || `<div class="empty">Completed and cancelled orders appear here.</div>`}</section>`;
   const menuScreen = `<section class="panel"><div class="section-head"><div><h2>Your menu</h2><p>Edit products, paid extras and free removals.</p></div><button class="btn primary small" id="addMenuItem">+ Add item</button></div>
     ${merchant.menu.map(item => `<div class="list-row"><div class="menu-summary"><div class="menu-thumb" aria-hidden="true">${esc(item.emoji || "🥪")}</div><div><strong>${esc(item.name)}</strong><p>${money(item.price)} · ${choicesFor(item).length} choices</p></div></div><div class="list-row-actions"><button class="btn ghost small" data-edit-item="${item.id}">Edit</button><button class="btn ${item.available ? "ghost" : "dark"} small" data-toggle-item="${item.id}">${item.available ? "Available" : "Unavailable"}</button></div></div>`).join("") || `<div class="empty">Add your first product to prepare the listing.</div>`}</section>`;
   const storeScreen = `<div class="detail-layout"><section class="panel"><form id="merchantStoreForm" class="editor-form compact-form"><section class="merchant-editor-section"><h2>Merchant details</h2><label>Trading name<input name="name" required value="${esc(merchant.name)}"></label><div class="editor-pair"><label>Area<input name="area" required value="${esc(merchant.area)}"></label><label>Prep time (min)<input name="prepMinutes" type="number" min="1" max="180" required value="${merchant.prepMinutes}"></label></div><div class="editor-pair"><label>Contact name<input name="contactName" value="${esc(merchant.contact?.name)}"></label><label>Phone<input name="phone" type="tel" value="${esc(merchant.contact?.phone)}"></label></div><label>Email<input name="email" type="email" value="${esc(merchant.contact?.email)}"></label></section>
@@ -443,6 +450,7 @@ function renderMerchant() {
     try { transitionOrder(store, order.id, next); render(); } catch (error) { showToast(error.message); }
   }));
   app.querySelectorAll("[data-order-cancel]").forEach(button => button.addEventListener("click", () => openCancelOrder(button.dataset.orderCancel)));
+  app.querySelectorAll("[data-order-history]").forEach(button => button.addEventListener("click", () => openMerchantOrder(button.dataset.orderHistory)));
   app.querySelectorAll("[data-toggle-item]").forEach(button => button.addEventListener("click", () => {
     const item = merchant.menu.find(i => i.id === button.dataset.toggleItem);
     item.available = !item.available;
@@ -459,6 +467,46 @@ function openCancelOrder(orderId) {
     event.preventDefault();
     if (!event.currentTarget.reportValidity()) return;
     try { transitionOrder(store, orderId, "cancelled", new FormData(event.currentTarget).get("reason")); modal.close(); render(); }
+    catch (error) { showToast(error.message); }
+  });
+}
+
+function merchantHistoryRow(order) {
+  const review = order.refundReview;
+  return `<div class="list-row history-row"><div class="history-copy"><strong>${esc(order.id)} · ${esc(order.customer || "Customer")}</strong><p>${esc(order.createdAt || order.createdIso || "")}${order.status === "cancelled" ? ` · Cancelled` : " · Collected"}</p></div><div class="list-row-actions"><span class="badge ${order.status === "completed" ? "green" : "red"}">${esc(order.status)}</span>${review ? `<span class="badge ${review.status === "needs_info" ? "amber" : review.status === "resolved" ? "green" : "orange"}">Refund: ${esc(review.status.replaceAll("_", " "))}</span>` : ""}<strong>${money(order.total)}</strong><button class="btn ghost small" type="button" data-order-history="${esc(order.id)}">View details</button></div></div>`;
+}
+
+function openMerchantOrder(orderId) {
+  const order = store.state.orders.find(item => item.id === orderId && item.merchantId === store.state.merchantId && ["completed", "cancelled"].includes(item.status));
+  if (!order) { showToast("Order unavailable"); return; }
+  const review = order.refundReview;
+  const pickup = order.pickup || store.merchant(order.merchantId);
+  modal.innerHTML = `<div class="modal-body editor-form"><div class="modal-head"><div><div class="eyebrow">Previous pickup · ${esc(order.status)}</div><h2>${esc(order.id)}</h2></div><button class="modal-close" type="button" data-close aria-label="Close">×</button></div>
+    <p class="muted">${esc(order.createdAt || order.createdIso || "")} · ${money(order.total)}</p>
+    <div class="order-detail-block"><strong>Customer</strong><p>${esc(order.customer || "Customer")} · ${esc(order.contact?.phone || "No phone recorded")}${order.contact?.email ? ` · ${esc(order.contact.email)}` : ""}</p></div>
+    <div class="order-detail-block"><strong>Items</strong><div class="order-items">${(order.items || []).map(line => `<div>${line.qty} × ${esc(line.name || store.product(line.productId)?.name || "Item")} · ${money((line.unitPrice || 0) * line.qty)}<small>${esc(choiceText(line))}</small></div>`).join("") || "No item details recorded"}</div></div>
+    <div class="order-detail-block"><strong>Collection</strong><p>${esc(pickup?.address || pickup?.area || "Address not recorded")}</p>${pickup ? `<a class="text-link" href="${directionsUrl(pickup)}" target="_blank" rel="noopener noreferrer">Open navigation ↗</a>` : ""}${order.cancelReason ? `<p>Cancellation reason: ${esc(order.cancelReason)}</p>` : ""}${order.experience ? `<p>Pickup experience: ${esc(EXPERIENCE[order.experience.value]?.label || "Rated")}</p>` : ""}</div>
+    <div class="order-detail-block"><strong>Payment and refund</strong><p>Pay on collection · payment is not verified in GoodKota.</p>${review ? `<p><span class="badge ${review.status === "resolved" ? "green" : "amber"}">Refund review: ${esc(review.status.replaceAll("_", " "))}</span> · ${money(review.amount)}</p><p>Reason: ${esc(review.reason)}</p>${review.adminNote ? `<p>GoodKota note: ${esc(review.adminNote)}</p>` : ""}${review.status === "resolved" ? `<p>Recorded outcome: ${review.outcome === "handled_externally" ? "Handled outside GoodKota" : "No refund due"}${review.externalReference ? ` · Ref: ${esc(review.externalReference)}` : ""}</p>` : ""}${review.history?.length ? `<details class="refund-timeline"><summary>Review activity</summary><ul>${review.history.map(entry => `<li><strong>${esc(entry.actor)} · ${esc(entry.action.replaceAll("_", " "))}</strong><small>${esc(entry.at)}</small><span>${esc(entry.note)}</span></li>`).join("")}</ul></details>` : ""}` : `<p class="muted">If the customer paid and money may be owed, send a refund review to GoodKota.</p>`}
+    ${!review || review.status === "needs_info" ? `<button class="btn primary" type="button" id="requestRefundReview">${review ? "Add information" : "Request refund review"}</button>` : ""}<p class="muted">This review does not move money or change payment status.</p></div></div>`;
+  if (!modal.open) modal.showModal();
+  modal.querySelector("[data-close]").addEventListener("click", () => modal.close());
+  modal.querySelector("#requestRefundReview")?.addEventListener("click", () => openMerchantRefundForm(order));
+}
+
+function openMerchantRefundForm(order) {
+  const review = order.refundReview;
+  modal.innerHTML = `<form class="modal-body editor-form" id="refundReviewForm"><div class="modal-head"><div><div class="eyebrow">${esc(order.id)} · ${money(order.total)}</div><h2>${review ? "Add refund information" : "Request refund review"}</h2></div><button class="modal-close" type="button" data-close aria-label="Close">×</button></div>
+    ${review?.adminNote ? `<p class="payment-review-note">GoodKota: ${esc(review.adminNote)}</p>` : ""}<p class="muted">Confirm that the customer paid. GoodKota will review the full order amount; this form does not issue a refund.</p>
+    <label>How did the customer pay?<select name="paymentMethod" required><option value="">Choose method</option>${[["cash","Cash"],["card","Card at collection"],["eft","EFT"],["other","Other"]].map(([value,label]) => `<option value="${value}" ${review?.paymentMethod === value ? "selected" : ""}>${label}</option>`).join("")}</select></label>
+    <label>Payment or receipt reference (if available)<input name="paymentReference" maxlength="100" value="${esc(review?.paymentReference || "")}" placeholder="Receipt number or transaction reference"></label>
+    <label>Why is a refund needed?<textarea name="reason" required maxlength="500" rows="3" placeholder="Explain what happened and what was paid">${esc(review?.reason || "")}</textarea></label>
+    <div class="action-row"><button class="btn ghost" type="button" id="backToOrder">Back to order</button><button class="btn primary" type="submit">Send for review</button></div></form>`;
+  modal.querySelector("[data-close]").addEventListener("click", () => modal.close());
+  modal.querySelector("#backToOrder").addEventListener("click", () => openMerchantOrder(order.id));
+  modal.querySelector("#refundReviewForm").addEventListener("submit", event => {
+    event.preventDefault();
+    if (!event.currentTarget.reportValidity()) return;
+    try { requestRefundReview(store, store.state.merchantId, order.id, Object.fromEntries(new FormData(event.currentTarget))); modal.close(); showToast("Refund review sent to GoodKota"); render(); }
     catch (error) { showToast(error.message); }
   });
 }

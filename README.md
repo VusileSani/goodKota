@@ -1,4 +1,4 @@
-# GoodKota MVP v15
+# GoodKota MVP v17
 
 An orange-led pickup discovery prototype with the premium graphite, black and white visual language of the uploaded build. GoodKota helps people find a kota worth eating in one launch cluster, see what a spot is known for, tailor an order and collect it. Merchant cards lead with food placeholders, menu highlights and live availability. The merchant and GoodKota workspaces retain the core operating flows from the supplied full-spectrum build.
 
@@ -22,9 +22,15 @@ Open `http://localhost:8080`. Use the workspace selector in the header to inspec
 6. In Merchant → Orders, accept, mark ready and mark collected, or cancel with a reason. Customer → Orders shows status, contents, directions and cancellation reason. A completed order can be rated once as **Amazing**, **Good** or **Average**. GoodKota → Orders provides oversight.
 7. Merchant → Support opens cases. GoodKota → Support records progress and a handover note. GoodKota → Quality sees the order feedback alongside its separate five-point review. Reports filter dated orders and export CSV; Activity shows recent actions.
 
+Merchant → Orders → Order history now opens each previous order with its item choices, customer contact, collection address, cancellation reason and pickup feedback. For a completed or cancelled order that the customer already paid for, the merchant can request a **full-order refund review** with the reported payment method, receipt reference (if available) and reason. GoodKota → Orders puts pending reviews first and can request more information or record a manual outcome with a note. The merchant can resubmit when more information is requested. A recorded external refund requires a transaction or receipt reference. Duplicate open reviews are blocked.
+
+The review record is **not a refund transaction**. The app does not verify that collection payment happened, move money, update `paymentStatus`, or verify an external refund. The actual payer, settlement account, provider refund API, partial refunds, customer notification and reconciliation depend on the agreed PayFast flow and a trusted backend. The office must handle any real refund outside this demo and verify it independently before recording a manual outcome. The browser-local demo is unsuitable for real customer or financial records.
+
 The experience indicator uses the last 20 rated, completed pickup orders. It remains neutral until there are at least three. Thereafter an average score of at least 1.5 of 2 is green (Amazing), at least 0.75 is yellow (Good), and lower is red (Average). A single review cannot turn a merchant red. GoodKota approval remains a separate editorial decision; ratings do not automatically approve or suspend a listing.
 
 The checkout uses **pay on collection** and records `unpaid`. Customer name, phone and email are captured for the order. No online charge is taken.
+
+When a customer adds an item, an orange cart bar appears at the bottom with the item count and current total. It stays above the navigation on customer tabs and sits at the bottom of a merchant menu. Tap it to adjust quantities, review choices and continue to pickup checkout.
 
 Checkout now displays exact cents where prices include cents, checks the current merchant menu and selected options again when creating an order, rejects a mixed or stale cart, and gives each pickup order a longer reference for future reconciliation. These checks protect the demo workflow; the browser remains untrusted for real payments.
 
@@ -68,6 +74,6 @@ Copy the setup token from your own environment into the Payments unlock form. Ke
 
 ## Updating GitHub Pages
 
-Extract the ZIP and copy its **contents** to the configured Pages publishing branch and folder. Commit and push changed files. Pushing only the ZIP leaves the public app unchanged. The customer, merchant and management demo works on Pages, while Payments explains that secure setup requires a backend. The service-worker cache name is bumped to v15; after deployment, reload or clear older site data if necessary.
+Extract the ZIP and copy its **contents** to the configured Pages publishing branch and folder. Commit and push changed files. Pushing only the ZIP leaves the public app unchanged. The customer, merchant and management demo works on Pages, while Payments explains that secure setup requires a backend. The service-worker cache name is bumped to v17; after deployment, reload or clear older site data if necessary.
 
 Run `npm test` for integrity and workflow checks.

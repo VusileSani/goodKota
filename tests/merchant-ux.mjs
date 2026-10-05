@@ -23,7 +23,16 @@ const controls = {
   reason: {value:"Closing for refurbishment", reportValidity() { return Boolean(this.value.trim()); }},
   active: listener({listingStatus:"active"}),
   paused: listener({listingStatus:"paused"}),
-  review: listener({listingStatus:"review"})
+  review: listener({listingStatus:"review"}),
+  adminOrder: listener({adminOrder:"GK-REFUND"}),
+  refundShortcut: listener({}),
+  refundForm: {reportValidity() { return true; },addEventListener(_type, callback) { this.submit = callback; },querySelector(selector) {
+    return ({'[name="decision"]':controls.refundDecision,'[name="outcome"]':controls.refundOutcome,'[name="externalReference"]':controls.refundReference,"#refundOutcomeFields":controls.refundFields})[selector];
+  }},
+  refundDecision: {value:"needs_info",addEventListener(_type, callback) { this.change = callback; }},
+  refundOutcome: {value:"",addEventListener(_type, callback) { this.change = callback; }},
+  refundReference: {required:false},
+  refundFields: {hidden:false}
 };
 const form = {
   addEventListener() {},
@@ -34,14 +43,14 @@ const modal = {
   querySelector(selector) {
     return ({"[data-close]":listener({}), "#manageMerchantForm":form,
       "[data-pickup-maps]":controls.maps, '[name="statusReason"]':controls.reason,
-      "[data-open-quality]":controls.quality})[selector] || null;
+      "[data-open-quality]":controls.quality, "#refundDecisionForm":controls.refundForm})[selector] || null;
   },
   querySelectorAll(selector) { return selector === "[data-listing-status]" ? [controls.active, controls.paused, controls.review] : []; }
 };
 const app = {
   innerHTML:"",
-  querySelector() { return null; },
-  querySelectorAll(selector) { return selector === "[data-manage-merchant]" ? [controls.manage] : []; }
+  querySelector(selector) { return selector === "[data-review-refunds]" ? controls.refundShortcut : null; },
+  querySelectorAll(selector) { return selector === "[data-manage-merchant]" ? [controls.manage] : selector === "[data-admin-order]" ? [controls.adminOrder] : []; }
 };
 const render = () => {};
 const props = {store, app, modal, render, showToast(message) { throw Error(message); },
@@ -70,4 +79,28 @@ controls.manage.click();
 assert.match(modal.innerHTML, /data-listing-status="active" disabled/);
 controls.quality.click();
 assert.equal(state.adminTab, "quality", "Readiness review should open the real quality workspace");
+state.orders.push({id:"GK-REFUND",merchantId:"m1",status:"completed",customer:"Nandi",contact:{phone:"0111111111"},items:[],total:4800,refundReview:{status:"requested",amount:4800,reason:"Missing item",paymentMethod:"cash",paymentReference:"POS-44"}});
+state.adminTab = "overview";
+state.adminOrderFilter = "completed";
+renderAdminWorkspace(props);
+assert(app.innerHTML.includes("Refund reviews"), "Management should surface pending refund work");
+controls.refundShortcut.click();
+assert.equal(state.adminOrderFilter, "refund_review", "Shortcut should open the pending refund queue even with a prior order filter");
+renderAdminWorkspace(props);
+assert(app.innerHTML.includes("Refund reviews needing action"));
+controls.adminOrder.click();
+assert(modal.innerHTML.includes("Refund review · requested") && modal.innerHTML.includes("Save review"), "Management must be able to inspect and review the request");
+assert.equal(controls.refundFields.hidden, true, "Manual outcome fields should stay out of the way when requesting information");
+controls.refundDecision.value = "resolved";
+controls.refundDecision.change();
+controls.refundOutcome.value = "handled_externally";
+controls.refundOutcome.change();
+assert(controls.refundOutcome.required && controls.refundReference.required && !controls.refundFields.hidden, "External refund outcome requires evidence");
+controls.refundDecision.value = "needs_info";
+controls.refundDecision.change();
+const originalFormData = globalThis.FormData;
+globalThis.FormData = class { constructor(form) { assert.equal(form, controls.refundForm); return new Map([["decision","needs_info"],["note","Attach the collection receipt"],["outcome", ""],["externalReference", ""]]); } };
+try { controls.refundForm.submit({preventDefault() {},currentTarget:controls.refundForm}); }
+finally { globalThis.FormData = originalFormData; }
+assert.equal(state.orders[0].refundReview.status, "needs_info", "Review action should update the existing order");
 console.log("Mobile merchant management workflow passed.");

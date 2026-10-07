@@ -1,79 +1,22 @@
-# GoodKota MVP v17
+# GoodKota MVP v21 · private cloud pilot
 
-An orange-led pickup discovery prototype with the premium graphite, black and white visual language of the uploaded build. GoodKota helps people find a kota worth eating in one launch cluster, see what a spot is known for, tailor an order and collect it. Merchant cards lead with food placeholders, menu highlights and live availability. The merchant and GoodKota workspaces retain the core operating flows from the supplied full-spectrum build.
+This package builds on v20 and the successful Firebase email sign-in test. It prepares a separate private pilot at `https://goodkota.web.app/`. The current GitHub Pages site remains in place. Firebase Hosting serves the app and sends `/api/**` to its Node API on Cloud Run. Firebase Authentication handles passwords and verified email; the API handles sessions, roles, orders and merchant actions.
 
-## Run locally
+The pilot uses Cloud Firestore transactions for shared role and operational state. It accepts only Firebase UIDs listed in `GOODKOTA_PILOT_UIDS` for API sessions. The storefront is visibly marked **Private pilot · Test orders only**. Online payment remains off.
 
-Serve **this directory** over HTTP (ES modules require it):
+## Start here
 
-```sh
-python3 -m http.server 8080
-```
+Read [docs/CLOUD-PILOT.md](docs/CLOUD-PILOT.md) before deploying. Cloud Run requires a linked billing account and upgrades a Spark project to Blaze. Do not deploy this package by uploading it to GitHub Pages. The v20 `auth-test.html` page can remain there as a separate Firebase-only test.
 
-Open `http://localhost:8080`. Use the workspace selector in the header to inspect Customer, Merchant and GoodKota views. All three views share state within one browser profile for demonstration. The area button lets customers prioritise spots in Midrand, Tembisa, Centurion or a typed area; menu items, descriptions and option names are searchable. Filters focus on price and kota ingredients.
+Local development still uses private JSON files by default. `npm ci`, `npm run build`, `npm test` and `npm start` work as in v20. Set `GOODKOTA_STORAGE=firestore` only when Firestore and Application Default Credentials are configured. The production container runs as an attached Google service identity; it needs no downloaded service-account key.
 
-## Main journey
+## Scope and limits
 
-1. In Customer → Account, submit a merchant application with the pickup address and contact details.
-2. In GoodKota → Applications, review and approve it. The new listing starts offline in **review**.
-3. In Merchant, select the new spot. In Store, use the PayFast guide to create an Individual trader or Business account on PayFast's website, complete PayFast verification, then send GoodKota the eight-digit Merchant ID for review. You can set up the listing while this is in progress. In Menu, add a kota and optional paid extras, free ingredient removals, or one-of groups for sauce and heat. Each choice can be switched off separately. Set store details and availability of each item.
-4. In GoodKota → Quality, record the five checks with a review note. In Merchants, activate the listing with a reason.
-5. In Merchant → Orders, open the listing for orders. In Customer → Discover, choose an item and its options, adjust quantities in the cart, enter contact details, and place a pickup order. The menu and total are rechecked before the browser records the order.
-6. In Merchant → Orders, accept, mark ready and mark collected, or cancel with a reason. Customer → Orders shows status, contents, directions and cancellation reason. A completed order can be rated once as **Amazing**, **Good** or **Average**. GoodKota → Orders provides oversight.
-7. Merchant → Support opens cases. GoodKota → Support records progress and a handover note. GoodKota → Quality sees the order feedback alongside its separate five-point review. Reports filter dated orders and export CSV; Activity shows recent actions.
+- The cloud test permits customer registration, verified email, order placement, merchant invitation and management once admin TOTP is configured. Admin access remains unavailable until Firebase Authentication with Identity Platform and TOTP are enabled and the admin enrolls an authenticator.
+- Role invitations and operational state survive server restarts and concurrent requests through Firestore transactions. The operational state is intentionally a **single capped document** for this pilot. It is not the partitioned order database required for a real launch; stop when the cap is reached and migrate to per-merchant and per-order documents.
+- Firestore rules deny direct browser reads and writes. Cloud Run's service account uses IAM. Do not grant users Firestore access to the private pilot collection.
+- PayFast setup remains disabled in the cloud pilot; its encrypted local-file store is deliberately blocked. The merchant-primary split and settlement contract still await written PayFast confirmation. No real merchant credentials or payments belong in this pilot.
+- Seeded merchants and products are test data. Do not invite real customers or treat pilot orders as live purchases. Backups, monitoring, data retention and operational recovery are needed before a public release.
+- The API requires a Firebase session cookie and checks account status, email verification and role permissions. Admin sessions require a TOTP sign-in factor. The user-facing app and API are on the same Hosting origin; GitHub Pages is not used for the full pilot because it cannot serve this API under its own `/api` path.
 
-Merchant → Orders → Order history now opens each previous order with its item choices, customer contact, collection address, cancellation reason and pickup feedback. For a completed or cancelled order that the customer already paid for, the merchant can request a **full-order refund review** with the reported payment method, receipt reference (if available) and reason. GoodKota → Orders puts pending reviews first and can request more information or record a manual outcome with a note. The merchant can resubmit when more information is requested. A recorded external refund requires a transaction or receipt reference. Duplicate open reviews are blocked.
-
-The review record is **not a refund transaction**. The app does not verify that collection payment happened, move money, update `paymentStatus`, or verify an external refund. The actual payer, settlement account, provider refund API, partial refunds, customer notification and reconciliation depend on the agreed PayFast flow and a trusted backend. The office must handle any real refund outside this demo and verify it independently before recording a manual outcome. The browser-local demo is unsuitable for real customer or financial records.
-
-The experience indicator uses the last 20 rated, completed pickup orders. It remains neutral until there are at least three. Thereafter an average score of at least 1.5 of 2 is green (Amazing), at least 0.75 is yellow (Good), and lower is red (Average). A single review cannot turn a merchant red. GoodKota approval remains a separate editorial decision; ratings do not automatically approve or suspend a listing.
-
-The checkout uses **pay on collection** and records `unpaid`. Customer name, phone and email are captured for the order. No online charge is taken.
-
-When a customer adds an item, an orange cart bar appears at the bottom with the item count and current total. It stays above the navigation on customer tabs and sits at the bottom of a merchant menu. Tap it to adjust quantities, review choices and continue to pickup checkout.
-
-Checkout now displays exact cents where prices include cents, checks the current merchant menu and selected options again when creating an order, rejects a mixed or stale cart, and gives each pickup order a longer reference for future reconciliation. These checks protect the demo workflow; the browser remains untrusted for real payments.
-
-## Mobile merchant experience
-
-GoodKota → Merchants → Manage now groups Merchant details, Pickup location with Open Maps, and Save changes. A separate Trading status card shows readiness for the five GoodKota checks, saved pickup address, available menu and quality clearance. It offers one status action for the listing's current state; the other action remains under “Other status action.” A reason is required and logged when the status changes. The merchant's Store page follows the same details → pickup → save order. On Merchant → Orders, live queue cards appear before summary metrics, with occupied statuses first, so an existing order is easier to reach on a phone.
-
-## Merchant PayFast onboarding and split preparation
-
-The merchant application does not require a PayFast account up front. Once approved, Merchant → Store offers a guided sign-up link to PayFast, a link for existing accounts, account type guidance and a Merchant ID submission form. Merchants complete identity and banking checks with PayFast. GoodKota → Payments shows the account details, an internal review note and a request-update path. Each spot keeps its own onboarding status. This browser demo cannot verify account ownership; “Details reviewed” means only that the GoodKota operator noted the details, not that payments are live.
-
-PayFast's public docs say a split transaction supports one receiving merchant and requires a custom integration. The existing cart permits one merchant per order. Which account is primary, the exact split and fee calculation, refund handling, onboarding handoff and the required credentials must be agreed with PayFast for GoodKota's arrangement. The current demo does not initiate a split, verify a payment or transfer funds. See `docs/PAYFAST-INTEGRATION.md` and the concise `docs/PAYFAST-SPLIT-DECISIONS.md` for tomorrow's provider questions.
-
-## Secure PayFast technical setup
-
-GoodKota → Payments also contains the earlier office-only credential screen when the bundled Node server is running. It stores a store-specific PayFast **Merchant ID**, **Merchant Key** and optional **Security Passphrase** in an encrypted configuration outside the public web root; a separate setup access code gates access, and the browser receives only masked status. PayFast does not label these as a generic public/private key pair. Only configure the checkout-initiating account once PayFast confirms the primary/secondary account direction. This is technical preparation only: **online checkout stays disabled** until authenticated orders, server pricing and validated split payment notifications are built.
-
-For a local secure-setup demo, set a random 32-byte setup code and 32-byte encryption key (base64), then run `npm start`. Keep the same encryption key for subsequent runs; losing it makes saved credentials unreadable. The server binds to `127.0.0.1:8080` by default. On PowerShell, you can generate values for the current session:
-
-```powershell
-$bytes = New-Object byte[] 32
-$rng = [Security.Cryptography.RandomNumberGenerator]::Create()
-$rng.GetBytes($bytes)
-$env:GOODKOTA_SETUP_TOKEN = [BitConverter]::ToString($bytes).Replace('-', '')
-$rng.GetBytes($bytes)
-$env:GOODKOTA_CONFIG_KEY = [Convert]::ToBase64String($bytes)
-Write-Host "Setup access code: $env:GOODKOTA_SETUP_TOKEN"
-npm start
-```
-
-Copy the setup token from your own environment into the Payments unlock form. Keep both variables in a proper secret manager for a persistent deployment. Do not commit them or the encrypted credential store. Any public server requires HTTPS, real admin authentication, protected storage and a working verified payment flow. See `docs/PAYFAST-INTEGRATION.md`.
-
-## Scope and honest limits
-
-- Delivery, drivers, dispatch, promotions, settlement and the wider full-spectrum modules are outside this pickup build.
-- Seed merchants and initial distances are illustrative. Their starting addresses identify areas, so navigation opens those areas until a merchant enters a real street address. The location picker ranks matching areas first; actual GPS distance needs location coordinates and a location service. No sample star scores are shown as customer evidence.
-- The workspace selector is a demonstration control, **not authentication or role enforcement**. Browser localStorage is local to one device and is not shared order delivery, durable business data, or secure storage for real customer details. This build must not be used to take real public orders or collect real customer data.
-- Feedback and merchant signals are stored in the same local browser demo. They require authenticated order ownership, shared persistence and moderation before public use.
-- Merchant PayFast IDs and review notes in this build live only in the browser demonstration state and are not a verified account connection. PayFast credentials can be saved only through the local secure server. The static GitHub Pages build cannot save secrets or turn on online payments.
-- Existing v9 browser state is reused where present. A fresh browser profile starts from the sample merchants. To demo a brand new listing, use the application journey above.
-
-## Updating GitHub Pages
-
-Extract the ZIP and copy its **contents** to the configured Pages publishing branch and folder. Commit and push changed files. Pushing only the ZIP leaves the public app unchanged. The customer, merchant and management demo works on Pages, while Payments explains that secure setup requires a backend. The service-worker cache name is bumped to v17; after deployment, reload or clear older site data if necessary.
-
-Run `npm test` for integrity and workflow checks.
+The v20 local build remains available as a rollback reference. This v21 package does not migrate v19 local accounts, sessions or browser demo data.

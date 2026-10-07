@@ -20,13 +20,16 @@ for (let index = 0; index < screens.length; index++) {
     customerDetails: {firstName:"",lastName:"",phone:"",email:""}, events: []
   };
   if (role === "merchant" && tab === "menu") state.merchants[0].menu[0].price = 4850;
+  state.merchants.forEach(merchant => { merchant.listingStatus = "active"; merchant.quality = {status:"healthy",note:""}; merchant.payfast = {status:"not_started",merchantId:"",reviewNote:""}; });
   const app = {innerHTML:"", insertAdjacentHTML(_position, html) { this.innerHTML += html; }, querySelectorAll() { return []; }, querySelector() { return null; }, addEventListener() {}};
   const passive = {addEventListener() {}};
-  const elements = {"#app":app, "#modal":passive, "#toast":{classList:{add(){},remove(){}}}, "#roleSelect":{value:"",addEventListener(){}}, "#locationLabel":{}, "#locationButton":passive, "#brandHome":passive};
+  const elements = {"#app":app, "#modal":passive, "#toast":{classList:{add(){},remove(){}}}, "#accountButton":{addEventListener(){}}, "#locationLabel":{}, "#locationButton":passive, "#brandHome":passive};
   globalThis.document = {querySelector(selector) { return elements[selector]; }};
-  globalThis.localStorage = {getItem() { return JSON.stringify(state); }, setItem() {}, removeItem() {}};
+  globalThis.sessionStorage = {getItem() { return null; }, setItem() {}, removeItem() {}};
+  globalThis.fetch = async url => ({ok:true,json:async () => url.includes("/auth/session") ? {user:{id:`smoke-${index}`,email:"test@example.test",emailVerified:true,role,merchantId:role === "merchant" ? "m1" : null}} : {state}});
   await import(`../js/app.js?smoke=${index}`);
-  assert(app.innerHTML.includes(expected), `${role}/${tab} did not render ${expected}`);
+  await new Promise(resolve => setImmediate(resolve));
+  assert(app.innerHTML.includes(expected), `${role}/${tab} did not render ${expected}: ${app.innerHTML.slice(0,240)}`);
   if (role === "merchant" && tab === "menu") assert(app.innerHTML.includes("48,50"), "Rand and cents must be shown exactly");
   if (role === "merchant" && tab === "store") {
     assert(app.innerHTML.includes("payfastAccountForm"));
@@ -39,15 +42,17 @@ const merchantState = {
   orders:[{id:"GK-READY", merchantId:"m1", status:"ready", customer:"Test customer", items:[], total:4800, createdAt:"Today"},
     {id:"GK-PREVIOUS", merchantId:"m1", status:"completed", customer:"Nandi Dube", contact:{phone:"0111111111"}, items:[{productId:"p1",name:"Classic Kota",qty:1,unitPrice:4800}], total:4800, createdAt:"Yesterday"}]
 };
+merchantState.merchants.forEach(merchant => { merchant.listingStatus = "active"; merchant.quality = {status:"healthy",note:""}; merchant.payfast = {status:"not_started",merchantId:"",reviewNote:""}; });
 const historyButton = {dataset:{orderHistory:"GK-PREVIOUS"},addEventListener(_type, handler) { this.click = handler; }};
 const refundButton = {addEventListener(_type, handler) { this.click = handler; }};
 const merchantApp = {innerHTML:"", querySelectorAll(selector) { return selector === "[data-order-history]" ? [historyButton] : []; }, querySelector() { return null; }, addEventListener() {}};
 const passive = {addEventListener() {}};
 const historyModal = {innerHTML:"",open:false,showModal() { this.open = true; },close() { this.open = false; },addEventListener() {},querySelector(selector) { return selector === "#requestRefundReview" ? refundButton : passive; }};
-const elements = {"#app":merchantApp, "#modal":historyModal, "#toast":{classList:{add(){},remove(){}}}, "#roleSelect":{value:"",addEventListener(){}}, "#locationLabel":{}, "#locationButton":passive, "#brandHome":passive};
+const elements = {"#app":merchantApp, "#modal":historyModal, "#toast":{classList:{add(){},remove(){}}}, "#accountButton":{addEventListener(){}}, "#locationLabel":{}, "#locationButton":passive, "#brandHome":passive};
 globalThis.document = {querySelector(selector) { return elements[selector]; }};
-globalThis.localStorage = {getItem() { return JSON.stringify(merchantState); }, setItem() {}, removeItem() {}};
+globalThis.fetch = async url => ({ok:true,json:async () => url.includes("/auth/session") ? {user:{id:"merchant-smoke",email:"merchant@example.test",emailVerified:true,role:"merchant",merchantId:"m1"}} : {state:merchantState}});
 await import("../js/app.js?smoke=priority-queue");
+await new Promise(resolve => setImmediate(resolve));
 assert(merchantApp.innerHTML.indexOf("Ready · 1") < merchantApp.innerHTML.indexOf("New · 0"), "Occupied queue should be first");
 assert(merchantApp.innerHTML.indexOf("Pickup queue") < merchantApp.innerHTML.indexOf("merchant-metrics"), "Orders should be reachable before metrics");
 assert(merchantApp.innerHTML.includes('data-order-history="GK-PREVIOUS"'), "Previous orders must be actionable");
@@ -63,6 +68,7 @@ for (const detail of [false, true]) {
     search:"", filter:"All", merchantId:"m1", events:[], cart:[{productId:"p1", qty:2, name:"Classic Kota", unitPrice:4800, choices:[]}],
     customerDetails:{firstName:"",lastName:"",phone:"",email:""}
   };
+  state.merchants.forEach(merchant => { merchant.listingStatus = "active"; merchant.quality = {status:"healthy",note:""}; merchant.payfast = {status:"not_started",merchantId:"",reviewNote:""}; });
   const cartButton = {addEventListener(type, handler) { if (type === "click") this.click = handler; }};
   const increase = {dataset:{line:"0",qty:"1"}, addEventListener(type, handler) { if (type === "click") this.click = handler; }};
   const cartApp = {
@@ -75,10 +81,11 @@ for (const detail of [false, true]) {
     querySelector() { return passive; },
     querySelectorAll(selector) { return selector === "[data-qty]" ? [increase] : []; }
   };
-  const cartElements = {"#app":cartApp, "#modal":cartModal, "#toast":{classList:{add(){},remove(){}}}, "#roleSelect":{value:"",addEventListener(){}}, "#locationLabel":{}, "#locationButton":passive, "#brandHome":passive};
+  const cartElements = {"#app":cartApp, "#modal":cartModal, "#toast":{classList:{add(){},remove(){}}}, "#accountButton":{addEventListener(){}}, "#locationLabel":{}, "#locationButton":passive, "#brandHome":passive};
   globalThis.document = {querySelector(selector) { return cartElements[selector]; }};
-  globalThis.localStorage = {getItem() { return JSON.stringify(state); }, setItem() {}, removeItem() {}};
+  globalThis.fetch = async url => ({ok:true,json:async () => url.includes("/auth/session") ? {user:{id:`cart-${detail}`,email:"customer@example.test",role:"customer"}} : {state}});
   await import(`../js/app.js?smoke=bottom-cart-${detail}`);
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal((cartApp.innerHTML.match(/data-cart/g) || []).length, 1, "Customer should have one cart action");
   assert(cartApp.innerHTML.includes("View cart, 2 items, R 96") || cartApp.innerHTML.includes("View cart, 2 items, R96"), "Bottom cart should show item count and total");
   if (detail) {

@@ -1,0 +1,7 @@
+node_modules
+public
+tests
+pages-auth-test
+*.zip
+.git
+.env*

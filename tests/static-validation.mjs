@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const required = [
   "index.html", "css/styles.css", "js/app.js", "js/core/store.js", "js/core/checkout.js", "js/core/operations.js", "js/core/feedback.js", "js/core/menu-choices.js", "js/core/payfast-onboarding.js", "js/views/payfast-setup.js", "js/views/admin-view.js", "js/data/seed.js", "server/server.mjs",
-  "assets/goodkota-logo.png", "manifest.webmanifest", "service-worker.js", "README.md"
+  "assets/goodkota-logo.png", "manifest.webmanifest", "service-worker.js", "README.md", "server/auth.mjs", "server/firebase-auth.mjs", "server/firebase-admin.mjs", "js/firebase-client.bundle.js", "server/state.mjs"
 ];
 for (const file of required) {
   if (!fs.existsSync(path.join(root, file))) throw new Error(`Missing ${file}`);
@@ -22,4 +22,4 @@ for (const phrase of ["Applications", "Quality", "Support", "Payments", "Export 
 }
 if (!readme.includes("PayFast")) throw new Error("Payment boundary missing");
 if (/Keep the MVP simple|What we are not building yet|directions intent recorded/.test(app)) throw new Error("Development copy leaked into UI");
-console.log("GoodKota MVP v17 static validation passed.");
+console.log("GoodKota MVP v20 static validation passed.");

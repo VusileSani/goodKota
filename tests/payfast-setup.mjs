@@ -20,7 +20,7 @@ assert(setup.secret);
 assert.equal((await (await fetch(`${base}/api/auth/session`,{headers:{Cookie:pendingCookie}})).json()).user,null);
 const complete = await fetch(`${base}/api/auth/mfa/complete`,{method:"POST",headers:{Cookie:pendingCookie,"Content-Type":"application/json"},body:JSON.stringify({code:totpCode(setup.secret,Math.floor(Date.now()/30_000))})});
 assert.equal(complete.status,200);
-const auth = {Authorization:`Bearer ${token}`,Cookie:complete.headers.get("set-cookie").match(/goodkota_session=[^;]+/)[0]};
+const auth = {Authorization:`Bearer ${token}`,Cookie:complete.headers.get("set-cookie").match(/__session=[^;]+/)[0]};
 
 try {
   assert.match(complete.headers.get("set-cookie"), /HttpOnly; SameSite=Strict/);
@@ -63,7 +63,7 @@ try {
   assert.equal((await (await fetch(`${base}/api/admin/payfast/status?storeId=m2`, {headers:auth})).json()).configured, false);
   const filename = join(dataDir, "payfast-m1.enc.json");
   assert.equal((await readFile(filename, "utf8")).includes("secretKey123"), false);
-  assert.equal((await stat(filename)).mode & 0o777, 0o600);
+  if (process.platform !== "win32") assert.equal((await stat(filename)).mode & 0o777, 0o600);
   assert.equal((await fetch(`${base}/api/admin/payfast/config`, {method:"POST", headers:{...auth,"Content-Type":"application/json",Origin:"https://other.example"}, body:"{}"})).status, 403);
   assert.equal((await fetch(`${base}/server/server.mjs`)).status, 404);
   assert.equal((await fetch(`${base}/index.html`)).status, 200);

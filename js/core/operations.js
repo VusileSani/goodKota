@@ -1,3 +1,4 @@
+import { parseCoords } from "./geo.js";
 export const CHECK_IDS = ["local", "kota", "consistency", "value", "readiness"];
 export const ORDER_NEXT = {
   new: ["accepted", "cancelled"],
@@ -64,7 +65,7 @@ export function reviewApplication(store, applicationId, decision, fields, reason
       standard: Object.fromEntries(CHECK_IDS.map(key => [key, false])),
       quality: { status: "healthy", note: "" },
       payfast: { status: "not_started", accountType: "", merchantId: "", reviewNote: "" },
-      note: "", tags: [], distanceKm: null
+      note: "", tags: [], lat: null, lng: null
     };
     store.state.merchants.push(merchant);
     Object.assign(application, { businessName: name, area, address,
@@ -85,8 +86,11 @@ export function saveMerchant(store, merchantId, fields) {
   if (store.state.merchants.some(m => m.id !== merchantId && m.name.toLowerCase() === name.toLowerCase())) throw new Error("A merchant with this name already exists.");
   const prepMinutes = Number(fields.prepMinutes);
   if (!Number.isInteger(prepMinutes) || prepMinutes < 1 || prepMinutes > 180) throw new Error("Prep time must be between 1 and 180 minutes.");
+  const hasCoords = fields.lat !== undefined || fields.lng !== undefined;
+  const coords = hasCoords ? parseCoords(fields.lat, fields.lng) : { lat: merchant.lat ?? null, lng: merchant.lng ?? null };
   Object.assign(merchant, {
     name, area: required(fields.area, "Area"), address: required(fields.address, "Pickup address"), prepMinutes,
+    lat: coords?.lat ?? null, lng: coords?.lng ?? null,
     contact: { name: clean(fields.contactName), phone: clean(fields.phone), email: clean(fields.email) }
   });
   store.log("merchant_updated", { merchantId });
@@ -135,6 +139,13 @@ export function transitionOrder(store, orderId, next, reason = "") {
   order.updatedAt = new Date().toISOString();
   store.log("order_status_changed", { orderId, status: next, reason: order.cancelReason || "" });
   return order;
+}
+
+// Customers may withdraw an order only until the merchant accepts it.
+export function cancelOwnOrder(store, orderId, reason = "Cancelled by customer") {
+  const order = store.state.orders.find(item => item.id === orderId);
+  if (!order || order.status !== "new") throw new Error("This order can no longer be cancelled. Contact the spot directly.");
+  return transitionOrder(store, orderId, "cancelled", reason);
 }
 
 // An operational record only. A refund must be performed and verified through

@@ -1,3 +1,4 @@
+import { distanceTo, formatDistance } from "./core/geo.js";
 import { Store } from "./core/store.js";
 import { STANDARD } from "./data/seed.js";
 import { canOrder, isPick, submitApplication, saveMerchant, transitionOrder, createCase, requestRefundReview } from "./core/operations.js";
@@ -124,6 +125,7 @@ function renderCustomer() {
       updateMerchantGrid();
     });
   }
+  app.querySelector("#useMyLocation")?.addEventListener("click", useMyLocation);
   app.querySelector("#findKota")?.addEventListener("click", () => app.querySelector("#merchantGrid")?.scrollIntoView({ behavior: "smooth" }));
   app.querySelector("#detailsForm")?.addEventListener("submit", event => {
     event.preventDefault();
@@ -133,6 +135,12 @@ function renderCustomer() {
     showToast("Details saved");
   });
   app.querySelector("#merchantApplication")?.addEventListener("click", openMerchantApplication);
+  app.querySelectorAll("[data-cancel-own-order]").forEach(button => button.addEventListener("click", async () => {
+    if (!confirm("Cancel this order?")) return;
+    button.disabled = true;
+    const result = await store.log("order_cancelled_by_customer", {orderId: button.dataset.cancelOwnOrder});
+    if (result?.ok) showToast("Order cancelled");
+  }));
   app.querySelectorAll("[data-rate-order]").forEach(button => button.addEventListener("click", () => openExperience(button.dataset.rateOrder)));
 
   app.querySelectorAll("[data-filter]").forEach(button => button.addEventListener("click", () => {
@@ -152,6 +160,7 @@ function discoverView() {
         <label class="searchbar">
           <input id="discoverSearch" type="search" placeholder="Search kota, chicken, russian or area" autocomplete="off" />
           <button class="btn primary" type="button" id="findKota">Find kota</button>
+          <button class="btn light" type="button" id="useMyLocation">${store.state.userPos ? "Location on ✓" : "Use my location"}</button>
         </label>
       </div>
     </section>
@@ -167,6 +176,24 @@ function discoverView() {
     </section>`;
 }
 
+const kmLabel = merchant => {
+  const km = distanceTo(store.state.userPos, merchant);
+  return km == null ? "" : `${formatDistance(km)} away`;
+};
+
+function useMyLocation() {
+  if (!navigator.geolocation) { showToast("Location isn't available on this device. Choose your area instead."); return; }
+  showToast("Finding kota near you…");
+  navigator.geolocation.getCurrentPosition(position => {
+    // Kept in memory only: never saved to storage and never sent to the server.
+    store.state.userPos = {lat: position.coords.latitude, lng: position.coords.longitude};
+    render();
+    showToast("Sorted by distance from you");
+  }, error => {
+    showToast(error.code === 1 ? "Location is off for GoodKota. Choose your area instead." : "Couldn't get your location. Choose your area instead.");
+  }, {enableHighAccuracy: false, timeout: 10000, maximumAge: 300000});
+}
+
 function filteredMerchants() {
   const q = store.state.search.trim().toLowerCase();
   const filter = store.state.filter;
@@ -176,7 +203,9 @@ function filteredMerchants() {
     .filter(m => m.listingStatus === "active")
     .filter(m => !q || `${m.name} ${m.area} ${m.tags.join(" ")} ${products(m).map(item => `${item.name} ${item.desc} ${choicesFor(item).filter(choice => choice.available !== false).map(choice => choice.name).join(" ")}`).join(" ")}`.toLowerCase().includes(q))
     .filter(m => filter === "All" || products(m).some(item => filter === "Under R60" ? item.price <= 6000 : filter === "Customisable" ? choicesFor(item).some(choice => choice.available !== false) : `${item.name} ${item.desc}`.toLowerCase().includes(filter.toLowerCase())))
-    .sort((a,b) => near(a) - near(b) || Number(canOrder(b)) - Number(canOrder(a)) || (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity));
+    .sort((a,b) => store.state.userPos
+      ? Number(canOrder(b)) - Number(canOrder(a)) || (distanceTo(store.state.userPos,a) ?? Infinity) - (distanceTo(store.state.userPos,b) ?? Infinity)
+      : near(a) - near(b) || Number(canOrder(b)) - Number(canOrder(a)));
 }
 
 function updateMerchantGrid() {
@@ -202,7 +231,7 @@ function merchantCards(merchants) {
       ${signature ? `<div class="signature-line">Try ${esc(signature.name)} · ${money(signature.price)}</div>` : ""}
       <div class="address"><a href="${directionsUrl(m)}" target="_blank" rel="noopener noreferrer" data-directions="${m.id}" aria-label="Navigate to ${esc(m.name)}">${esc(m.address || m.area)} ↗</a></div>
       <div class="merchant-facts">
-        ${store.state.location === "Midrand" && m.distanceKm != null ? `<span><strong>~${m.distanceKm.toFixed(1)} km</strong></span>` : ""}
+        ${kmLabel(m) ? `<span><strong>${kmLabel(m)}</strong></span>` : ""}
         <span>~${m.prepMinutes} min</span>
         <span class="experience-dot ${feedback.tone}"></span><span>${feedback.count >= 3 ? `${feedback.label} · ${feedback.count} orders` : feedback.count ? `${feedback.count} pickup rating${feedback.count === 1 ? "" : "s"}` : "Feedback pending"}</span>
         <span class="badge ${m.online ? "green" : "dark"}">${m.online ? "Open now" : "Closed"}</span>
@@ -223,7 +252,7 @@ function merchantDetail(merchant) {
       <button class="link-button back" id="backDiscover">← Back to nearby</button>
       <div class="eyebrow">${standardPass(merchant) ? "GoodKota Pick" : "Quality review"}</div>
       <h1>${esc(merchant.name)}</h1>
-      <p>${esc(merchant.address || merchant.area)}${store.state.location === "Midrand" && merchant.distanceKm != null ? ` · ~${merchant.distanceKm.toFixed(1)} km` : ""}${feedback.count >= 3 ? ` · ${feedback.label} from ${feedback.count} collected orders` : ""}</p>
+      <p>${esc(merchant.address || merchant.area)}${kmLabel(merchant) ? ` · ${kmLabel(merchant)}` : ""}${feedback.count >= 3 ? ` · ${feedback.label} from ${feedback.count} collected orders` : ""}</p>
       <div class="detail-actions">
         <a class="btn primary" href="${directionsUrl(merchant)}" target="_blank" rel="noopener noreferrer" data-directions="${merchant.id}">Get directions ↗</a>
         <button class="btn light" data-favourite="${merchant.id}">${store.state.favourites.includes(merchant.id) ? "♥ Saved" : "♡ Save"}</button>
@@ -254,7 +283,7 @@ function ordersView() {
 function orderRow(order) {
   const merchant = store.merchant(order.merchantId);
   const tone = order.status === "cancelled" ? "red" : order.status === "completed" ? "green" : order.status === "ready" ? "orange" : "dark";
-  return `<div class="list-row"><div><strong>${esc(merchant?.name || "GoodKota")}</strong><p>${esc(order.id)} · ${esc(order.createdAt)} · Pay on collection</p><p>${order.items.map(line => `${line.qty} × ${esc(line.name || store.product(line.productId)?.name || "Item")}${choiceText(line) ? ` (${esc(choiceText(line))})` : ""}`).join(" · ")}</p>${order.cancelReason ? `<p>Cancelled: ${esc(order.cancelReason)}</p>` : ""}${merchant ? `<a class="text-link" href="${directionsUrl(merchant)}" target="_blank" rel="noopener noreferrer" data-directions="${merchant.id}">Get directions ↗</a>` : ""}${order.status === "completed" ? order.experience ? `<p><span class="badge ${EXPERIENCE[order.experience.value]?.tone || "dark"}">Your experience: ${esc(EXPERIENCE[order.experience.value]?.label || "Rated")}</span></p>` : `<p><button class="btn primary small" data-rate-order="${esc(order.id)}">Rate this pickup</button></p>` : ""}</div><div class="list-row-actions"><span class="badge ${tone}">${esc(order.status)}</span><strong>${money(order.total)}</strong></div></div>`;
+  return `<div class="list-row"><div><strong>${esc(merchant?.name || "GoodKota")}</strong><p>${esc(order.id)} · ${esc(order.createdAt)} · Pay on collection</p><p>${order.items.map(line => `${line.qty} × ${esc(line.name || store.product(line.productId)?.name || "Item")}${choiceText(line) ? ` (${esc(choiceText(line))})` : ""}`).join(" · ")}</p>${order.cancelReason ? `<p>Cancelled: ${esc(order.cancelReason)}</p>` : ""}${merchant ? `<a class="text-link" href="${directionsUrl(merchant)}" target="_blank" rel="noopener noreferrer" data-directions="${merchant.id}">Get directions ↗</a>` : ""}${order.status === "new" ? `<p><button class="btn ghost small" data-cancel-own-order="${esc(order.id)}">Cancel order</button></p>` : ""}${order.status === "completed" ? order.experience ? `<p><span class="badge ${EXPERIENCE[order.experience.value]?.tone || "dark"}">Your experience: ${esc(EXPERIENCE[order.experience.value]?.label || "Rated")}</span></p>` : `<p><button class="btn primary small" data-rate-order="${esc(order.id)}">Rate this pickup</button></p>` : ""}</div><div class="list-row-actions"><span class="badge ${tone}">${esc(order.status)}</span><strong>${money(order.total)}</strong></div></div>`;
 }
 
 function openExperience(orderId) {

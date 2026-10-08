@@ -14,7 +14,7 @@ The Hosting-to-Cloud-Run rewrite is configured for `europe-west1` (Belgium). Fir
 2. In Firebase **Build → Firestore Database**, create the default database in **Native mode**, preferably `europe-west1` for this pilot. Start in **production mode**, which denies browser access by default; deploy the supplied `firestore.rules` after the database exists.
 3. In Google Cloud Console, enable **Cloud Run**, **Cloud Build**, **Artifact Registry**, and **Firestore** APIs for project `goodkota` if prompted during deployment.
 4. Create a dedicated service account, such as `goodkota-api@goodkota.iam.gserviceaccount.com`. Grant it **Cloud Datastore User** (`roles/datastore.user`) for Firestore and the Identity Platform permissions needed by Firebase Admin Auth to read users, check revocation, and create session cookies. For a first private pilot, **Identity Platform Admin** (`roles/identityplatform.admin`) is the predefined role; narrow it to a custom role after verifying the exact methods used. Attach this account to Cloud Run. Do not generate or download a JSON key.
-5. In Firebase **Authentication → Users**, copy the **UID** of your already verified test account. This is an identifier, not a password. Use it as the first entry in `GOODKOTA_PILOT_UIDS`. Only listed UIDs can receive API sessions; add future test operators there before testing their role.
+5. In Firebase **Authentication → Users**, copy the **UID** of your already verified test account. This is an identifier, not a password. Use it as the first entry in `GOODKOTA_PILOT_UIDS`. For an invite-only pilot, list permitted UIDs. For public registration, leave GOODKOTA_PILOT_UIDS unset. Admin access always requires GOODKOTA_ADMIN_UID and TOTP.
 
 ## 3. Deploy the Node API
 
@@ -25,12 +25,12 @@ npm ci
 npm run build
 npm test
 gcloud config set project goodkota
-gcloud run deploy goodkota-api --source . --region europe-west1 --allow-unauthenticated --service-account goodkota-api@goodkota.iam.gserviceaccount.com --max-instances 2 --set-env-vars GOODKOTA_STORAGE=firestore,GOODKOTA_FIREBASE_PROJECT_ID=goodkota,GOODKOTA_PUBLIC_ORIGIN=https://goodkota.web.app,GOODKOTA_PILOT_UIDS=YOUR_VERIFIED_TEST_UID
+gcloud run deploy goodkota-api --source . --region europe-west1 --allow-unauthenticated --service-account goodkota-api@goodkota.iam.gserviceaccount.com --max-instances 2 --set-env-vars GOODKOTA_STORAGE=firestore,GOODKOTA_FIREBASE_PROJECT_ID=goodkota,GOODKOTA_PUBLIC_ORIGIN=https://goodkota.web.app,GOODKOTA_ADMIN_UID=YOUR_ADMIN_UID
 ```
 
 Replace `YOUR_VERIFIED_TEST_UID` locally. Do not put passwords, Firebase Admin JSON, or Payfast keys in environment variables or the repository. The Cloud Run service is reachable publicly so that Firebase Hosting can call it; all sensitive API operations still enforce Firebase sessions and roles. If the build requests permissions for the deployer or Cloud Build account, grant only the requested build and deployment permissions and retain the dedicated runtime account above.
 
-The server should fail at startup if `GOODKOTA_PILOT_UIDS` is missing. After Hosting deployment, `/api/health` must return `status: "ok"` to confirm Firestore access; `/api/auth/capabilities` should return `provider: "firebase"`.
+An absent `GOODKOTA_PILOT_UIDS` enables public customer registration. After Hosting deployment, `/api/health` must return `status: "ok"` to confirm Firestore access; `/api/auth/capabilities` should return `provider: "firebase"`.
 
 ## 4. Deploy the web app and rules
 
@@ -46,9 +46,9 @@ Open `https://goodkota.web.app/`. It must show **Private pilot · Test orders on
 
 ## 5. Enable admin MFA, then merchant role testing
 
-The project must be upgraded to Firebase Authentication with Identity Platform before admin access can work. Review that upgrade and its pricing separately. Google's current TOTP setup uses the Admin SDK or project configuration API; the included `scripts/enable-totp.mjs` performs that project-wide change **only** when `GOODKOTA_CONFIRM_TOTP_CONFIG=1` is deliberately set and a privileged Application Default Credential is available. Do not run it before the upgrade decision. Create a dedicated admin login with a real inbox, verify it, add its UID to `GOODKOTA_PILOT_UIDS`, and set `GOODKOTA_ADMIN_UID` on the Cloud Run service. Do not make the personal customer test account the permanent administrator.
+The project must be upgraded to Firebase Authentication with Identity Platform before admin access can work. Review that upgrade and its pricing separately. Google's current TOTP setup uses the Admin SDK or project configuration API; the included `scripts/enable-totp.mjs` performs that project-wide change **only** when `GOODKOTA_CONFIRM_TOTP_CONFIG=1` is deliberately set and a privileged Application Default Credential is available. Do not run it before the upgrade decision. Create a dedicated admin login with a real inbox, verify it, set `GOODKOTA_ADMIN_UID` on the Cloud Run service. Do not make the personal customer test account the permanent administrator.
 
-The admin signs in, enrolls an authenticator, signs out, and signs in again with TOTP. Only then should an admin session and the **Merchant access** invitation flow be tested. A merchant tester needs a separate verified account, their UID on the allowlist, and a one-use invitation code. Test that other customers cannot claim it or operate the merchant's store. Do not send passwords, TOTP setup keys, recovery codes or service-account credentials in chat.
+The admin signs in, enrolls an authenticator, signs out, and signs in again with TOTP. Only then should an admin session and the **Merchant access** invitation flow be tested. A merchant tester needs a separate verified account and a one-use invitation code; include their UID in the allowlist only if invite-only mode is enabled. Test that other customers cannot claim it or operate the merchant's store. Do not send passwords, TOTP setup keys, recovery codes or service-account credentials in chat.
 
 ## Rollback and limitations
 

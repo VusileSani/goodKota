@@ -4,14 +4,17 @@ import { join } from "node:path";
 import { seed } from "../js/data/seed.js";
 import { buildPickupOrder } from "../js/core/checkout.js";
 import { merchantExperience, rateCompletedOrder } from "../js/core/feedback.js";
-import { submitApplication, reviewApplication, saveMerchant, reviewMerchant, setMerchantStatus, setQuality, transitionOrder, requestRefundReview, reviewRefundRequest, createCase, updateCase } from "../js/core/operations.js";
+import { cancelOwnOrder, submitApplication, reviewApplication, saveMerchant, reviewMerchant, setMerchantStatus, setQuality, transitionOrder, requestRefundReview, reviewRefundRequest, createCase, updateCase } from "../js/core/operations.js";
 import { submitPayfastAccount, reviewPayfastAccount } from "../js/core/payfast-onboarding.js";
 
 const clean = value => String(value ?? "").trim();
 const short = (value, limit) => clean(value).length <= limit;
+// Abuse limits for pay-on-collection orders (no payment deters fake orders).
+export const ORDER_LIMITS = Object.freeze({openPerCustomer:3, openPerCustomerPerMerchant:1, perCustomerPerHour:6, openPerMerchant:60, maxLines:20, maxQtyPerLine:20});
+const OPEN = new Set(["new","accepted","ready"]);
 const publicMerchant = merchant => {
-  const {id,name,area,address,distanceKm,prepMinutes,online,listingStatus,standard,note,tags,menu} = merchant;
-  return {id,name,area,address,distanceKm,prepMinutes,online,listingStatus,standard,note,tags,menu};
+  const {id,name,area,address,lat,lng,prepMinutes,online,listingStatus,standard,note,tags,menu} = merchant;
+  return {id,name,area,address,lat:lat ?? null,lng:lng ?? null,prepMinutes,online,listingStatus,standard,note,tags,menu};
 };
 
 export function createStateRepository({dataDir,storage} = {}) {
@@ -26,6 +29,11 @@ export function createStateRepository({dataDir,storage} = {}) {
     state.events ||= [];
     state.revision ||= 0;
     state.merchants.forEach(merchant => {
+      if (merchant.lat === undefined || merchant.lng === undefined) {
+        const seeded = seed.merchants.find(m => m.id === merchant.id);
+        merchant.lat = seeded?.lat ?? null; merchant.lng = seeded?.lng ?? null;
+      }
+      delete merchant.distanceKm;
       merchant.address ||= merchant.area;
       merchant.listingStatus ||= "active";
       merchant.quality ||= {status:"healthy",note:""};
@@ -131,6 +139,13 @@ export function createStateRepository({dataDir,storage} = {}) {
           if (!/^GK-[0-9A-F]{16}$/.test(payload.requestId || "")) throw new Error("Order reference is invalid.");
           if (state.orders.some(o => o.customerId === user.id && o.requestId === payload.requestId)) break;
           const merchant = s.merchant(payload.merchantId);
+          if (!Array.isArray(payload.cart) || payload.cart.length > ORDER_LIMITS.maxLines || payload.cart.some(line => !(line?.qty <= ORDER_LIMITS.maxQtyPerLine))) throw new Error("That order is too large. Remove some items and try again.");
+          const mine = state.orders.filter(o => o.customerId === user.id);
+          const openMine = mine.filter(o => OPEN.has(o.status));
+          if (openMine.length >= ORDER_LIMITS.openPerCustomer) throw new Error("You have too many open orders. Collect or cancel one first.");
+          if (openMine.some(o => o.merchantId === payload.merchantId)) throw new Error("You already have an open order at this spot.");
+          if (mine.filter(o => Date.now() - Date.parse(o.createdIso) < 3600000).length >= ORDER_LIMITS.perCustomerPerHour) throw new Error("Too many orders in the last hour. Try again later.");
+          if (state.orders.filter(o => o.merchantId === payload.merchantId && OPEN.has(o.status)).length >= ORDER_LIMITS.openPerMerchant) throw new Error("This spot is very busy right now. Try again shortly.");
           const order = buildPickupOrder(payload.details,merchant,payload.cart);
           order.customerId = user.id;
           order.requestId = payload.requestId;
@@ -140,6 +155,10 @@ export function createStateRepository({dataDir,storage} = {}) {
         }
         case "order_status_changed":
           ownOrder(payload.orderId); transitionOrder(s,payload.orderId,payload.status,payload.reason); break;
+        case "order_cancelled_by_customer": {
+          if (user.role !== "customer" || !state.orders.some(o => o.id === payload.orderId && o.customerId === user.id)) throw new Error("Order unavailable.");
+          cancelOwnOrder(s,payload.orderId); break;
+        }
         case "refund_review_requested":
           ownOrder(payload.orderId); requestRefundReview(s,user.merchantId,payload.orderId,payload.fields); break;
         case "refund_review_updated":

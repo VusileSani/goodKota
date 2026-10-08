@@ -11,7 +11,7 @@ export const seed = {
   locations: ["Midrand", "Tembisa", "Centurion"],
   merchants: [
     {
-      id: "m1", name: "Kasi Bites Midrand", area: "Halfway House, Midrand", address: "Halfway House, Midrand", distanceKm: 1.4,
+      id: "m1", name: "Kasi Bites Midrand", area: "Halfway House, Midrand", address: "Halfway House, Midrand", lat: -25.9885, lng: 28.1280,
       prepMinutes: 14, priceBand: "R45–R95", online: true,
       standard: { local: true, kota: true, consistency: true, value: true, readiness: true },
       note: "Big flavour, crisp chips and a dependable classic kota.",
@@ -28,7 +28,7 @@ export const seed = {
       ]
     },
     {
-      id: "m2", name: "Tembisa Kota House", area: "Ivory Park, Tembisa", address: "Ivory Park, Tembisa", distanceKm: 6.7,
+      id: "m2", name: "Tembisa Kota House", area: "Ivory Park, Tembisa", address: "Ivory Park, Tembisa", lat: -25.9190, lng: 28.2160,
       prepMinutes: 18, priceBand: "R40–R90", online: true,
       standard: { local: true, kota: true, consistency: true, value: true, readiness: true },
       note: "Known for generous portions and a proper kasi-style build.",
@@ -43,7 +43,7 @@ export const seed = {
       ]
     },
     {
-      id: "m3", name: "Centurion Kota Works", area: "The Reeds, Centurion", address: "The Reeds, Centurion", distanceKm: 10.9,
+      id: "m3", name: "Centurion Kota Works", area: "The Reeds, Centurion", address: "The Reeds, Centurion", lat: -25.8350, lng: 28.1790,
       prepMinutes: 16, priceBand: "R55–R105", online: true,
       standard: { local: true, kota: true, consistency: true, value: true, readiness: true },
       note: "A cleaner modern take without losing the kota identity.",
@@ -57,7 +57,7 @@ export const seed = {
       ]
     },
     {
-      id: "m4", name: "Ebony Park Corner", area: "Ebony Park, Midrand", address: "Ebony Park, Midrand", distanceKm: 3.8,
+      id: "m4", name: "Ebony Park Corner", area: "Ebony Park, Midrand", address: "Ebony Park, Midrand", lat: -26.0070, lng: 28.1380,
       prepMinutes: 20, priceBand: "R40–R80", online: true,
       standard: { local: true, kota: true, consistency: false, value: true, readiness: true },
       note: "Popular local stop currently under GoodKota quality review.",

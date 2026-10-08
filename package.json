@@ -1,11 +1,12 @@
 {
-  "name": "goodkota-mvp-v21",
-  "version": "21.0.0",
+  "name": "goodkota-v23",
+  "version": "23.3.1",
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node server/server.mjs", "build": "esbuild js/firebase-client.js --bundle --format=esm --platform=browser --target=es2022 --outfile=js/firebase-client.bundle.js --minify && node scripts/build-hosting.mjs",
-    "test": "node tests/static-validation.mjs && node tests/menu-integrity.mjs && node tests/operations.mjs && node tests/auth.mjs && node tests/firebase-auth.mjs && node tests/firebase-server.mjs && node tests/mail.mjs && node tests/actor-isolation.mjs && node tests/firestore-storage.mjs && node tests/cloud-http.mjs && node tests/client-sync.mjs && node tests/render-smoke.mjs && node tests/merchant-ux.mjs && node tests/payfast-onboarding.mjs && node tests/payfast-setup.mjs"
+    "start": "node server/server.mjs",
+    "build": "esbuild js/firebase-client.js --bundle --format=esm --platform=browser --target=es2022 --outfile=js/firebase-client.bundle.js --minify && node scripts/build-hosting.mjs",
+    "test": "node tests/static-validation.mjs && node tests/menu-integrity.mjs && node tests/operations.mjs && node tests/auth.mjs && node tests/firebase-auth.mjs && node tests/firebase-server.mjs && node tests/mail.mjs && node tests/actor-isolation.mjs && node tests/firestore-storage.mjs && node tests/cloud-http.mjs && node tests/client-sync.mjs && node tests/render-smoke.mjs && node tests/merchant-ux.mjs && node tests/payfast-onboarding.mjs && node tests/payfast-setup.mjs && node tests/geo.mjs && node tests/order-limits.mjs && node tests/firestore-guards.mjs"
   },
   "dependencies": {
     "esbuild": "^0.28.2",

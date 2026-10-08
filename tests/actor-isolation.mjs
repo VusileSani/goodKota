@@ -43,7 +43,7 @@ try {
   await repo.apply(admin,"refund_review_updated",{orderId:order.id,status:"needs_info",note:"Send a receipt"});
   assert.equal((await repo.snapshot(merchant)).orders[0].refundReview.status,"needs_info");
   assert.equal((await repo.snapshot(admin)).orders[0].refundReview.adminNote,"Send a receipt");
-  assert.equal((await stat(join(dataDir,"state.json"))).mode & 0o777,0o600);
+  if (process.platform !== "win32") assert.equal((await stat(join(dataDir,"state.json"))).mode & 0o777,0o600);
   const reopened = createStateRepository({dataDir});
   assert.equal((await reopened.snapshot(customer)).orders[0].id,order.id,"Orders should survive server restart");
   console.log("Server actor isolation and shared order workflow passed.");

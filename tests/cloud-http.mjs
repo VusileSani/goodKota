@@ -23,7 +23,13 @@ const people = new Map([
 ]);
 const decoded = uid => ({uid,auth_time:now,firebase:{}});
 const firebaseAuth = {verifyIdToken:async uid => decoded(uid),verifySessionCookie:async cookie => decoded(cookie.replace("cookie-","")),createSessionCookie:async uid => `cookie-${uid}`,getUser:async uid => people.get(uid)};
-assert.throws(() => createGoodKotaServer({storageProvider:"firestore",cloudStorage,firebaseAuth}),/GOODKOTA_PILOT_UIDS/);
+const publicServer = createGoodKotaServer({storageProvider:"firestore",cloudStorage,firebaseAuth,publicOrigin:"https://goodkota.web.app"});
+await new Promise(resolve => publicServer.listen(0,"127.0.0.1",resolve));
+try {
+  const publicBase = `http://127.0.0.1:${publicServer.address().port}`;
+  const registration = await fetch(publicBase+"/api/auth/exchange",{method:"POST",headers:{"Content-Type":"application/json",Origin:"https://goodkota.web.app"},body:JSON.stringify({idToken:"c1"})});
+  assert.equal(registration.status,200,"A verified customer can enter when the pilot UID list is empty");
+} finally { await new Promise(resolve => publicServer.close(resolve)); }
 const server = createGoodKotaServer({storageProvider:"firestore",cloudStorage,firebaseAuth,pilotUids:"c1,a1",adminUid:"a1",publicOrigin:"https://goodkota.web.app"});
 await new Promise(resolve => server.listen(0,"127.0.0.1",resolve));
 const base = `http://127.0.0.1:${server.address().port}`;

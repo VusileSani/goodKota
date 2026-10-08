@@ -26,6 +26,7 @@ try {
   const exchange = await post("/api/auth/exchange",{idToken:"c1"});
   assert.equal(exchange.status,200);
   const cookie = exchange.headers.get("set-cookie").split(";")[0];
+  assert(cookie.startsWith("__session="),"Firebase Hosting requires __session cookie");
   const session = await (await fetch(base+"/api/auth/session",{headers:{Cookie:cookie}})).json();
   assert.deepEqual([session.user.role,session.user.emailVerified],["customer",true]);
   assert.equal((await post("/api/auth/invite",{merchantId:"m1",email:"bad@example.test"},{Cookie:cookie})).status,403);

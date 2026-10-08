@@ -25,7 +25,7 @@ export class Store {
   reset() { sessionStorage.removeItem(this.uiKey); location.reload(); }
   sync(snapshot) {
     const ui = Object.fromEntries(UI_FIELDS.map(key => [key,this.state[key]]));
-    this.state = {...snapshot,...ui};
+    this.state = {...snapshot,...ui,userPos:this.state.userPos};
     if (!this.state.merchants.some(merchant => merchant.id === this.state.selectedMerchantId)) this.state.selectedMerchantId = null;
     this.save();
     this.onUpdate();
@@ -76,7 +76,7 @@ export class Store {
     }).catch(async error => {
       try {
         const response = await fetch("./api/data",{credentials:"same-origin"});
-        if (response.ok) this.state = (await response.json()).state;
+        if (response.ok) this.state = {...(await response.json()).state,userPos:this.state.userPos};
       } catch { /* The next refresh can recover when the connection returns. */ }
       this.onUpdate(error.message);
       return {ok:false};

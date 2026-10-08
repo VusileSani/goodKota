@@ -1,22 +1,43 @@
-# GoodKota MVP v21 · private cloud pilot
+# GoodKota v23 · production architecture foundation
 
-This package builds on v20 and the successful Firebase email sign-in test. It prepares a separate private pilot at `https://goodkota.web.app/`. The current GitHub Pages site remains in place. Firebase Hosting serves the app and sends `/api/**` to its Node API on Cloud Run. Firebase Authentication handles passwords and verified email; the API handles sessions, roles, orders and merchant actions.
+This build consolidates the working GoodKota v22 private pilot and the v23 production-architecture work completed on 7 October 2026. The customer and merchant product surface remains intentionally stable while the cloud persistence layer moves away from the single operational Firestore document.
 
-The pilot uses Cloud Firestore transactions for shared role and operational state. It accepts only Firebase UIDs listed in `GOODKOTA_PILOT_UIDS` for API sessions. The storefront is visibly marked **Private pilot · Test orders only**. Online payment remains off.
+Firebase Hosting serves the app and routes `/api/**` to the Node API on Cloud Run. Firebase Authentication provides identity and verified email; the API remains authoritative for sessions, roles, prices, order rules and merchant actions. Online payment remains off until the PayFast split, settlement, webhook and refund contract is confirmed and implemented server-side.
 
-## Start here
+## v23 architecture
 
-Read [docs/CLOUD-PILOT.md](docs/CLOUD-PILOT.md) before deploying. Cloud Run requires a linked billing account and upgrades a Spark project to Blaze. Do not deploy this package by uploading it to GitHub Pages. The v20 `auth-test.html` page can remain there as a separate Firebase-only test.
+New cloud writes use partitioned Firestore documents for merchants, orders, merchant applications, support cases, customer profiles and audit events. The adapter can read the legacy v22 `goodkota_pilot_private/operations` document so an existing pilot can migrate on its next successful write; v23 does not write that legacy operations document. Role state remains separately stored while the role repository is migrated in a later targeted change.
 
-Local development still uses private JSON files by default. `npm ci`, `npm run build`, `npm test` and `npm start` work as in v20. Set `GOODKOTA_STORAGE=firestore` only when Firestore and Application Default Credentials are configured. The production container runs as an attached Google service identity; it needs no downloaded service-account key.
+The v23 adapter deliberately preserves the v22 repository transaction contract during this migration. This is a compatibility bridge, not the final high-throughput order path: commands still assemble the operational state during a transaction. The next backend optimization should move order and merchant commands to targeted document transactions/counters without changing the client contract. Do not add microservices or distributed infrastructure merely to remove this bridge.
 
-## Scope and limits
+Request correlation IDs and structured server-side error logging are included. Internal errors and stack traces are not exposed to clients.
 
-- The cloud test permits customer registration, verified email, order placement, merchant invitation and management once admin TOTP is configured. Admin access remains unavailable until Firebase Authentication with Identity Platform and TOTP are enabled and the admin enrolls an authenticator.
-- Role invitations and operational state survive server restarts and concurrent requests through Firestore transactions. The operational state is intentionally a **single capped document** for this pilot. It is not the partitioned order database required for a real launch; stop when the cap is reached and migrate to per-merchant and per-order documents.
-- Firestore rules deny direct browser reads and writes. Cloud Run's service account uses IAM. Do not grant users Firestore access to the private pilot collection.
-- PayFast setup remains disabled in the cloud pilot; its encrypted local-file store is deliberately blocked. The merchant-primary split and settlement contract still await written PayFast confirmation. No real merchant credentials or payments belong in this pilot.
-- Seeded merchants and products are test data. Do not invite real customers or treat pilot orders as live purchases. Backups, monitoring, data retention and operational recovery are needed before a public release.
-- The API requires a Firebase session cookie and checks account status, email verification and role permissions. Admin sessions require a TOTP sign-in factor. The user-facing app and API are on the same Hosting origin; GitHub Pages is not used for the full pilot because it cannot serve this API under its own `/api` path.
+## Security and operational invariants
 
-The v20 local build remains available as a rollback reference. This v21 package does not migrate v19 local accounts, sessions or browser demo data.
+- Firestore rules deny direct browser reads and writes; Cloud Run accesses private data through its service identity.
+- The API enforces account status, verified email and role permissions. Admin sessions require the configured TOTP factor.
+- Order pricing and merchant ownership are server-authoritative. Never trust browser totals or role claims.
+- Existing order state-transition rules, idempotent request IDs, customer cancellation rules and server-side abuse limits must not be weakened.
+- Customer geolocation remains in memory only, with area fallback. Merchant coordinates are validated server-side.
+- API responses are excluded from service-worker caching. Security headers remain enabled.
+- Never commit Firebase Admin credentials, PayFast secrets, session secrets or production customer data.
+
+## Build and release gate
+
+From a clean checkout run:
+
+```bash
+npm ci
+npm run build
+npm test
+```
+
+All suites must pass before deployment, including `firebase-server`, `firestore-storage`, `cloud-http`, `payfast-setup`, `geo`, and `order-limits`. A partially installed dependency tree is not a valid test environment.
+
+This review environment could execute the migration-specific Firestore test successfully, but its clean `npm ci` repeatedly timed out before dependencies finished installing. Consequently this package is **not represented as having passed the complete clean-install test gate here**. Run the three commands above in the deployment workstation/CI before release.
+
+## Deployment
+
+Read `docs/CLOUD-PILOT.md` before deploying. Use Firebase Hosting + Cloud Run for the full pilot; GitHub Pages cannot provide the same-origin authenticated API. Use the dedicated runtime service account and Application Default Credentials rather than downloaded service-account keys.
+
+Seed merchants/products remain test data until deliberately replaced with verified merchant records and real merchant pins. Do not enable real payments until the PayFast integration requirements in `docs/PAYFAST-INTEGRATION.md` and `docs/PAYFAST-SPLIT-DECISIONS.md` are resolved.

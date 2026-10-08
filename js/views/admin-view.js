@@ -158,7 +158,7 @@ export function renderAdminWorkspace({store, app, modal, render, showToast, esc,
           <div class="editor-pair"><label>Contact name<input name="contactName" value="${e(m.contact?.name)}"></label><label>Contact phone<input name="phone" type="tel" value="${e(m.contact?.phone)}"></label></div>
           <label>Contact email<input name="email" type="email" value="${e(m.contact?.email)}"></label></section>
           <section class="merchant-editor-section pickup-section"><div class="merchant-section-title"><h3>Pickup location</h3><a href="${directionsUrl(m)}" target="_blank" rel="noopener noreferrer" class="text-link" data-pickup-maps>Open Maps ↗</a></div>
-          <label>Pickup address<input name="address" required value="${e(m.address)}" autocomplete="street-address"></label></section>
+          <label>Pickup address<input name="address" required value="${e(m.address)}" autocomplete="street-address"></label><div class="editor-pair"><label>Latitude<input name="lat" inputmode="decimal" placeholder="-25.9885" value="${e(m.lat ?? "")}"></label><label>Longitude<input name="lng" inputmode="decimal" placeholder="28.1280" value="${e(m.lng ?? "")}"></label></div></section>
           <button class="btn primary save-merchant" type="submit">Save changes</button></form>
         <section class="merchant-status-card" aria-labelledby="tradingStatusHeading"><div class="merchant-section-title"><h3 id="tradingStatusHeading">Trading status</h3>${statusBadge(m.listingStatus)}</div>
           <p class="merchant-status-note">${m.listingStatus === "active" ? "Listed. The merchant can open or close orders." : m.listingStatus === "paused" ? "Listing paused. Resume when the spot is ready." : "Listing in review. Complete the checks before activation."}</p>

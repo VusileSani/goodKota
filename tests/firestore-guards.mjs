@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {createFirestoreStorage} from '../server/firestore-storage.mjs';
+const writes=[];
+const firestore={collection(name){return {doc(id){return {path:`${name}/${id}`,get:async()=>({data:()=>undefined})}},get:async()=>({docs:[]})}},async runTransaction(fn){const pending=[];const tx={get:async ref=>ref.path==='goodkota_system/state'?{data:()=>({schemaVersion:23})}:{docs:[],data:()=>undefined},set:(...args)=>pending.push(args),delete:(...args)=>pending.push(args)};const result=await fn(tx);writes.push(...pending);return result}};
+const store=createFirestoreStorage(firestore);
+const base={revision:1,merchants:[],orders:[],applications:[],supportCases:[],profiles:{},events:[]};
+await assert.rejects(()=>store.state.update(async()=>({state:{...base,profiles:{'../bad':{name:'x'}}}})),/Invalid Firestore document ID/);
+await assert.rejects(()=>store.state.update(async()=>({state:{...base,orders:[{id:'same'},{id:'same'}]}})),/Duplicate orders document ID/);
+await assert.rejects(()=>store.state.update(async()=>({state:{...base,orders:Array.from({length:451},(_,i)=>({id:`order-${i}`}))}})),/safe write budget/);
+assert.equal(writes.length,0,'Invalid transactions must stage no writes');
+console.log('Firestore document ID, duplicate and write-budget guards passed.');

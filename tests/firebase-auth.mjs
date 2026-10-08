@@ -34,11 +34,13 @@ try {
   assert.equal((await auth.fromToken(admin.token)).role,"admin");
   const invitation = await auth.inviteMerchant(admin.user,"store-1","merchant@example.test");
   const merchantSession = await auth.exchange("m1");
-  await assert.rejects(() => auth.claimMerchant(customer.user,invitation.code),/invalid or expired/);
-  await assert.rejects(() => auth.claimMerchant(merchantSession.user,"wrong"),/invalid or expired/);
-  await auth.claimMerchant(merchantSession.user,invitation.code);
+  await assert.rejects(() => auth.claimMerchant(customer.user,invitation.code),/Verify your email/);
+  await assert.rejects(() => auth.claimMerchant(merchantSession.user,"wrong"),/Verify your email/);
+  await assert.rejects(() => auth.claimMerchant(merchantSession.user,invitation.code),/Verify your email/);
+  users.get("m1").emailVerified = true;
+  await auth.claimMerchant({...merchantSession.user,emailVerified:true},invitation.code);
   assert.equal((await auth.fromToken(merchantSession.token)).merchantId,"store-1");
-  assert.equal((await auth.fromToken(merchantSession.token)).emailVerified,false);
+  assert.equal((await auth.fromToken(merchantSession.token)).emailVerified,true);
   await assert.rejects(async () => auth.claimMerchant(await auth.fromToken(merchantSession.token),invitation.code),/already has access/);
   await auth.resendVerification(customer.user);
   assert.equal(mail.length,1);
@@ -46,7 +48,7 @@ try {
   users.get("m1").disabled = true;
   assert.equal(await auth.fromToken(merchantSession.token),null);
   const file = join(dataDir,"roles.json");
-  assert.equal((await stat(file)).mode & 0o777,0o600);
+  if (process.platform !== "win32") assert.equal((await stat(file)).mode & 0o777,0o600);
   const contents = await readFile(file,"utf8");
   assert(!contents.includes(invitation.code));
   console.log("Firebase identity and role isolation passed.");

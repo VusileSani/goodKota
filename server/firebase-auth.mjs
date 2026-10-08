@@ -80,6 +80,7 @@ export function createFirebaseIdentity({adminAuth, dataDir, roleStorage, adminUi
   const claimMerchant = (actor,code) => mutate(async records => {
     if (!actor?.id || !validEmail(actor.email) || typeof code !== "string" || code.length > 128) throw new Error("Sign in with the invited email and enter the code.");
     if (actor.role !== "customer") throw new Error("Account already has access.");
+    if (!actor.emailVerified) throw new Error("Verify your email before activating merchant access.");
     const email = safeEmail(actor.email);
     const index = records.invites.findIndex(i => i.email === email && i.expires > now());
     const invite = records.invites[index];

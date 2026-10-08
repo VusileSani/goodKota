@@ -10,27 +10,31 @@ import { firebaseAdminAuth, firebaseAdminFirestore } from "./firebase-admin.mjs"
 import { createFirebaseIdentity } from "./firebase-auth.mjs";
 import { createStateRepository } from "./state.mjs";
 import { createFirestoreStorage } from "./firestore-storage.mjs";
+import { httpError } from "./errors.mjs";
+import { requestIdFor, logRequestError } from "./request-context.mjs";
 
 const defaultRoot = fileURLToPath(new URL("../", import.meta.url));
 const types = { ".html":"text/html; charset=utf-8", ".js":"text/javascript; charset=utf-8", ".css":"text/css; charset=utf-8", ".png":"image/png", ".webmanifest":"application/manifest+json", ".svg":"image/svg+xml" };
-const securityHeaders = {"X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer-Policy":"no-referrer","Content-Security-Policy":"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"};
+const securityHeaders = {"X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer-Policy":"no-referrer","Permissions-Policy":"geolocation=(self), camera=(), microphone=(), payment=()","Strict-Transport-Security":"max-age=31536000; includeSubDomains","Content-Security-Policy":"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"};
 const json = (response, status, data) => {
   response.writeHead(status, {...securityHeaders,"Content-Type":"application/json; charset=utf-8", "Cache-Control":"no-store"});
   response.end(JSON.stringify(data));
 };
 const sameToken = (actual, expected) => {
-  const candidate = Buffer.from(actual.replace(/^Bearer /, ""));
+  const candidate = Buffer.from(typeof actual === "string" && actual.startsWith("Bearer ") ? actual.slice(7) : "");
   const secret = Buffer.from(expected);
   return candidate.length === secret.length && timingSafeEqual(candidate, secret);
 };
 const limitedJson = async (request, maxBytes = 4096) => {
   if (!request.headers["content-type"]?.startsWith("application/json")) throw new Error("Send JSON.");
-  let body = "";
+  const chunks = [];
+  let size = 0;
   for await (const chunk of request) {
-    body += chunk.toString("utf8");
-    if (Buffer.byteLength(body) > maxBytes) throw new Error("Setup request is too large.");
+    size += chunk.length;
+    if (size > maxBytes) throw new Error("Setup request is too large.");
+    chunks.push(chunk);
   }
-  return JSON.parse(body);
+  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 };
 
 export function createGoodKotaServer({
@@ -58,7 +62,7 @@ export function createGoodKotaServer({
   if (!["local","firestore"].includes(storageProvider)) throw new Error("Unknown storage provider.");
   if (storageProvider === "firestore" && authProvider !== "firebase") throw new Error("Cloud storage requires Firebase authentication.");
   const allowedPilotUids = new Set(String(pilotUids).split(",").map(uid => uid.trim()).filter(Boolean));
-  if (storageProvider === "firestore" && !allowedPilotUids.size) throw new Error("Set GOODKOTA_PILOT_UIDS before hosting the cloud pilot.");
+  // An empty allowlist enables public verified-user registration; admin access still requires explicit UID and TOTP.
   if (authProvider === "local" && publicOrigin && !/^http:\/\/(127\.0\.0\.1|localhost|\[::1\])(?::\d+)?$/.test(publicOrigin)) throw new Error("Local account mode is only for loopback testing.");
   const payfastConfigured = Boolean(token && encryptionKey);
   if ((token || encryptionKey) && (!token || token.length < 32)) throw new Error("Set a random GOODKOTA_SETUP_TOKEN of at least 32 characters.");
@@ -68,7 +72,7 @@ export function createGoodKotaServer({
   if (storageProvider === "firestore" && payfastConfigured) throw new Error("Payfast key storage is not available in the cloud pilot.");
   const storage = storageProvider === "firestore" ? cloudStorage || createFirestoreStorage(firebaseAdminFirestore()) : null;
   const mailer = sendVerification || createVerificationMailer({apiKey:mailApiKey,from:mailFrom,publicOrigin,devMail,dataDir:authDir});
-  const auth = authProvider === "firebase" ? createFirebaseIdentity({adminAuth:firebaseAuth || firebaseAdminAuth(),dataDir:authDir,roleStorage:storage?.roles,adminUid,pilotUids:storage ? allowedPilotUids : null,sendLink:createLinkMailer({apiKey:mailApiKey,from:mailFrom,devMail,dataDir:authDir})}) : createAuth({dataDir:authDir,adminEmail,adminPassword,sendVerification:mailer});
+  const auth = authProvider === "firebase" ? createFirebaseIdentity({adminAuth:firebaseAuth || firebaseAdminAuth(),dataDir:authDir,roleStorage:storage?.roles,adminUid,pilotUids:storage && allowedPilotUids.size ? allowedPilotUids : null,sendLink:createLinkMailer({apiKey:mailApiKey,from:mailFrom,devMail,dataDir:authDir})}) : createAuth({dataDir:authDir,adminEmail,adminPassword,sendVerification:mailer});
   const mailReady = Boolean(sendVerification || devMail || (mailApiKey && mailFrom && publicOrigin.startsWith("https://")));
   const repository = createStateRepository({dataDir:stateDir,storage:storage?.state});
   const fileFor = storeId => {
@@ -97,11 +101,15 @@ export function createGoodKotaServer({
   };
 
   return http.createServer(async (request, response) => {
-    const url = new URL(request.url || "/", "http://localhost");
+    let url;
+    try { url = new URL(request.url || "/", "http://localhost"); }
+    catch { json(response,400,{error:"Invalid request URL."}); return; }
     const path = url.pathname;
-    const sessionToken = (request.headers.cookie || "").split(";").map(part => part.trim()).find(part => part.startsWith("goodkota_session="))?.slice("goodkota_session=".length) || "";
+    const requestId = requestIdFor(request);
+    response.setHeader("X-Request-Id",requestId);
+    const sessionToken = (request.headers.cookie || "").split(";").map(part => part.trim()).find(part => part.startsWith("__session="))?.slice("__session=".length) || "";
     const challengeToken = (request.headers.cookie || "").split(";").map(part => part.trim()).find(part => part.startsWith("goodkota_mfa="))?.slice("goodkota_mfa=".length) || "";
-    const cookie = token => `goodkota_session=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${token ? 43200 : 0}${publicOrigin.startsWith("https://") ? "; Secure" : ""}`;
+    const cookie = token => `__session=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${token ? 43200 : 0}${publicOrigin.startsWith("https://") ? "; Secure" : ""}`;
     const challengeCookie = token => `goodkota_mfa=${token}; Path=/api/auth; HttpOnly; SameSite=Strict; Max-Age=${token ? 600 : 0}${publicOrigin.startsWith("https://") ? "; Secure" : ""}`;
     const origin = request.headers.origin;
     const expectedOrigin = publicOrigin || `http://${request.headers.host}`;
@@ -119,12 +127,18 @@ export function createGoodKotaServer({
     }
     if (path === "/api/actions" && request.method === "POST") {
       if (origin && origin !== expectedOrigin) { json(response, 403, {error:"Origin not allowed."}); return; }
-      const user = await auth.fromToken(sessionToken);
+      let user;
+      try { user = await auth.fromToken(sessionToken); }
+      catch { json(response,503,{error:"Authentication temporarily unavailable."}); return; }
       if (!user) { json(response, 401, {error:"Sign in to continue."}); return; }
       try {
         const input = await limitedJson(request, 65536);
         json(response, 200, {state:await repository.apply(user,input.type,input.payload)});
-      } catch (error) { json(response, 400, {error:error.message || "Action could not be saved."}); }
+      } catch (error) {
+        const failure = httpError(error);
+        logRequestError({requestId,path,error});
+        json(response,failure.status,{error:failure.message,code:failure.code,requestId});
+      }
       return;
     }
     if (path.startsWith("/api/auth/")) {

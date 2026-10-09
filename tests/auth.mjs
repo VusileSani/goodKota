@@ -48,7 +48,7 @@ try {
   const file = join(dataDir, "accounts.json");
   const contents = await readFile(file, "utf8");
   assert(!contents.includes("MerchantPassword123!") && !contents.includes(invite.code) && !contents.includes(messages[3].token) && !contents.includes(admin.backupCodes[0]));
-  if (process.platform !== "win32") assert.equal((await stat(file)).mode & 0o777, 0o600);
+  assert.equal((await stat(file)).mode & 0o777, 0o600);
   const restarted = createAuth({dataDir,now:() => clock,sendVerification});
   assert.equal((await restarted.login("merchant@example.test", "MerchantPassword123!", "test-ip")).user.emailVerified,true);
   assert.equal(await restarted.fromToken(admin.token), null);

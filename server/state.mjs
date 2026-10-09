@@ -61,11 +61,13 @@ export function createStateRepository({dataDir,storage} = {}) {
     state.events = state.events.slice(-1000);
   }});
   const snapshotFromState = user => {
-    const common = {revision:state.revision,accountId:user?.id || null,location:"Midrand",locations:["Midrand","Tembisa","Centurion"],role:user?.role || "customer",customerTab:"discover",merchantTab:"orders",adminTab:"overview",selectedMerchantId:null,search:"",filter:"All",cart:[],favourites:[],customerDetails:{firstName:"",lastName:"",phone:"",email:""},events:[],applications:[],supportCases:[],orders:[],merchantId:user?.merchantId || ""};
+    const common = {revision:state.revision,accountId:user?.id || null,location:"Midrand",locations:["Midrand","Tembisa","Centurion"],role:user?.role || "customer",customerTab:"discover",merchantTab:"orders",adminTab:"overview",selectedMerchantId:null,search:"",cart:[],favourites:[],customerDetails:{firstName:"",lastName:"",phone:"",email:user?.email || ""},events:[],applications:[],supportCases:[],orders:[],merchantId:user?.merchantId || ""};
     if (user?.role === "admin") return {...common,...structuredClone(state),role:"admin",merchantId:state.merchants[0]?.id || ""};
     if (user?.role === "merchant") return {...common,merchants:structuredClone(state.merchants.filter(m => m.id === user.merchantId)),orders:structuredClone(state.orders.filter(o => o.merchantId === user.merchantId)),supportCases:structuredClone(state.supportCases.filter(c => c.merchantId === user.merchantId))};
     const profile = state.profiles[user?.id] || {};
-    return {...common,merchants:state.merchants.filter(m => m.listingStatus === "active").map(m => ({...publicMerchant(m),feedbackSummary:merchantExperience(state,m.id)})),orders:user ? structuredClone(state.orders.filter(o => o.customerId === user.id)) : [],favourites:profile.favourites || [],customerDetails:profile.customerDetails || common.customerDetails};
+    const savedDetails = profile.customerDetails || {};
+    const customerDetails = {firstName:savedDetails.firstName || "",lastName:savedDetails.lastName || "",phone:savedDetails.phone || "",email:user?.email || savedDetails.email || ""};
+    return {...common,merchants:state.merchants.filter(m => m.listingStatus === "active").map(m => ({...publicMerchant(m),feedbackSummary:merchantExperience(state,m.id)})),orders:user ? structuredClone(state.orders.filter(o => o.customerId === user.id)) : [],favourites:profile.favourites || [],customerDetails,profileComplete:Boolean(customerDetails.firstName && customerDetails.lastName && customerDetails.phone && customerDetails.email),notifications:(profile.notifications || []).slice(0,50)};
   };
   const snapshot = async user => {
     if (storage) { await queue; normalize(await storage.read()); }
@@ -146,15 +148,33 @@ export function createStateRepository({dataDir,storage} = {}) {
           if (openMine.some(o => o.merchantId === payload.merchantId)) throw new Error("You already have an open order at this spot.");
           if (mine.filter(o => Date.now() - Date.parse(o.createdIso) < 3600000).length >= ORDER_LIMITS.perCustomerPerHour) throw new Error("Too many orders in the last hour. Try again later.");
           if (state.orders.filter(o => o.merchantId === payload.merchantId && OPEN.has(o.status)).length >= ORDER_LIMITS.openPerMerchant) throw new Error("This spot is very busy right now. Try again shortly.");
-          const order = buildPickupOrder(payload.details,merchant,payload.cart);
+          const existingProfile = state.profiles[user.id] || {};
+          const saved = existingProfile.customerDetails || {};
+          const legacy = payload.details || {};
+          const details = {firstName:clean(saved.firstName || legacy.firstName).slice(0,80),lastName:clean(saved.lastName || legacy.lastName).slice(0,80),phone:clean(saved.phone || legacy.phone).slice(0,30),email:clean(user.email || saved.email || legacy.email).slice(0,254)};
+          if (!details.firstName || !details.lastName || details.phone.replace(/\D/g, "").length < 7 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(details.email)) throw new Error("Complete your account details before ordering.");
+          const order = buildPickupOrder(details,merchant,payload.cart);
           order.customerId = user.id;
           order.requestId = payload.requestId;
           state.orders.unshift(order);
-          state.profiles[user.id] = {...(state.profiles[user.id] || {}),customerDetails:order.customerDetails};
+          state.profiles[user.id] = {...existingProfile,customerDetails:details};
           s.log(type,{orderId:order.id,merchantId:merchant.id,customerId:user.id}); break;
         }
         case "order_status_changed":
-          ownOrder(payload.orderId); transitionOrder(s,payload.orderId,payload.status,payload.reason); break;
+          {
+          const order = ownOrder(payload.orderId);
+          const before = order.status;
+          transitionOrder(s,payload.orderId,payload.status,payload.reason);
+          if (before !== "ready" && order.status === "ready" && order.customerId) {
+            const profile = state.profiles[order.customerId] ||= {};
+            profile.notifications ||= [];
+            if (!profile.notifications.some(n => n.orderId === order.id && n.type === "order_ready")) {
+              profile.notifications.unshift({id:`ready-${order.id}`,type:"order_ready",orderId:order.id,merchantId:order.merchantId,message:"Your order is ready for collection.",createdAt:new Date().toISOString(),readAt:null});
+              profile.notifications = profile.notifications.slice(0,50);
+            }
+          }
+          break;
+        }
         case "order_cancelled_by_customer": {
           if (user.role !== "customer" || !state.orders.some(o => o.id === payload.orderId && o.customerId === user.id)) throw new Error("Order unavailable.");
           cancelOwnOrder(s,payload.orderId); break;
@@ -180,11 +200,23 @@ export function createStateRepository({dataDir,storage} = {}) {
           saved.has(payload.merchantId) ? saved.delete(payload.merchantId) : saved.add(payload.merchantId);
           profile.favourites = [...saved]; break;
         }
+        case "notification_read": {
+          if (user.role !== "customer") throw new Error("Customer access required.");
+          const profile = state.profiles[user.id] ||= {};
+          const notification = (profile.notifications || []).find(n => n.id === payload.id);
+          if (!notification) throw new Error("Notification unavailable.");
+          notification.readAt ||= new Date().toISOString();
+          break;
+        }
         case "customer_details_saved": {
           if (user.role !== "customer") throw new Error("Customer access required.");
           const details = payload.fields || {};
-          if (!clean(details.firstName) || !clean(details.phone) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean(details.email))) throw new Error("Check your contact details.");
-          state.profiles[user.id] = {...(state.profiles[user.id] || {}),customerDetails:{firstName:clean(details.firstName).slice(0,80),lastName:clean(details.lastName).slice(0,80),phone:clean(details.phone).slice(0,30),email:clean(details.email).slice(0,254)}}; break;
+          const firstName = clean(details.firstName).slice(0,80);
+          const lastName = clean(details.lastName).slice(0,80);
+          const phone = clean(details.phone).slice(0,30);
+          const email = clean(user.email || details.email).slice(0,254);
+          if (!firstName || !lastName || phone.replace(/\D/g, "").length < 7 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Check your contact details.");
+          state.profiles[user.id] = {...(state.profiles[user.id] || {}),customerDetails:{firstName,lastName,phone,email}}; break;
         }
         default: throw new Error("Unsupported action.");
       }

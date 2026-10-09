@@ -80,7 +80,6 @@ export function createFirebaseIdentity({adminAuth, dataDir, roleStorage, adminUi
   const claimMerchant = (actor,code) => mutate(async records => {
     if (!actor?.id || !validEmail(actor.email) || typeof code !== "string" || code.length > 128) throw new Error("Sign in with the invited email and enter the code.");
     if (actor.role !== "customer") throw new Error("Account already has access.");
-    if (!actor.emailVerified) throw new Error("Verify your email before activating merchant access.");
     const email = safeEmail(actor.email);
     const index = records.invites.findIndex(i => i.email === email && i.expires > now());
     const invite = records.invites[index];
@@ -92,6 +91,11 @@ export function createFirebaseIdentity({adminAuth, dataDir, roleStorage, adminUi
     records.invites.splice(index,1);
     return {claimed:true};
   });
+  const rolesForUids = async uids => {
+    const roles = await load();
+    return Object.fromEntries((uids || []).map(uid => [uid, uid === adminUid ? "admin" : roles.merchants[uid] ? "merchant" : "customer"]));
+  };
+  const roleForUid = async uid => (await rolesForUids([uid]))[uid];
   const resendVerification = actor => locked(async () => {
     if (!actor || actor.emailVerified) return {sent:false};
     const last = mailSent.get(actor.id) || 0;
@@ -101,5 +105,5 @@ export function createFirebaseIdentity({adminAuth, dataDir, roleStorage, adminUi
     mailSent.set(actor.id,now());
     return {sent:true};
   });
-  return {load,fromToken,exchange,inviteMerchant,claimMerchant,resendVerification,logout:() => {}};
+  return {load,fromToken,exchange,inviteMerchant,claimMerchant,resendVerification,roleForUid,rolesForUids,logout:() => {}};
 }

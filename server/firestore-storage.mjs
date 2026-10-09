@@ -19,8 +19,7 @@ const legacyCollection = "goodkota_pilot_private";
 const metaCollection = "goodkota_system";
 const metaDocument = "state";
 const rolesDocument = "roles";
-const canonical = value => JSON.stringify(value,(_key,item) => item && !Array.isArray(item) && typeof item === "object" ? Object.fromEntries(Object.entries(item).sort(([a],[b]) => a.localeCompare(b))) : item);
-const stableEventId = event => createHash("sha256").update(canonical(event)).digest("hex").slice(0,32);
+const stableEventId = event => createHash("sha256").update(JSON.stringify(event)).digest("hex").slice(0,32);
 const safeDocumentId = id => {
   const value = String(id);
   if (!value || value === "." || value === ".." || value.includes("/") || /[\x00-\x1f]/.test(value) || Buffer.byteLength(value,"utf8") > 1500) throw new Error("Invalid Firestore document ID.");

@@ -12,8 +12,8 @@ let store;
 let actor = null;
 let firebaseMode = false;
 let mailResendAvailable = false;
+let orderReadyEmailAvailable = false;
 let firebaseClient;
-let pendingCheckoutDetails = null;
 let refreshTimer;
 const app = document.querySelector("#app");
 const modal = document.querySelector("#modal");
@@ -41,7 +41,7 @@ function render() {
   locationButton.hidden = actor?.role === "merchant" || actor?.role === "admin";
   locationLabel.textContent = store.state.location;
   if (store.state.role === "merchant") renderMerchant();
-  else if (store.state.role === "admin") renderAdminWorkspace({store, app, modal, render, showToast, esc, money, directionsUrl, choiceText});
+  else if (store.state.role === "admin") renderAdminWorkspace({store, app, modal, render, showToast, esc, money, directionsUrl, choiceText, notificationCapabilities:{inApp:true,email:orderReadyEmailAvailable}});
   else renderCustomer();
   if (actor && !actor.emailVerified) {
     app.insertAdjacentHTML("afterbegin", `<section class="verification-banner" role="status"><div><strong>Verify your email</strong><p>Check ${esc(actor.email)} for a link. Open it before placing orders or managing a store.</p></div><button class="btn ghost small" type="button" data-resend-email>Resend link</button></section>`);
@@ -127,13 +127,29 @@ function renderCustomer() {
   }
   app.querySelector("#useMyLocation")?.addEventListener("click", useMyLocation);
   app.querySelector("#findKota")?.addEventListener("click", () => app.querySelector("#merchantGrid")?.scrollIntoView({ behavior: "smooth" }));
-  app.querySelector("#detailsForm")?.addEventListener("submit", event => {
+  app.querySelector("#detailsForm")?.addEventListener("submit", async event => {
     event.preventDefault();
-    if (!event.currentTarget.reportValidity()) return;
-    store.state.customerDetails = Object.fromEntries(new FormData(event.currentTarget));
-    store.log("customer_details_saved", {fields:store.state.customerDetails});
-    showToast("Details saved");
+    const form = event.currentTarget;
+    if (!form.reportValidity()) return;
+    const fields = Object.fromEntries(new FormData(form));
+    const button = form.querySelector('[type="submit"]');
+    button.disabled = true;
+    const result = await store.log("customer_details_saved", {fields});
+    if (result?.ok) showToast("Details saved");
+    else button.disabled = false;
   });
+  app.querySelector("#enableDeviceAlerts")?.addEventListener("click", async () => {
+    try {
+      const permission = await Notification.requestPermission();
+      showToast(permission === "granted" ? "Device alerts enabled" : "Device alerts remain off");
+      render();
+    } catch { showToast("Device alerts are not available in this browser"); }
+  });
+  app.querySelectorAll("[data-read-notification]").forEach(button => button.addEventListener("click", async () => {
+    button.disabled = true;
+    const result = await store.log("notification_read", {id:button.dataset.readNotification});
+    if (!result?.ok) button.disabled = false;
+  }));
   app.querySelector("#merchantApplication")?.addEventListener("click", openMerchantApplication);
   app.querySelectorAll("[data-cancel-own-order]").forEach(button => button.addEventListener("click", async () => {
     if (!confirm("Cancel this order?")) return;
@@ -143,11 +159,6 @@ function renderCustomer() {
   }));
   app.querySelectorAll("[data-rate-order]").forEach(button => button.addEventListener("click", () => openExperience(button.dataset.rateOrder)));
 
-  app.querySelectorAll("[data-filter]").forEach(button => button.addEventListener("click", () => {
-    store.state.filter = button.dataset.filter;
-    store.save();
-    render();
-  }));
 }
 
 function discoverView() {
@@ -158,7 +169,7 @@ function discoverView() {
         <h1>Good kota.<br>Near you.</h1>
         <p>Find the kota worth eating, close to where you are.</p>
         <label class="searchbar">
-          <input id="discoverSearch" type="search" placeholder="Search kota, chicken, russian or area" autocomplete="off" />
+          <input id="discoverSearch" type="search" placeholder="Search kota spots, menu items or areas" autocomplete="off" />
           <button class="btn primary" type="button" id="findKota">Find kota</button>
           <button class="btn light" type="button" id="useMyLocation">${store.state.userPos ? "Location on ✓" : "Use my location"}</button>
         </label>
@@ -167,10 +178,7 @@ function discoverView() {
 
     <section class="section">
       <div class="section-head">
-        <div><h2>Where the good kota is</h2><p>Start around ${esc(store.state.location)}. Choose the food you feel like.</p></div>
-        <div class="filter-row">
-          ${["All","Under R60","Chicken","Russian","Customisable"].map(filter => `<button class="chip ${store.state.filter === filter ? "active" : ""}" data-filter="${filter}">${filter}</button>`).join("")}
-        </div>
+        <div><h2>Where the good kota is</h2><p>Start around ${esc(store.state.location)}. Search by spot, menu item or area.</p></div>
       </div>
       <div class="merchant-grid" id="merchantGrid">${merchantCards(filteredMerchants())}</div>
     </section>`;
@@ -196,13 +204,11 @@ function useMyLocation() {
 
 function filteredMerchants() {
   const q = store.state.search.trim().toLowerCase();
-  const filter = store.state.filter;
   const near = m => m.area.toLowerCase().includes(store.state.location.toLowerCase()) ? 0 : 1;
   const products = m => m.menu.filter(item => item.available);
   return store.state.merchants
     .filter(m => m.listingStatus === "active")
     .filter(m => !q || `${m.name} ${m.area} ${m.tags.join(" ")} ${products(m).map(item => `${item.name} ${item.desc} ${choicesFor(item).filter(choice => choice.available !== false).map(choice => choice.name).join(" ")}`).join(" ")}`.toLowerCase().includes(q))
-    .filter(m => filter === "All" || products(m).some(item => filter === "Under R60" ? item.price <= 6000 : filter === "Customisable" ? choicesFor(item).some(choice => choice.available !== false) : `${item.name} ${item.desc}`.toLowerCase().includes(filter.toLowerCase())))
     .sort((a,b) => store.state.userPos
       ? Number(canOrder(b)) - Number(canOrder(a)) || (distanceTo(store.state.userPos,a) ?? Infinity) - (distanceTo(store.state.userPos,b) ?? Infinity)
       : near(a) - near(b) || Number(canOrder(b)) - Number(canOrder(a)));
@@ -300,23 +306,28 @@ function openExperience(orderId) {
 
 function accountView() {
   if (!actor) return `<div class="page-title"><div class="eyebrow">Your GoodKota</div><h1>Make it yours</h1></div><section class="panel account-panel"><p>Explore kota spots freely. Sign in when you are ready to order, save spots or view your pickups.</p><button class="btn primary" type="button" id="guestSignIn">Sign in or create account</button></section>`;
-  const details = store.state.customerDetails;
-  return `<div class="page-title"><div class="eyebrow">Account</div><h1>Your details</h1></div><section class="panel account-panel"><form id="detailsForm" class="checkout-fields">
-    <label>First name<input name="firstName" autocomplete="given-name" required value="${esc(details.firstName)}"></label>
-    <label>Last name<input name="lastName" autocomplete="family-name" value="${esc(details.lastName)}"></label>
-    <label>Mobile number<input name="phone" type="tel" inputmode="tel" autocomplete="tel" required value="${esc(details.phone)}"></label>
-    <label>Email address<input name="email" type="email" autocomplete="email" required value="${esc(details.email)}"></label>
+  const details = store.state.customerDetails || {};
+  const notices = (store.state.notifications || []);
+  const unread = notices.filter(n => !n.readAt).length;
+  const deviceAlerts = typeof Notification !== "undefined" ? Notification.permission : "unsupported";
+  const notificationPanel = `<section class="panel account-panel section"><div class="section-head"><div><h2>Order alerts ${unread ? `(${unread} new)` : ""}</h2><p>Ready updates are saved here automatically.${orderReadyEmailAvailable ? " Email ready alerts are also active." : ""}</p></div>${deviceAlerts === "granted" ? `<span class="badge green">Device alerts on</span>` : deviceAlerts !== "unsupported" ? `<button class="btn ghost small" type="button" id="enableDeviceAlerts">Enable device alerts</button>` : ""}</div>${deviceAlerts !== "unsupported" && deviceAlerts !== "granted" ? `<p class="muted">Device alerts work while GoodKota is open in your browser. Your in-app notification history is retained either way.</p>` : ""}${notices.length ? notices.map(n => `<div class="list-row"><div><strong>${esc(n.message)}</strong><p>${esc(n.orderId)} · ${new Date(n.createdAt).toLocaleString("en-ZA", {dateStyle:"medium",timeStyle:"short"})}</p></div>${n.readAt ? `<span class="badge">Read</span>` : `<button class="btn ghost small" data-read-notification="${esc(n.id)}">Mark read</button>`}</div>`).join("") : `<p class="muted">No order alerts yet.</p>`}</section>`;
+  return `<div class="page-title"><div class="eyebrow">Account</div><h1>Your details</h1><p>Saved once and reused for future pickup orders.</p></div><section class="panel account-panel"><form id="detailsForm" class="checkout-fields">
+    <label>First name<input name="firstName" autocomplete="given-name" required maxlength="80" value="${esc(details.firstName)}"></label>
+    <label>Last name<input name="lastName" autocomplete="family-name" required maxlength="80" value="${esc(details.lastName)}"></label>
+    <label>Mobile number<input name="phone" type="tel" inputmode="tel" autocomplete="tel" required maxlength="30" value="${esc(details.phone)}"></label>
+    <label>Email address<input name="email" type="email" autocomplete="email" readonly value="${esc(actor.email || details.email)}"><small class="muted">Your sign-in email is used for order communication.</small></label>
     <button class="btn primary" type="submit">Save details</button>
-  </form></section><section class="panel account-panel section"><h2>Own a kota spot?</h2><p class="muted">Tell us about your business and where customers can collect. Once approved, we will guide you through setting up your own PayFast account.</p><button class="btn ghost" id="merchantApplication">Apply to list your spot</button></section>`;
+  </form></section>${notificationPanel}<section class="panel account-panel section"><h2>Own a kota spot?</h2><p class="muted">Tell us about your business and where customers can collect. Once approved, we will guide you through setting up your own PayFast account.</p><button class="btn ghost" id="merchantApplication">Apply to list your spot</button></section>`;
 }
 
 function openMerchantApplication() {
   if (!actor) { openAccess(); return; }
+  const details = store.state.customerDetails || {};
   modal.innerHTML = `<form class="modal-body editor-form" id="applyForm"><div class="modal-head"><div><div class="eyebrow">GoodKota merchants</div><h2>List your kota spot</h2></div><button class="modal-close" type="button" data-close aria-label="Close">×</button></div>
-    <div class="editor-pair"><label>Trading name<input name="businessName" required maxlength="80"></label><label>Area<input name="area" required maxlength="80"></label></div>
+    <div class="editor-pair"><label>Trading name<input name="businessName" required maxlength="80"></label><label>Area<input name="area" required maxlength="80" value="${esc(store.state.location || "")}"></label></div>
     <label>Pickup address<input name="address" required autocomplete="street-address" placeholder="Street address customers can navigate to"></label>
-    <div class="editor-pair"><label>Contact name<input name="contactName" required autocomplete="name"></label><label>Mobile number<input name="phone" type="tel" required autocomplete="tel"></label></div>
-    <label>Email<input name="email" type="email" required autocomplete="email"></label><label>About your spot<textarea name="note" rows="3" placeholder="What makes your kota special?"></textarea></label>
+    <div class="editor-pair"><label>Contact name<input name="contactName" required autocomplete="name" value="${esc([details.firstName,details.lastName].filter(Boolean).join(" "))}"></label><label>Mobile number<input name="phone" type="tel" required autocomplete="tel" value="${esc(details.phone || "")}"></label></div>
+    <label>Email<input name="email" type="email" required autocomplete="email" value="${esc(actor.email || details.email || "")}"></label><label>About your spot<textarea name="note" rows="3" placeholder="What makes your kota special?"></textarea></label>
     <p class="muted">Next: set up your menu and your own PayFast account. You can apply before you have an account.</p>
     <button class="btn primary" type="submit">Send application</button></form>`;
   modal.showModal();
@@ -333,7 +344,8 @@ function openMerchantApplication() {
 
 function customerNav() {
   const tabs = [["discover","⌂","Discover"],["saved","♡","Saved"],["orders","≡","Orders"],["account","●","Account"]];
-  return `<nav class="bottom-nav" aria-label="Customer navigation">${tabs.map(([id,icon,label]) => `<button class="${store.state.customerTab === id ? "active" : ""}" data-customer-tab="${id}"><span>${icon}</span>${label}</button>`).join("")}</nav>`;
+  const unread = (store.state.notifications || []).filter(item => !item.readAt).length;
+  return `<nav class="bottom-nav" aria-label="Customer navigation">${tabs.map(([id,icon,label]) => `<button class="${store.state.customerTab === id ? "active" : ""}" data-customer-tab="${id}"><span>${icon}</span>${label}${id === "account" && unread ? `<b class="nav-count" aria-label="${unread} unread order alerts">${unread > 9 ? "9+" : unread}</b>` : ""}</button>`).join("")}</nav>`;
 }
 
 function bottomCart(onMerchantDetail = false) {
@@ -396,10 +408,7 @@ function openCart() {
   const pickupMerchant = store.product(store.state.cart[0]?.productId)?.merchantId;
   const pickup = store.merchant(pickupMerchant);
   modal.innerHTML = `<div class="modal-body"><div class="modal-head"><div><div class="eyebrow">Pickup order</div><h2>Your cart</h2></div><button class="modal-close" data-close aria-label="Close cart">×</button></div><div class="cart-items">${lines || `<div class="empty">Your cart is empty.</div>`}</div>${store.state.cart.length ? `<div class="cart-total"><span>Total</span><span>${money(cartTotal())}</span></div><p class="pickup-detail">Collect from ${esc(pickup?.name || "the merchant")} · <a class="text-link" href="${directionsUrl(pickup)}" target="_blank" rel="noopener noreferrer">Get directions ↗</a></p><form id="checkoutForm" class="checkout-fields">
-    <label>First name<input name="firstName" autocomplete="given-name" required value="${esc(details.firstName)}"></label>
-    <label>Last name<input name="lastName" autocomplete="family-name" value="${esc(details.lastName)}"></label>
-    <label>Mobile number<input name="phone" type="tel" inputmode="tel" autocomplete="tel" required value="${esc(details.phone)}"></label>
-    <label>Email address<input name="email" type="email" autocomplete="email" required value="${esc(details.email)}"></label>
+    <div class="checkout-identity"><strong>${esc([details.firstName, details.lastName].filter(Boolean).join(" ") || "Your contact details")}</strong><p class="muted">${esc(details.phone || "Add your mobile number in Account")}</p><button type="button" class="btn ghost small" id="editCheckoutProfile">Edit in Account</button></div>
     <div class="payment-choice"><strong>Payment</strong><span>Pay on collection</span></div>
     <button class="btn primary checkout-submit" type="submit">Place pickup order</button>
   </form>` : ""}</div>`;
@@ -412,15 +421,18 @@ function openCart() {
     if (line.qty <= 0) store.state.cart.splice(Number(button.dataset.line), 1);
     store.save(); modal.close(); render(); openCart();
   }));
+  modal.querySelector("#editCheckoutProfile")?.addEventListener("click", () => { modal.close(); store.state.customerTab = "account"; render(); });
   modal.querySelector("#checkoutForm")?.addEventListener("submit", event => {
     event.preventDefault();
     if (!event.currentTarget.reportValidity()) return;
-    placeOrder(Object.fromEntries(new FormData(event.currentTarget)));
+    const saved = store.state.customerDetails || {};
+    if (!saved.firstName || !saved.lastName || !saved.phone || !saved.email) { modal.close(); store.state.customerTab = "account"; render(); showToast("Complete your account details before ordering"); return; }
+    placeOrder(saved);
   });
 }
 
 function placeOrder(details) {
-  if (!actor) { pendingCheckoutDetails = details; modal.close(); openAccess(); return; }
+  if (!actor) { modal.close(); openAccess(); return; }
   if (!store.state.cart.length) return;
   const product = store.product(store.state.cart[0].productId);
   const stale = store.state.cart.some(line => {
@@ -703,14 +715,10 @@ async function boot() {
     const capabilities = await capabilitiesResponse.json();
     firebaseMode = capabilities.provider === "firebase";
     mailResendAvailable = capabilities.resendAvailable === true;
+    orderReadyEmailAvailable = capabilities.orderReadyEmailAvailable === true;
     actor = (await sessionResponse.json()).user;
     store = new Store((await dataResponse.json()).state, actor, error => { if (error) showToast(error); if (error === "Sign in to continue.") boot(); else render(); });
     if (actor?.role === "customer" && guestCart.length) { store.state.cart = guestCart; store.save(); }
-    if (actor?.role === "customer" && pendingCheckoutDetails) {
-      store.state.customerDetails = pendingCheckoutDetails;
-      pendingCheckoutDetails = null;
-      resumeCart = store.state.cart.length > 0;
-    }
     accountButton.hidden = false;
   } catch {
     accountButton.hidden = true;
@@ -724,7 +732,7 @@ async function boot() {
 }
 
 async function refreshSharedState() {
-  if (!store || modal.open || document.visibilityState === "hidden" || ["INPUT","TEXTAREA","SELECT"].includes(document.activeElement?.tagName)) return;
+  if (!store || modal.open || ["INPUT","TEXTAREA","SELECT"].includes(document.activeElement?.tagName)) return;
   const current = store;
   await current.queue;
   try {
@@ -734,14 +742,31 @@ async function refreshSharedState() {
     if (snapshot.accountId !== (actor?.id || null)) { await boot(); showToast("Session ended. Sign in again to continue."); return; }
     if (snapshot.revision === current.state.revision) return;
     const newOrders = actor?.role === "merchant" && snapshot.orders.filter(o => o.status === "new" && !current.state.orders.some(previous => previous.id === o.id)).length;
+    const previousNotices = new Set((current.state.notifications || []).map(item => item.id));
+    const newNotices = actor?.role === "customer" ? (snapshot.notifications || []).filter(item => !previousNotices.has(item.id)) : [];
     current.sync(snapshot);
     if (newOrders) showToast(`${newOrders} new pickup order${newOrders === 1 ? "" : "s"}`);
+    if (newNotices.length) {
+      showToast(newNotices[0].message);
+      if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.visibilityState === "hidden" && "serviceWorker" in navigator) {
+        navigator.serviceWorker.ready.then(registration => registration.showNotification("GoodKota", {body:newNotices[0].message,tag:newNotices[0].id,data:{orderId:newNotices[0].orderId}})).catch(() => {});
+      }
+    }
   } catch { /* Keep the current view when the connection is briefly unavailable. */ }
+}
+
+async function saveProfileAfterRegistration(fields) {
+  try {
+    const response = await fetch("./api/actions",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"customer_details_saved",payload:{fields:{firstName:fields.firstName,lastName:fields.lastName,phone:fields.phone,email:fields.email}}})});
+    return response.ok;
+  } catch { return false; }
 }
 
 function openAccess(mode = "login") {
   const titles = {login:"Welcome back",register:"Create a customer account",claim:"Activate merchant access"};
-  modal.innerHTML = `<form class="modal-body editor-form" id="accessForm"><div class="modal-head"><div><div class="eyebrow">GoodKota account</div><h2>${titles[mode]}</h2></div><button type="button" class="modal-close" data-close aria-label="Close">×</button></div><label>Email<input name="email" type="email" autocomplete="email" required></label>${mode === "claim" ? `<label>Merchant invitation code<input name="code" autocomplete="off" required></label>` : ""}<label>Password<input name="password" type="password" autocomplete="${mode === "login" ? "current-password" : "new-password"}" minlength="12" required></label><button class="btn primary" type="submit">${mode === "login" ? "Sign in" : mode === "register" ? "Create account" : "Activate account"}</button>${firebaseMode && mode === "login" ? `<button class="link-button" type="button" id="resetPassword">Forgot password?</button>` : ""}<div class="action-row"><button class="link-button" type="button" data-auth-mode="login">Sign in</button><button class="link-button" type="button" data-auth-mode="register">Create customer account</button><button class="link-button" type="button" data-auth-mode="claim">Merchant invitation</button></div><p class="muted" id="authError" role="alert"></p></form>`;
+  const registrationFields = mode === "register" ? `<div class="editor-pair"><label>First name<input name="firstName" autocomplete="given-name" maxlength="80" required></label><label>Last name<input name="lastName" autocomplete="family-name" maxlength="80" required></label></div><label>Mobile number<input name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="30" required></label>` : "";
+  const alternate = mode === "login" ? `<div class="auth-switch"><span>New to GoodKota?</span><button class="btn ghost wide" type="button" data-auth-mode="register">Create an account</button><button class="link-button auth-tertiary" type="button" data-auth-mode="claim">Have a merchant invitation?</button></div>` : mode === "register" ? `<div class="auth-switch"><span>Already have an account?</span><button class="btn ghost wide" type="button" data-auth-mode="login">Sign in instead</button><button class="link-button auth-tertiary" type="button" data-auth-mode="claim">Activate merchant invitation</button></div>` : `<div class="auth-switch"><span>Not activating a merchant account?</span><button class="btn ghost wide" type="button" data-auth-mode="login">Sign in</button><button class="link-button auth-tertiary" type="button" data-auth-mode="register">Create customer account</button></div>`;
+  modal.innerHTML = `<form class="modal-body editor-form auth-form" id="accessForm"><div class="modal-head"><div><div class="eyebrow">GoodKota account</div><h2>${titles[mode]}</h2></div><button type="button" class="modal-close" data-close aria-label="Close">×</button></div>${registrationFields}<label>Email<input name="email" type="email" autocomplete="email" required></label>${mode === "claim" ? `<label>Merchant invitation code<input name="code" autocomplete="off" required></label>` : ""}<label>Password<input name="password" type="password" autocomplete="${mode === "login" ? "current-password" : "new-password"}" minlength="12" required></label>${firebaseMode && mode === "login" ? `<button class="link-button auth-forgot" type="button" id="resetPassword">Forgot password?</button>` : ""}<button class="btn primary wide" type="submit">${mode === "login" ? "Sign in" : mode === "register" ? "Create account" : "Activate account"}</button>${alternate}<p class="muted" id="authError" role="alert"></p></form>`;
   if (!modal.open) modal.showModal();
   modal.querySelector("[data-close]").addEventListener("click", () => modal.close());
   modal.querySelectorAll("[data-auth-mode]").forEach(button => button.addEventListener("click", () => openAccess(button.dataset.authMode)));
@@ -780,16 +805,20 @@ function openAccess(mode = "login") {
           const claim = await claimResponse.json();
           if (!claimResponse.ok) throw new Error(claim.error || "Invitation could not be claimed.");
         }
+        const profileSaved = mode !== "register" || await saveProfileAfterRegistration(fields);
         modal.close(); await boot();
-        if (mailPending) showToast("Account created. Verification email could not be sent; retry from your account.");
+        if (!profileSaved) showToast("Account created. Complete your details in Account before ordering.");
+        else if (mailPending) showToast("Account created. Verification email could not be sent; retry from your account.");
         return;
       }
       const response = await fetch(`./api/auth/${mode === "register" ? "register" : mode === "claim" ? "claim" : "login"}`, {method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify(Object.fromEntries(new FormData(form)))});
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Could not sign in.");
       if (result.next) { await openMfa(result.next); return; }
+      const profileSaved = mode !== "register" || await saveProfileAfterRegistration(Object.fromEntries(new FormData(form)));
       modal.close(); await boot();
-      if (result.mailPending) showToast("Account created. Email could not be sent; use Resend link.");
+      if (!profileSaved) showToast("Account created. Complete your details in Account before ordering.");
+      else if (result.mailPending) showToast("Account created. Email could not be sent; use Resend link.");
     } catch (error) { form.querySelector("#authError").textContent = error.message; submit.disabled = false; }
   });
 }

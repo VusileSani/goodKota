@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createVerificationMailer } from "../server/mail.mjs";
+import { createVerificationMailer, createOrderReadyMailer } from "../server/mail.mjs";
 
 const dataDir = await mkdtemp(join(tmpdir(),"goodkota-mail-test-"));
 try {
@@ -19,5 +19,11 @@ try {
   const body = JSON.parse(request.options.body);
   assert.equal(body.to[0],"nandi@example.test");
   assert(body.text.includes("https://goodkota.example/?verify="));
-  console.log("Verification email delivery adapters passed.");
+  const orderMail = createOrderReadyMailer({apiKey:"private-key",from:"GoodKota <orders@example.test>",fetchImpl:async (url,options) => { request = {url,options}; return {ok:true}; }});
+  await orderMail({to:"nandi@example.test",customerName:"Nandi Dube",orderId:"GK-1234",merchantName:"Kasi Bites",pickupAddress:"12 New Street"});
+  const orderBody = JSON.parse(request.options.body);
+  assert.equal(orderBody.to[0],"nandi@example.test");
+  assert.match(orderBody.subject,/GK-1234.*ready/i);
+  assert(orderBody.text.includes("12 New Street"));
+  console.log("Verification and order-ready email delivery adapters passed.");
 } finally { await rm(dataDir,{recursive:true,force:true}); }

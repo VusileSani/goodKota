@@ -5,7 +5,7 @@ import { extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { createAuth } from "./auth.mjs";
-import { createVerificationMailer, createLinkMailer } from "./mail.mjs";
+import { createVerificationMailer, createLinkMailer, createOrderReadyMailer } from "./mail.mjs";
 import { firebaseAdminAuth, firebaseAdminFirestore } from "./firebase-admin.mjs";
 import { createFirebaseIdentity } from "./firebase-auth.mjs";
 import { createStateRepository } from "./state.mjs";
@@ -52,17 +52,15 @@ export function createGoodKotaServer({
   cloudStorage,
   storageProvider = process.env.GOODKOTA_STORAGE || "local",
   adminUid = process.env.GOODKOTA_ADMIN_UID || "",
-  pilotUids = process.env.GOODKOTA_PILOT_UIDS || "",
   mailApiKey = process.env.RESEND_API_KEY || "",
   mailFrom = process.env.GOODKOTA_MAIL_FROM || "",
   devMail = process.env.GOODKOTA_DEV_MAIL === "1",
-  sendVerification
+  sendVerification,
+  sendOrderReady
 } = {}) {
   if (!["firebase","local"].includes(authProvider)) throw new Error("Unknown authentication provider.");
   if (!["local","firestore"].includes(storageProvider)) throw new Error("Unknown storage provider.");
   if (storageProvider === "firestore" && authProvider !== "firebase") throw new Error("Cloud storage requires Firebase authentication.");
-  const allowedPilotUids = new Set(String(pilotUids).split(",").map(uid => uid.trim()).filter(Boolean));
-  // An empty allowlist enables public verified-user registration; admin access still requires explicit UID and TOTP.
   if (authProvider === "local" && publicOrigin && !/^http:\/\/(127\.0\.0\.1|localhost|\[::1\])(?::\d+)?$/.test(publicOrigin)) throw new Error("Local account mode is only for loopback testing.");
   const payfastConfigured = Boolean(token && encryptionKey);
   if ((token || encryptionKey) && (!token || token.length < 32)) throw new Error("Set a random GOODKOTA_SETUP_TOKEN of at least 32 characters.");
@@ -72,8 +70,10 @@ export function createGoodKotaServer({
   if (storageProvider === "firestore" && payfastConfigured) throw new Error("Payfast key storage is not available in the cloud pilot.");
   const storage = storageProvider === "firestore" ? cloudStorage || createFirestoreStorage(firebaseAdminFirestore()) : null;
   const mailer = sendVerification || createVerificationMailer({apiKey:mailApiKey,from:mailFrom,publicOrigin,devMail,dataDir:authDir});
-  const auth = authProvider === "firebase" ? createFirebaseIdentity({adminAuth:firebaseAuth || firebaseAdminAuth(),dataDir:authDir,roleStorage:storage?.roles,adminUid,pilotUids:storage && allowedPilotUids.size ? allowedPilotUids : null,sendLink:createLinkMailer({apiKey:mailApiKey,from:mailFrom,devMail,dataDir:authDir})}) : createAuth({dataDir:authDir,adminEmail,adminPassword,sendVerification:mailer});
+  const auth = authProvider === "firebase" ? createFirebaseIdentity({adminAuth:firebaseAuth || firebaseAdminAuth(),dataDir:authDir,roleStorage:storage?.roles,adminUid,sendLink:createLinkMailer({apiKey:mailApiKey,from:mailFrom,devMail,dataDir:authDir})}) : createAuth({dataDir:authDir,adminEmail,adminPassword,sendVerification:mailer});
   const mailReady = Boolean(sendVerification || devMail || (mailApiKey && mailFrom && publicOrigin.startsWith("https://")));
+  const orderReadyMailer = sendOrderReady || (devMail || (mailApiKey && mailFrom) ? createOrderReadyMailer({apiKey:mailApiKey,from:mailFrom,devMail,dataDir:authDir}) : null);
+  const orderReadyEmailAvailable = Boolean(orderReadyMailer);
   const repository = createStateRepository({dataDir:stateDir,storage:storage?.state});
   const fileFor = storeId => {
     if (!/^[a-zA-Z0-9_-]{2,80}$/.test(storeId || "")) throw new Error("Choose a valid GoodKota store.");
@@ -120,6 +120,35 @@ export function createGoodKotaServer({
       } catch { json(response,503,{status:"unavailable"}); }
       return;
     }
+    if (path === "/api/admin/customers" && request.method === "GET") {
+      try {
+        const actor = await auth.fromToken(sessionToken);
+        if (!actor) { json(response,401,{error:"Sign in to continue."}); return; }
+        if (actor.role !== "admin") { json(response,403,{error:"Administrator access required."}); return; }
+        if (authProvider !== "firebase") { json(response,501,{error:"Customer directory requires Firebase Authentication."}); return; }
+        const pageToken = url.searchParams.get("pageToken") || undefined;
+        if (pageToken && (pageToken.length > 4096 || /[\x00-\x20\x7f]/.test(pageToken))) { json(response,400,{error:"Invalid page token."}); return; }
+        const result = await (firebaseAuth || firebaseAdminAuth()).listUsers(100,pageToken);
+        const adminState = await repository.snapshot(actor);
+        const roleMap = typeof auth.rolesForUids === "function" ? await auth.rolesForUids(result.users.map(user => user.uid)) : {};
+        const orderStats = new Map();
+        for (const order of adminState.orders || []) {
+          if (!order.customerId) continue;
+          const current = orderStats.get(order.customerId) || {count:0,lastOrderAt:null};
+          current.count += 1;
+          if (!current.lastOrderAt || String(order.createdIso || "") > current.lastOrderAt) current.lastOrderAt = order.createdIso || null;
+          orderStats.set(order.customerId,current);
+        }
+        const customers = result.users.map(u => {
+          const role = roleMap[u.uid] || (u.uid === adminUid ? "admin" : "customer");
+          const profile = adminState.profiles?.[u.uid]?.customerDetails || {};
+          const stats = role === "customer" ? orderStats.get(u.uid) || {count:0,lastOrderAt:null} : {count:0,lastOrderAt:null};
+          return {id:u.uid,email:u.email || "",role,emailVerified:u.emailVerified === true,disabled:u.disabled === true,createdAt:u.metadata?.creationTime || null,lastSignInAt:u.metadata?.lastSignInTime || null,firstName:profile.firstName || "",lastName:profile.lastName || "",phone:profile.phone || "",profileComplete:Boolean(profile.firstName && profile.lastName && profile.phone && u.email),orderCount:stats.count,lastOrderAt:stats.lastOrderAt};
+        });
+        json(response,200,{customers,nextPageToken:result.pageToken || null});
+      } catch (error) { logRequestError({requestId,path,error}); json(response,503,{error:"Customer directory temporarily unavailable.",requestId}); }
+      return;
+    }
     if (path === "/api/data" && request.method === "GET") {
       try { json(response, 200, {state:await repository.snapshot(await auth.fromToken(sessionToken))}); }
       catch { json(response, 500, {error:"Data unavailable."}); }
@@ -133,7 +162,23 @@ export function createGoodKotaServer({
       if (!user) { json(response, 401, {error:"Sign in to continue."}); return; }
       try {
         const input = await limitedJson(request, 65536);
-        json(response, 200, {state:await repository.apply(user,input.type,input.payload)});
+        const nextState = await repository.apply(user,input.type,input.payload);
+        let notificationDelivery = null;
+        if (input.type === "order_status_changed" && input.payload?.status === "ready") {
+          const order = nextState.orders.find(item => item.id === input.payload.orderId && item.status === "ready");
+          if (order) {
+            if (orderReadyMailer) {
+              try {
+                await orderReadyMailer({to:order.contact?.email,customerName:order.customer,orderId:order.id,merchantName:order.pickup?.name,pickupAddress:order.pickup?.address});
+                notificationDelivery = {channel:"email",status:"sent"};
+              } catch (deliveryError) {
+                notificationDelivery = {channel:"email",status:"failed"};
+                logRequestError({requestId,path:"/api/notifications/order-ready",error:deliveryError});
+              }
+            } else notificationDelivery = {channel:"email",status:"not_configured"};
+          }
+        }
+        json(response, 200, {state:nextState,notificationDelivery});
       } catch (error) {
         const failure = httpError(error);
         logRequestError({requestId,path,error});
@@ -148,7 +193,7 @@ export function createGoodKotaServer({
           json(response, 200, {user:await auth.fromToken(sessionToken)}); return;
         }
         if (path === "/api/auth/capabilities" && request.method === "GET") {
-          json(response,200,{provider:authProvider,resendAvailable:Boolean(devMail || (mailApiKey && mailFrom))}); return;
+          json(response,200,{provider:authProvider,resendAvailable:Boolean(devMail || (mailApiKey && mailFrom)),orderReadyEmailAvailable}); return;
         }
         if (path === "/api/auth/exchange" && request.method === "POST" && authProvider === "firebase") {
           const input = await limitedJson(request,10000);

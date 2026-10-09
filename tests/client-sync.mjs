@@ -9,7 +9,7 @@ import { saveMerchant } from "../js/core/operations.js";
 
 const dataDir = await mkdtemp(join(tmpdir(),"goodkota-client-test-"));
 const repo = createStateRepository({dataDir});
-const customer = {id:"c1",role:"customer",emailVerified:true};
+const customer = {id:"c1",role:"customer",email:"nandi@example.test",emailVerified:true};
 const merchant = {id:"u1",role:"merchant",emailVerified:true,merchantId:"m1"};
 globalThis.sessionStorage = {getItem() { return null; },setItem() {},removeItem() {}};
 let actingAs;
@@ -23,7 +23,7 @@ try {
   const customerStore = new Store(await repo.snapshot(customer),customer);
   const pickupMerchant = customerStore.merchant("m1");
   const cart = [{productId:"p1",name:"Classic Kota",unitPrice:4800,qty:1,choices:[]}];
-  const order = buildPickupOrder({firstName:"Nandi",phone:"0111111111",email:"nandi@example.test"},pickupMerchant,cart);
+  const order = buildPickupOrder({firstName:"Nandi",lastName:"Dube",phone:"0111111111",email:"nandi@example.test"},pickupMerchant,cart);
   customerStore.state.orders.unshift(order);
   assert.equal((await customerStore.log("pickup_order_created",{orderId:order.id,merchantId:"m1"})).ok,true);
   assert.equal(customerStore.state.orders[0].customerId,customer.id);

@@ -6,8 +6,8 @@ import { createStateRepository } from "../server/state.mjs";
 
 const dataDir = await mkdtemp(join(tmpdir(), "goodkota-state-test-"));
 const repo = createStateRepository({dataDir});
-const customer = {id:"customer-1",role:"customer",emailVerified:true};
-const otherCustomer = {id:"customer-2",role:"customer",emailVerified:true};
+const customer = {id:"customer-1",role:"customer",email:"nandi@example.test",emailVerified:true};
+const otherCustomer = {id:"customer-2",role:"customer",email:"other@example.test",emailVerified:true};
 const merchant = {id:"operator-1",role:"merchant",emailVerified:true,merchantId:"m1"};
 const otherMerchant = {id:"operator-2",role:"merchant",emailVerified:true,merchantId:"m2"};
 const admin = {id:"office-1",role:"admin",emailVerified:true};
@@ -20,7 +20,10 @@ try {
   await assert.rejects(() => repo.apply(customer,"merchant_availability_changed",{merchantId:"m1",online:false}), /not assigned/);
   await assert.rejects(() => repo.apply(otherMerchant,"merchant_availability_changed",{merchantId:"m1",online:false}), /not assigned/);
   const cart = [{productId:"p1",name:"Classic Kota",unitPrice:4800,qty:1,choices:[]}];
-  const pickup = {merchantId:"m1",requestId:"GK-0000000000000001",details:{firstName:"Nandi",lastName:"Dube",phone:"0111111111",email:"nandi@example.test"},cart};
+  await repo.apply(customer,"customer_details_saved",{fields:{firstName:"Nandi",lastName:"Dube",phone:"0111111111",email:"spoof@example.test"}});
+  const savedProfile = await repo.snapshot(customer);
+  assert.deepEqual(savedProfile.customerDetails,{firstName:"Nandi",lastName:"Dube",phone:"0111111111",email:"nandi@example.test"},"Authenticated email is canonical and profile is retained");
+  const pickup = {merchantId:"m1",requestId:"GK-0000000000000001",details:{firstName:"Wrong",lastName:"Person",phone:"0999999999",email:"wrong@example.test"},cart};
   await assert.rejects(() => repo.apply({...customer,emailVerified:false},"pickup_order_created",pickup), /Verify your email/);
   await repo.apply(customer,"pickup_order_created",pickup);
   await repo.apply(customer,"pickup_order_created",pickup);
@@ -28,6 +31,8 @@ try {
   const order = customerState.orders[0];
   assert.equal(customerState.orders.length,1,"Retrying a checkout request must not create another order");
   assert.equal(order.customerId,customer.id);
+  assert.equal(order.customer,"Nandi Dube","Checkout must use the retained profile, not submitted checkout identity");
+  assert.equal(order.contact.email,"nandi@example.test");
   assert.equal((await repo.snapshot(otherCustomer)).orders.length,0);
   assert.equal((await repo.snapshot(merchant)).orders[0].id,order.id);
   assert.equal((await repo.snapshot(otherMerchant)).orders.length,0);
@@ -35,6 +40,11 @@ try {
   await assert.rejects(() => repo.apply(otherMerchant,"order_status_changed",{orderId:order.id,status:"accepted"}), /unavailable/);
   await repo.apply(merchant,"order_status_changed",{orderId:order.id,status:"accepted"});
   await repo.apply(merchant,"order_status_changed",{orderId:order.id,status:"ready"});
+  const readyState = await repo.snapshot(customer);
+  assert.equal(readyState.notifications.length,1,"Ready status must create a retained customer notification");
+  assert.equal(readyState.notifications[0].orderId,order.id);
+  await repo.apply(customer,"notification_read",{id:readyState.notifications[0].id});
+  assert((await repo.snapshot(customer)).notifications[0].readAt,"Notification read state must persist");
   await repo.apply(merchant,"order_status_changed",{orderId:order.id,status:"completed"});
   await assert.rejects(() => repo.apply(otherCustomer,"order_experience_rated",{orderId:order.id,value:"amazing"}), /unavailable/);
   await repo.apply(customer,"order_experience_rated",{orderId:order.id,value:"amazing"});
@@ -43,8 +53,11 @@ try {
   await repo.apply(admin,"refund_review_updated",{orderId:order.id,status:"needs_info",note:"Send a receipt"});
   assert.equal((await repo.snapshot(merchant)).orders[0].refundReview.status,"needs_info");
   assert.equal((await repo.snapshot(admin)).orders[0].refundReview.adminNote,"Send a receipt");
-  if (process.platform !== "win32") assert.equal((await stat(join(dataDir,"state.json"))).mode & 0o777,0o600);
+  assert.equal((await stat(join(dataDir,"state.json"))).mode & 0o777,0o600);
   const reopened = createStateRepository({dataDir});
-  assert.equal((await reopened.snapshot(customer)).orders[0].id,order.id,"Orders should survive server restart");
+  const reopenedCustomer = await reopened.snapshot(customer);
+  assert.equal(reopenedCustomer.orders[0].id,order.id,"Orders should survive server restart");
+  assert.deepEqual(reopenedCustomer.customerDetails,{firstName:"Nandi",lastName:"Dube",phone:"0111111111",email:"nandi@example.test"},"Customer details should survive future logins/server restarts");
+  assert(reopenedCustomer.notifications[0].readAt,"Notification history/read state should survive server restart");
   console.log("Server actor isolation and shared order workflow passed.");
 } finally { await rm(dataDir,{recursive:true,force:true}); }

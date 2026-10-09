@@ -6,7 +6,7 @@ import { createStateRepository, ORDER_LIMITS } from "../server/state.mjs";
 
 const dir = await mkdtemp(join(tmpdir(),"goodkota-limits-"));
 const repo = createStateRepository({dataDir:dir});
-const customer = id => ({id,role:"customer",emailVerified:true});
+const customer = id => ({id,role:"customer",email:`${id}@example.test`,emailVerified:true});
 const merchantUser = {id:"mu",role:"merchant",emailVerified:true,merchantId:"m1"};
 const details = {firstName:"Nandi",lastName:"D",phone:"0111111111",email:"n@example.test"};
 const cartFor = (snap,mid,pid) => { const p = snap.merchants.find(m => m.id===mid).menu.find(i => i.id===pid); return [{productId:pid,name:p.name,unitPrice:p.price,qty:1,choices:[]}]; };

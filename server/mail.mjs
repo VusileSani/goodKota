@@ -42,3 +42,27 @@ export function createLinkMailer({apiKey = "",from = "",devMail = false,dataDir,
     if (!response.ok) throw new Error("Email could not be sent. Try again later.");
   };
 }
+
+export function createOrderReadyMailer({apiKey = "",from = "",devMail = false,dataDir,fetchImpl = fetch} = {}) {
+  return async ({to,customerName = "",orderId,merchantName = "",pickupAddress = ""} = {}) => {
+    const email = String(to || "").trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Order notification email is invalid.");
+    const subject = `Your GoodKota order ${orderId || ""} is ready`.trim();
+    const greeting = customerName ? `Hi ${customerName},` : "Hi,";
+    const pickup = merchantName ? `Your order from ${merchantName} is ready for collection.` : "Your GoodKota order is ready for collection.";
+    const address = pickupAddress ? `\nPickup: ${pickupAddress}` : "";
+    const text = `${greeting}\n\n${pickup}${address}\n\nOrder: ${orderId || "GoodKota order"}\n\nPlease collect it while it is fresh.`;
+    if (devMail) {
+      await mkdir(dataDir,{recursive:true,mode:0o700});
+      await appendFile(join(dataDir,"dev-mail.ndjson"),`${JSON.stringify({kind:"order_ready",to:email,subject,text,at:new Date().toISOString()})}\n`,{mode:0o600});
+      return {sent:true};
+    }
+    if (!apiKey || !from) throw new Error("Order notification email is not configured.");
+    let response;
+    try {
+      response = await fetchImpl("https://api.resend.com/emails",{method:"POST",headers:{Authorization:`Bearer ${apiKey}`,"Content-Type":"application/json"},body:JSON.stringify({from,to:[email],subject,text}),signal:AbortSignal.timeout(8000)});
+    } catch { throw new Error("Order notification email could not be sent."); }
+    if (!response.ok) throw new Error("Order notification email could not be sent.");
+    return {sent:true};
+  };
+}

@@ -30,8 +30,8 @@ const firestore = {
 const cloud = createFirestoreStorage(firestore);
 const repo1 = createStateRepository({storage:cloud.state});
 const repo2 = createStateRepository({storage:cloud.state});
-const customer = {id:"c1",role:"customer",emailVerified:true};
-const other = {id:"c2",role:"customer",emailVerified:true};
+const customer = {id:"c1",role:"customer",email:"customer@example.test",emailVerified:true};
+const other = {id:"c2",role:"customer",email:"other@example.test",emailVerified:true};
 const merchant = {id:"m2",role:"merchant",emailVerified:true,merchantId:"m1"};
 
 assert((await repo1.snapshot(null)).merchants.some(item => item.id === "m1"));

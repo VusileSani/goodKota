@@ -137,7 +137,6 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .page-title { margin: 8px 0 24px; }
 .page-title h1 { font-size: clamp(36px, 6vw, 60px); }
 
-.filter-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip, .badge {
   display: inline-flex;
   align-items: center;
@@ -571,8 +570,6 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid rgba(241,90,41
   .work-row-actions { flex-wrap: wrap; }
   .report-form label { flex: 1 1 130px; }
   .list-row { align-items: start; }
-  .filter-row { flex-wrap: nowrap; width: 100%; overflow-x: auto; padding: 2px 1px 8px; }
-  .filter-row .chip { flex: none; }
 }
 /* Account verification and admin recovery surfaces. */
 .verification-banner { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1rem 1.25rem; margin:1rem auto; max-width:1160px; border:1px solid #f4a34d; border-radius:18px; background:#fff3df; color:#292624; box-shadow:0 8px 24px #19191912; }
@@ -581,3 +578,14 @@ button:focus-visible, textarea:focus-visible { outline: 3px solid rgba(241,90,41
 .verification-banner button { white-space:nowrap; }
 .recovery-codes { background:#242424; color:#fff; padding:1.25rem; border-radius:14px; letter-spacing:.08em; line-height:1.8; user-select:all; }
 @media (max-width:600px) { .verification-banner { flex-direction:column; align-items:flex-start; margin:1rem; } }
+
+/* v23.4 authentication clarity, retained profiles and alert badges */
+.auth-form { gap: 14px; }
+.auth-form .wide { width: 100%; margin-top: 0; }
+.auth-forgot { justify-self: end; margin-top: -6px; }
+.auth-switch { display: grid; gap: 10px; margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--line); text-align: center; }
+.auth-switch > span { color: var(--muted); font-size: 13px; font-weight: 750; }
+.auth-tertiary { justify-self: center; }
+.checkout-fields input[readonly] { opacity: .82; cursor: not-allowed; }
+.bottom-nav button { position: relative; }
+.nav-count { position: absolute; top: 4px; left: calc(50% + 8px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; display: grid; place-items: center; background: var(--orange); color: white; font-size: 10px; line-height: 1; box-shadow: 0 0 0 2px var(--paper); }

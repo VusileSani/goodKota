@@ -1,4 +1,4 @@
-const UI_FIELDS = ["customerTab","merchantTab","adminTab","selectedMerchantId","search","filter","cart","location","adminOrderFilter","adminMerchantSearch","reportFrom","reportTo","reportMerchantId"];
+const UI_FIELDS = ["customerTab","merchantTab","adminTab","selectedMerchantId","search","cart","location","adminOrderFilter","adminMerchantSearch","reportFrom","reportTo","reportMerchantId"];
 
 export class Store {
   constructor(state, actor, onUpdate = () => {}) {
@@ -72,7 +72,9 @@ export class Store {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Could not save this change.");
       this.sync(result.state);
-      return {ok:true};
+      if (result.notificationDelivery?.status === "failed") this.onUpdate("Order marked ready. The in-app alert was saved, but the email alert failed.");
+      else if (result.notificationDelivery?.status === "not_configured") this.onUpdate("Order marked ready. The in-app alert was saved; email alerts are not configured.");
+      return {ok:true,notificationDelivery:result.notificationDelivery || null};
     }).catch(async error => {
       try {
         const response = await fetch("./api/data",{credentials:"same-origin"});

@@ -23,20 +23,15 @@ const people = new Map([
 ]);
 const decoded = uid => ({uid,auth_time:now,firebase:{}});
 const firebaseAuth = {verifyIdToken:async uid => decoded(uid),verifySessionCookie:async cookie => decoded(cookie.replace("cookie-","")),createSessionCookie:async uid => `cookie-${uid}`,getUser:async uid => people.get(uid)};
-const publicServer = createGoodKotaServer({storageProvider:"firestore",cloudStorage,firebaseAuth,publicOrigin:"https://goodkota.web.app"});
-await new Promise(resolve => publicServer.listen(0,"127.0.0.1",resolve));
-try {
-  const publicBase = `http://127.0.0.1:${publicServer.address().port}`;
-  const registration = await fetch(publicBase+"/api/auth/exchange",{method:"POST",headers:{"Content-Type":"application/json",Origin:"https://goodkota.web.app"},body:JSON.stringify({idToken:"c1"})});
-  assert.equal(registration.status,200,"A verified customer can enter when the pilot UID list is empty");
-} finally { await new Promise(resolve => publicServer.close(resolve)); }
-const server = createGoodKotaServer({storageProvider:"firestore",cloudStorage,firebaseAuth,pilotUids:"c1,a1",adminUid:"a1",publicOrigin:"https://goodkota.web.app"});
+const server = createGoodKotaServer({storageProvider:"firestore",cloudStorage,firebaseAuth,adminUid:"a1",publicOrigin:"https://goodkota.web.app"});
 await new Promise(resolve => server.listen(0,"127.0.0.1",resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
 const post = (path,body,headers={}) => fetch(base+path,{method:"POST",headers:{"Content-Type":"application/json",Origin:"https://goodkota.web.app",...headers},body:JSON.stringify(body)});
 try {
   assert.equal((await (await fetch(base+"/api/health")).json()).status,"ok");
-  assert.equal((await post("/api/auth/exchange",{idToken:"bad"})).status,403);
+  // Any verified Firebase customer may establish a customer session. Merchant/admin privileges remain role-gated.
+  const openCustomer = await post("/api/auth/exchange",{idToken:"bad"});
+  assert.equal(openCustomer.status,200);
   assert.equal((await (await post("/api/auth/exchange",{idToken:"a1"})).json()).next,"mfa_enroll");
   assert.equal((await post("/api/auth/exchange",{idToken:"c1"},{Origin:"https://evil.example"})).status,403);
   const login = await post("/api/auth/exchange",{idToken:"c1"});
@@ -49,5 +44,5 @@ try {
   assert.equal((await post("/api/actions",{type:"favourite_toggle",payload:{merchantId:"m1"}},{Cookie:cookie})).status,200);
   const after = await (await fetch(base+"/api/data",{headers:{Cookie:cookie}})).json();
   assert.deepEqual(after.state.favourites,["m1"]);
-  console.log("Cloud pilot HTTP, allowlist, session and state boundary passed.");
+  console.log("Cloud pilot HTTP, open customer registration, session and state boundary passed.");
 } finally { await new Promise(resolve => server.close(resolve)); }

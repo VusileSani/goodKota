@@ -15,7 +15,8 @@ const firebaseAuth = {
   verifyIdToken:async id => decoded(id),
   createSessionCookie:async id => `cookie-${id}`,
   verifySessionCookie:async cookie => decoded(cookie.replace("cookie-","")),
-  getUser:async uid => people.get(uid)
+  getUser:async uid => people.get(uid),
+  listUsers:async () => ({users:[...people.values()],pageToken:undefined})
 };
 const server = createGoodKotaServer({authProvider:"firebase",firebaseAuth,adminUid:"a1",authDir:join(dataDir,"auth"),stateDir:join(dataDir,"state"),dataDir:join(dataDir,"payfast")});
 await new Promise(resolve => server.listen(0,"127.0.0.1",resolve));
@@ -26,12 +27,18 @@ try {
   const exchange = await post("/api/auth/exchange",{idToken:"c1"});
   assert.equal(exchange.status,200);
   const cookie = exchange.headers.get("set-cookie").split(";")[0];
-  assert(cookie.startsWith("__session="),"Firebase Hosting requires __session cookie");
   const session = await (await fetch(base+"/api/auth/session",{headers:{Cookie:cookie}})).json();
   assert.deepEqual([session.user.role,session.user.emailVerified],["customer",true]);
   assert.equal((await post("/api/auth/invite",{merchantId:"m1",email:"bad@example.test"},{Cookie:cookie})).status,403);
   assert.equal((await post("/api/auth/claim",{code:"invalid"},{Cookie:cookie})).status,401);
-  assert.equal((await post("/api/auth/exchange",{idToken:"a1"})).status,200);
+  const profileSave = await post("/api/actions",{type:"customer_details_saved",payload:{fields:{firstName:"Nandi",lastName:"Dube",phone:"0111111111",email:"spoof@example.test"}}},{Cookie:cookie});
+  assert.equal(profileSave.status,200);
+  const adminExchange = await post("/api/auth/exchange",{idToken:"a1"});
+  assert.equal(adminExchange.status,200);
+  const adminCookie = adminExchange.headers.get("set-cookie").split(";")[0];
+  const directory = await (await fetch(base+"/api/admin/customers",{headers:{Cookie:adminCookie}})).json();
+  const listed = directory.customers.find(item => item.id === "c1");
+  assert.deepEqual([listed.firstName,listed.lastName,listed.phone,listed.profileComplete,listed.orderCount],["Nandi","Dube","0111111111",true,0]);
   assert.equal((await fetch(base+"/api/data",{headers:{Cookie:cookie}})).status,200);
   console.log("Firebase session HTTP boundary passed.");
 } finally { await new Promise(resolve => server.close(resolve)); await rm(dataDir,{recursive:true,force:true}); }

@@ -16,7 +16,7 @@ for (let index = 0; index < screens.length; index++) {
   const state = {
     ...structuredClone(seed), role, customerTab: role === "customer" ? tab : "discover",
     merchantTab: role === "merchant" ? tab : "orders", adminTab: role === "admin" ? tab : "overview",
-    merchantId: "m1", selectedMerchantId: null, search: "", filter: "All", cart: [],
+    merchantId: "m1", selectedMerchantId: null, search: "", cart: [],
     customerDetails: {firstName:"",lastName:"",phone:"",email:""}, events: []
   };
   if (role === "merchant" && tab === "menu") state.merchants[0].menu[0].price = 4850;
@@ -26,7 +26,7 @@ for (let index = 0; index < screens.length; index++) {
   const elements = {"#app":app, "#modal":passive, "#toast":{classList:{add(){},remove(){}}}, "#accountButton":{addEventListener(){}}, "#locationLabel":{}, "#locationButton":passive, "#brandHome":passive};
   globalThis.document = {querySelector(selector) { return elements[selector]; }};
   globalThis.sessionStorage = {getItem() { return null; }, setItem() {}, removeItem() {}};
-  globalThis.fetch = async url => ({ok:true,json:async () => url.includes("/auth/session") ? {user:{id:`smoke-${index}`,email:"test@example.test",emailVerified:true,role,merchantId:role === "merchant" ? "m1" : null}} : {state}});
+  globalThis.fetch = async url => ({ok:true,json:async () => url.includes("/auth/session") ? {user:{id:`smoke-${index}`,email:"test@example.test",emailVerified:true,role,merchantId:role === "merchant" ? "m1" : null}} : url.includes("/api/admin/customers") ? {customers:[],nextPageToken:null} : url.includes("/api/auth/capabilities") ? {provider:"firebase",resendAvailable:false,orderReadyEmailAvailable:false} : {state}});
   await import(`../js/app.js?smoke=${index}`);
   await new Promise(resolve => setImmediate(resolve));
   assert(app.innerHTML.includes(expected), `${role}/${tab} did not render ${expected}: ${app.innerHTML.slice(0,240)}`);
@@ -65,7 +65,7 @@ assert(historyModal.innerHTML.includes("Send for review") && historyModal.innerH
 for (const detail of [false, true]) {
   const state = {
     ...structuredClone(seed), role:"customer", customerTab:"discover", selectedMerchantId:detail ? "m1" : null,
-    search:"", filter:"All", merchantId:"m1", events:[], cart:[{productId:"p1", qty:2, name:"Classic Kota", unitPrice:4800, choices:[]}],
+    search:"", merchantId:"m1", events:[], cart:[{productId:"p1", qty:2, name:"Classic Kota", unitPrice:4800, choices:[]}],
     customerDetails:{firstName:"",lastName:"",phone:"",email:""}
   };
   state.merchants.forEach(merchant => { merchant.listingStatus = "active"; merchant.quality = {status:"healthy",note:""}; merchant.payfast = {status:"not_started",merchantId:"",reviewNote:""}; });

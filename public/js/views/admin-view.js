@@ -4,13 +4,13 @@ import { merchantExperience } from "../core/feedback.js";
 import { mountPayfastSetup } from "./payfast-setup.js";
 import { payfastAccount, reviewPayfastAccount } from "../core/payfast-onboarding.js";
 
-const tabs = ["overview", "applications", "merchants", "orders", "quality", "support", "reports", "payments", "activity"];
+const tabs = ["overview", "customers", "applications", "merchants", "orders", "quality", "support", "reports", "payments", "activity"];
 const date = value => value ? new Date(value).toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" }) : "—";
 const statusBadge = value => `<span class="badge ${value === "active" || value === "approved" || value === "resolved" || value === "completed" || value === "details_checked" ? "green" : value === "paused" || value === "declined" || value === "cancelled" || value === "intervention" || value === "needs_action" ? "red" : "amber"}">${value.replaceAll("_", " ")}</span>`;
 const row = (title, detail, badge, action) => `<div class="work-row"><div class="work-row-copy"><strong>${title}</strong><p>${detail}</p></div><div class="work-row-actions">${badge || ""}${action || ""}</div></div>`;
 const empty = text => `<div class="empty">${text}</div>`;
 
-export function renderAdminWorkspace({store, app, modal, render, showToast, esc, money, directionsUrl, choiceText}) {
+export function renderAdminWorkspace({store, app, modal, render, showToast, esc, money, directionsUrl, choiceText, notificationCapabilities = {inApp:true,email:false}}) {
   const state = store.state;
   const tab = tabs.includes(state.adminTab) ? state.adminTab : "overview";
   const pending = state.applications.filter(a => ["new", "review"].includes(a.status)).length;
@@ -44,9 +44,13 @@ export function renderAdminWorkspace({store, app, modal, render, showToast, esc,
       ${openCases ? row("Support cases", `${openCases} unresolved`, statusBadge("open"), `<button class="btn ghost small" data-admin-tab="support">View</button>`) : ""}
       ${lowFeedback ? row("Pickup experience", `${lowFeedback} spot(s) need quality review`, statusBadge("intervention"), `<button class="btn ghost small" data-admin-tab="quality">Review</button>`) : ""}
       ${paymentIntake ? row("PayFast account details", `${paymentIntake} merchant submission(s) to check`, statusBadge("submitted"), `<button class="btn ghost small" data-admin-tab="payments">Review</button>`) : ""}
-      ${!pending && !newOrders && !refundPending && !openCases && !lowFeedback && !paymentIntake ? empty("All clear for now.") : ""}</section>
+      ${!notificationCapabilities.email ? row("Customer Ready alerts", "In-app alerts are active. Transactional email delivery is not configured on the API.", `<span class="badge amber">In-app only</span>`, "") : ""}
+      ${!pending && !newOrders && !refundPending && !openCases && !lowFeedback && !paymentIntake && notificationCapabilities.email ? empty("All clear for now.") : ""}</section>
       <section class="panel"><h2>Recently changed</h2>${state.events.slice(-5).reverse().map(ev => row(e(ev.type.replaceAll("_", " ")), date(ev.at), "", "")).join("") || empty("Actions will appear here.")}</section></div>
     <section class="panel section account-panel"><h2>Merchant access</h2><p class="muted">Invite an approved store operator. The invitation code is shown once and expires after 72 hours.</p><form class="editor-form" id="inviteMerchantForm"><label>Store<select name="merchantId" required>${state.merchants.map(m => `<option value="${e(m.id)}">${e(m.name)}</option>`).join("")}</select></label><label>Operator email<input name="email" type="email" required autocomplete="email" placeholder="operator@example.com"></label><button class="btn primary" type="submit">Create merchant invitation</button></form></section>`;
+  const customers = () => `${heading("Accounts", "Customer directory", "Registered customers, their retained contact profile and recent account activity.")}
+    <div class="work-toolbar"><input type="search" id="customerSearch" placeholder="Search name, email, phone or user ID" aria-label="Search customers"><button class="btn ghost small" id="refreshCustomers">Refresh</button></div>
+    <section class="panel" id="customerRows"><p class="muted">Loading customer accounts…</p></section><p class="muted" id="customerDirectoryStatus"></p>`;
   const applications = () => `${heading("Intake", "Merchant applications", "Review details, approve a listing into setup, or decline with a reason.")}
     <div class="work-toolbar"><button class="btn primary small" id="newApplication">+ Add application</button></div>
     <section class="panel">${state.applications.map(a => row(e(a.businessName), `${e(a.area)} · ${e(a.contactName)} · ${date(a.createdAt)}${a.reviewReason ? ` · ${e(a.reviewReason)}` : ""}`, statusBadge(a.status), `<button class="btn ghost small" data-application="${e(a.id)}">${["new","review"].includes(a.status) ? "Review" : "Details"}</button>`)).join("") || empty("No applications yet. Merchants can apply from the customer account screen.")}</section>`;
@@ -80,8 +84,49 @@ export function renderAdminWorkspace({store, app, modal, render, showToast, esc,
       ${state.merchants.map(m => { const account = payfastAccount(m); return row(e(m.name), account.merchantId ? `${e(account.accountType)} · Merchant ID ${e(account.merchantId)}${account.reviewNote ? ` · ${e(account.reviewNote)}` : ""}` : "Open Merchant → Store to start the guided sign-up", statusBadge(account.status), account.merchantId ? `<button class="btn ghost small" data-payfast-review="${e(m.id)}">Review details</button>` : ""); }).join("") || empty("Approve a merchant to begin payment setup.")}
       <p class="muted">A details check keeps online checkout off. PayFast must verify the accounts and GoodKota must finish and test the split integration.</p></section>
     <div id="payfastSetup"></div>`;
-  const screens = {overview, applications, merchants, orders, quality, support, reports, payments, activity};
+  const screens = {overview, customers, applications, merchants, orders, quality, support, reports, payments, activity};
   app.innerHTML = `<nav class="work-tabs" aria-label="Management sections">${tabs.map(id => `<button class="${tab === id ? "active" : ""}" data-admin-tab="${id}">${id === "overview" ? "Overview" : id[0].toUpperCase() + id.slice(1)}${id === "applications" && pending ? `<small>${pending}</small>` : ""}</button>`).join("")}</nav>${screens[tab]()}`;
+  if (tab === "customers") {
+    const list = app.querySelector("#customerRows");
+    const status = app.querySelector("#customerDirectoryStatus");
+    const refresh = app.querySelector("#refreshCustomers");
+    let records = [];
+    const draw = () => {
+      const term = app.querySelector("#customerSearch")?.value.trim().toLowerCase() || "";
+      const matches = records.filter(u => u.role === "customer" && `${u.firstName} ${u.lastName} ${u.email} ${u.phone} ${u.id}`.toLowerCase().includes(term));
+      list.innerHTML = matches.map(u => {
+        const name = `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.email || "Unnamed customer";
+        const detail = `${e(u.email || "No email")} · ${e(u.phone || "No mobile saved")} · ${u.orderCount || 0} order(s) · Registered ${date(u.createdAt)} · Last sign-in ${date(u.lastSignInAt)}`;
+        const badges = `<span class="badge ${u.disabled ? "red" : u.emailVerified ? "green" : "amber"}">${u.disabled ? "Disabled" : u.emailVerified ? "Verified" : "Unverified"}</span> <span class="badge ${u.profileComplete ? "green" : "amber"}">${u.profileComplete ? "Profile complete" : "Profile incomplete"}</span>`;
+        return row(e(name), detail, badges, "");
+      }).join("") || empty(term ? "No customers match that search." : "No customer registrations yet.");
+    };
+    const loadAll = async () => {
+      records = [];
+      let nextPageToken = null;
+      let pages = 0;
+      refresh.disabled = true;
+      status.textContent = "Loading customer directory…";
+      try {
+        do {
+          const query = nextPageToken ? `?pageToken=${encodeURIComponent(nextPageToken)}` : "";
+          const response = await fetch(`./api/admin/customers${query}`, {credentials:"same-origin"});
+          if (!response.ok) throw new Error("Could not load customer accounts.");
+          const data = await response.json();
+          records.push(...data.customers);
+          nextPageToken = data.nextPageToken;
+          pages += 1;
+        } while (nextPageToken && pages < 10);
+        draw();
+        const customersLoaded = records.filter(item => item.role === "customer").length;
+        status.textContent = nextPageToken ? `${customersLoaded} customers loaded. Directory is capped at 1,000 accounts for this pilot.` : `${customersLoaded} customer${customersLoaded === 1 ? "" : "s"} loaded.`;
+      } catch (error) { list.textContent = error.message; status.textContent = ""; }
+      finally { refresh.disabled = false; }
+    };
+    app.querySelector("#customerSearch").addEventListener("input",draw);
+    refresh.addEventListener("click",loadAll);
+    loadAll();
+  }
   if (tab === "payments") mountPayfastSetup(app.querySelector("#payfastSetup"), {esc:e, showToast, merchants:state.merchants});
   app.querySelectorAll("[data-payfast-review]").forEach(button => button.addEventListener("click", () => {
     const merchant = store.merchant(button.dataset.payfastReview);
